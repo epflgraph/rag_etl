@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rag-etl"
+version = "0.1.0"
+description = "An ETL pipeline for preparing data for retrieval-augmented generation (RAG)."
+readme = "README.md"
+authors = [
+    { name = "Aitor Pérez Pérez", email = "aitor.perez@epfl.ch" },
+    { name = "Javier Lloret Pardo", email = "javier.lloretpardo@epfl.ch" }
+]
+license = { text = "MIT" }
+requires-python = ">=3.12"
+
+# optional: your runtime dependencies
+dependencies = [
+    "python-dotenv"
+#    "pandas",
+#    "requests",
+]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[project.optional-dependencies]
+dev = [
+#    "pytest",
+#    "black",
+#    "ruff",
+#    "mypy",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]

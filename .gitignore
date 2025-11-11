@@ -1,0 +1,14 @@
+# Python cache
+__pycache__/
+
+# Package installed in editing mode
+*.egg-info/
+
+# Pycharm project files
+.idea/
+
+# Config file
+.env
+
+# MACOS .DS_Store
+.DS_Store

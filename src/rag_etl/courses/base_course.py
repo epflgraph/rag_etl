@@ -78,9 +78,9 @@ class BaseCourse(ABC):
 
         resources: List[BaseResource] = []
         for extractor in self.extractors:
-            logging.debug(f"Running extractor: {extractor.__class__.__name__}")
+            logging.info(f"Running extractor: {extractor.__class__.__name__}")
             extracted = extractor.extract()
-            logging.debug(f"Extractor {extractor.__class__.__name__} returned {len(extracted)} resources")
+            logging.info(f"Extractor {extractor.__class__.__name__} returned {len(extracted)} resources")
             resources.extend(extracted)
 
         return resources
@@ -91,9 +91,9 @@ class BaseCourse(ABC):
         resources: List[BaseResource] = list(resources)
 
         for transformer in self.transformers:
-            logging.debug(f"Running transformer: {transformer.__class__.__name__} with {len(resources)} resources")
+            logging.info(f"Running transformer: {transformer.__class__.__name__} with {len(resources)} resources")
             resources = transformer.transform(resources)
-            logging.debug(f"Transformer {transformer.__class__.__name__} output {len(resources)} resources")
+            logging.info(f"Transformer {transformer.__class__.__name__} output {len(resources)} resources")
 
         return resources
 
@@ -101,7 +101,7 @@ class BaseCourse(ABC):
         """Persist resources using the loaders."""
 
         for loader in self.loaders:
-            logging.debug(f"Running loader: {loader.__class__.__name__} with {len(resources)} resources")
+            logging.info(f"Running loader: {loader.__class__.__name__} with {len(resources)} resources")
             loader.load(list(resources))
 
     ################################################################
@@ -120,14 +120,21 @@ class BaseCourse(ABC):
 
         logging.info(f"Starting pipeline for course {self.course_code}")
 
+        logging.info("#" * 64)
+
         # Extract
         resources = self.extract()
-        logging.info(f"Extracted {len(resources)} resources")
+
+        logging.info("#" * 64)
 
         # Transform
         resources = self.transform(resources)
-        logging.info(f"Transformed to {len(resources)} resources")
+
+        logging.info("#" * 64)
 
         # Load
         self.load(resources)
+
+        logging.info("#" * 64)
+
         logging.info(f"Finished pipeline for course {self.course_code}")

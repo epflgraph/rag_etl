@@ -3,8 +3,6 @@ from __future__ import annotations
 from typing import List, Tuple
 from pathlib import Path
 
-import logging
-
 from rag_etl.resources import MoodleResource
 from rag_etl.extractors import BaseExtractor
 
@@ -32,8 +30,6 @@ class MoodleExtractor(BaseExtractor):
             List[MoodleResource]: List of raw Resources.
         """
 
-        logging.debug(f"Extracting Moodle resources from {self.moodle_dump_path}")
-
         # Parse index file
         resources = parse_index(self.moodle_dump_path, self.allowed_href_prefixes)
 
@@ -53,7 +49,5 @@ class MoodleExtractor(BaseExtractor):
             )
             for resource in resources
         ]
-
-        logging.debug(f"Extracted {len(resources)} Moodle resources from {self.moodle_dump_path}")
 
         return resources

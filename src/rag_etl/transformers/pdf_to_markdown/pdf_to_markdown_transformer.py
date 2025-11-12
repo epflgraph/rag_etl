@@ -58,6 +58,4 @@ class PDFToMarkdownTransformer(BaseTransformer):
             )
             transformed_resources.append(new_resource)
 
-        logging.debug(f"Transformed {len(transformed_resources)} resources in total")
-
         return transformed_resources

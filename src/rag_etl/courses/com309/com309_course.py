@@ -13,7 +13,7 @@ from rag_etl.transformers import (
     SplitExercisesTransformer,
 )
 
-from rag_etl.loaders import BaseLoader, DummyLoader
+from rag_etl.loaders import BaseLoader, ContentMetadataLoader
 
 from rag_etl.courses.com309.com309_metadata_transformer import COM309MetadataTransformer
 
@@ -23,7 +23,19 @@ class COM309Course(BaseCourse):
     Course-specific pipeline for COM309.
     """
 
+    course_info = {
+        "course_title": "Introduction to quantum information processing",
+        "course_id": "COM-309",
+        "academic_course": "2025-2026",
+        "semester": 1,
+        "admin_info_link": "https://moodle.epfl.ch/course/COM-309",
+        "coursebook_link": "https://edu.epfl.ch/coursebook/en/introduction-to-quantum-information-processing-COM-309"
+    }
+
     moodle_dump_path = '/Users/hera/Documents/EPFL/2025/COM-309/moodle'
+
+    output_path = '/Users/hera/Documents/EPFL/2025/COM-309'
+
 
     pdf_to_markdown_type_subtypes = [
         ('exam', 'previous_year_exam'),
@@ -57,13 +69,13 @@ class COM309Course(BaseCourse):
     def loaders(self) -> List[BaseLoader]:
         """No loaders defined for this course."""
         return [
-            DummyLoader()
+            ContentMetadataLoader(output_path=self.output_path, course_info=self.course_info)
         ]
 
 
 if __name__ == '__main__':
     import sys
-    logging.basicConfig(level=logging.DEBUG, format='[%(levelname)s] [%(filename)s:%(lineno)d] %(message)s', handlers=[logging.StreamHandler(sys.stdout)])
+    logging.basicConfig(level=logging.INFO, format='[%(levelname)s] [%(filename)s:%(lineno)d] %(message)s', handlers=[logging.StreamHandler(sys.stdout)])
 
     course = BaseCourse.from_code('COM309')
     course.run()

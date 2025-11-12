@@ -10,15 +10,6 @@ from rag_etl.transformers import BaseTransformer
 
 class COM309MetadataTransformer(BaseTransformer):
 
-    course_metadata = {
-        "course_title": "Introduction to quantum information processing",
-        "course_id": "COM-309",
-        "academic_course": "2025-2026",
-        "semester": 1,
-        "admin_info_link": "https://moodle.epfl.ch/course/COM-309",
-        "coursebook_link": "https://edu.epfl.ch/coursebook/en/introduction-to-quantum-information-processing-COM-309"
-    }
-
     weeks = {
         '2025-09-10': 1,
         '2025-09-17': 2,
@@ -85,10 +76,7 @@ class COM309MetadataTransformer(BaseTransformer):
         return self.weeks.get(resource.date, None)
 
     def _infer_year(self, resource: BaseResource) -> Optional[str]:
-        if isinstance(resource, MoodleResource):
-            text = resource.section_text.lower()
-        else:
-            text = resource.title.lower()
+        text = resource.title.lower()
 
         years = re.findall(r'\b(1[0-9]{3}|2[0-9]{3})\b', text)
 

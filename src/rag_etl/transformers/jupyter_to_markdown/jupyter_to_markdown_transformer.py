@@ -40,9 +40,11 @@ class JupyterToMarkdownTransformer(BaseTransformer):
             md_path = ipynb_path.with_suffix('.md')
 
             # Only convert if not cached
-            if not md_path.exists():
+            cached = self.get_from_cache(ipynb_path, md_path)
+            if not cached:
                 logging.debug(f"Splitting {resource.path} into exercises")
                 convert_ipynb_to_md(ipynb_path, md_path)
+                self.set_to_cache(ipynb_path, md_path)
 
             # Build transformed resource and append it
             new_resource = resource.copy_with(

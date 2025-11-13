@@ -10,6 +10,8 @@ from rag_etl.resources import BaseResource
 
 from rag_etl.transformers.jupyter_to_markdown.utils import convert_ipynb_to_md
 
+import rag_etl.utils.mime_types as mt
+
 
 class JupyterToMarkdownTransformer(BaseTransformer):
     """
@@ -29,7 +31,7 @@ class JupyterToMarkdownTransformer(BaseTransformer):
 
         for resource in resources:
             # Skip if resource is not a Jupyter notebook
-            if resource.mime_type != "application/x-ipynb+json":
+            if resource.mime_type != mt.IPYNB:
                 transformed_resources.append(resource)
                 continue
 
@@ -45,7 +47,7 @@ class JupyterToMarkdownTransformer(BaseTransformer):
             # Build transformed resource and append it
             new_resource = resource.copy_with(
                 path=str(md_path),
-                mime_type="text/markdown",
+                mime_type=mt.MARKDOWN,
                 processing_method=None,
             )
             transformed_resources.append(new_resource)

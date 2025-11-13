@@ -10,6 +10,8 @@ from rag_etl.resources import BaseResource
 
 from rag_etl.transformers.split_exercises.utils import split_md_into_exercises
 
+import rag_etl.utils.mime_types as mt
+
 
 class SplitExercisesTransformer(BaseTransformer):
     """
@@ -36,7 +38,7 @@ class SplitExercisesTransformer(BaseTransformer):
                 continue
 
             # Skip if resource is not Markdown
-            if resource.mime_type != "text/markdown":
+            if resource.mime_type != mt.MARKDOWN:
                 transformed_resources.append(resource)
                 continue
 

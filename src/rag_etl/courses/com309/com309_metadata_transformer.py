@@ -7,6 +7,8 @@ from typing import Sequence, Tuple, Optional
 from rag_etl.resources import BaseResource, MoodleResource
 from rag_etl.transformers import BaseTransformer
 
+import rag_etl.utils.mime_types as mt
+
 
 class COM309MetadataTransformer(BaseTransformer):
 
@@ -163,7 +165,7 @@ class COM309MetadataTransformer(BaseTransformer):
         return False
 
     def _get_processing_method(self, resource: BaseResource) -> Optional[str]:
-        if resource.mime_type != 'application/pdf':
+        if resource.mime_type != mt.PDF:
             return None
 
         if (resource.type, resource.subtype) == ('theory', 'lecture_notes'):

@@ -17,6 +17,8 @@ from rag_etl.loaders import BaseLoader, ContentMetadataLoader
 
 from rag_etl.courses.com309.com309_metadata_transformer import COM309MetadataTransformer
 
+import rag_etl.utils.mime_types as mt
+
 
 class COM309Course(BaseCourse):
     """
@@ -59,7 +61,7 @@ class COM309Course(BaseCourse):
         """Single transformer that converts PDFs into Markdown text."""
         return [
             COM309MetadataTransformer(),
-            ExtractZipTransformer(mime_types=['application/pdf', 'application/x-ipynb+json']),
+            ExtractZipTransformer(mime_types=[mt.PDF, mt.IPYNB]),
             JupyterToMarkdownTransformer(),
             PDFToMarkdownTransformer(type_subtypes=self.pdf_to_markdown_type_subtypes),
             SplitExercisesTransformer(type_subtypes=self.split_exercises_type_subtypes),

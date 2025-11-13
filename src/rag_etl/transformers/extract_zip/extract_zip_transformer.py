@@ -6,12 +6,11 @@ from pathlib import Path
 import logging
 
 import zipfile
-import mimetypes
 
 from rag_etl.transformers import BaseTransformer
 from rag_etl.resources import BaseResource
 
-mimetypes.add_type("application/x-ipynb+json", ".ipynb")
+import rag_etl.utils.mime_types as mt
 
 
 def unzip_file(zip_path):
@@ -66,7 +65,7 @@ class ExtractZipTransformer(BaseTransformer):
 
         for resource in resources:
             # Skip if resource is not a zip file
-            if resource.mime_type != "application/zip":
+            if resource.mime_type != mt.ZIP:
                 transformed_resources.append(resource)
                 continue
 
@@ -77,7 +76,7 @@ class ExtractZipTransformer(BaseTransformer):
 
             # Iterate over extracted files and add new resources for each of them
             for extracted_file in iter_files(resource_folder):
-                mime_type, _ = mimetypes.guess_type(str(extracted_file))
+                mime_type = mt.guess_mime_type(str(extracted_file))
 
                 # Skip if mime type not in list
                 if mime_type not in self.mime_types:

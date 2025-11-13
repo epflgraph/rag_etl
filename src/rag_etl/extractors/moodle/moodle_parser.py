@@ -1,12 +1,9 @@
 from typing import List, Tuple
 from pathlib import Path
 
-import mimetypes
-
 from bs4 import BeautifulSoup
 
-
-mimetypes.add_type("application/x-ipynb+json", ".ipynb")
+import rag_etl.utils.mime_types as mt
 
 
 def parse_index(moodle_dump_path: Path, allowed_href_prefixes: Tuple[str]) -> List[dict]:
@@ -109,7 +106,6 @@ def resolve_resource(resource: dict, moodle_dump_path: Path) -> dict:
     resource['title'] = resource['title'].replace(f'({moodle_resource_type})', '').strip()
 
     # Guess resource mime type
-    mime_type, _ = mimetypes.guess_type(resource['path'])
-    resource['mime_type'] = mime_type
+    resource['mime_type'] = mt.guess_mime_type(resource['path'])
 
     return resource

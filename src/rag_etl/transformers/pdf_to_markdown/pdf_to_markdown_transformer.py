@@ -10,6 +10,8 @@ from rag_etl.resources import BaseResource
 
 from rag_etl.transformers.pdf_to_markdown.utils import convert_pdf_to_md
 
+import rag_etl.utils.mime_types as mt
+
 
 class PDFToMarkdownTransformer(BaseTransformer):
     """
@@ -37,7 +39,7 @@ class PDFToMarkdownTransformer(BaseTransformer):
                 continue
 
             # Skip if resource is not a PDF
-            if resource.mime_type != "application/pdf":
+            if resource.mime_type != mt.PDF:
                 transformed_resources.append(resource)
                 continue
 
@@ -53,7 +55,7 @@ class PDFToMarkdownTransformer(BaseTransformer):
             # Build transformed resource and append it
             new_resource = resource.copy_with(
                 path=str(md_path),
-                mime_type="text/markdown",
+                mime_type=mt.MARKDOWN,
                 processing_method=None,
             )
             transformed_resources.append(new_resource)

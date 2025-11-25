@@ -48,9 +48,11 @@ class PDFToMarkdownTransformer(BaseTransformer):
             md_path = pdf_path.with_suffix(".md")
 
             # Only convert if not cached
-            if not md_path.exists():
+            cached = self.get_from_cache(pdf_path, md_path)
+            if not cached:
                 logging.debug(f"Converting {resource.path} → {md_path.name}")
                 convert_pdf_to_md(pdf_path, md_path)
+                self.set_to_cache(pdf_path, md_path)
 
             # Build transformed resource and append it
             new_resource = resource.copy_with(

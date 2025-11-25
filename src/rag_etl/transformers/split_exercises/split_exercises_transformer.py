@@ -47,6 +47,13 @@ class SplitExercisesTransformer(BaseTransformer):
             exercises_path = md_path.parent / 'exercises'
 
             # Only split if not cached
+            cached = self.get_from_cache(md_path, exercises_path)
+            if not cached:
+                logging.debug(f"Splitting {resource.path} into exercises")
+                split_md_into_exercises(md_path, exercises_path)
+                self.set_to_cache(md_path, exercises_path)
+
+            # Only split if not cached
             if not exercises_path.exists():
                 logging.debug(f"Splitting {resource.path} into exercises")
                 split_md_into_exercises(md_path, exercises_path)

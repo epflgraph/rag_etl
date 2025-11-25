@@ -24,7 +24,7 @@ def _hash_file(path: Path) -> str:
 def get_from_cache(scope: str, key_path: str, value_path: str) -> bool:
     """
     Hashes the bytes of the file `key_path`, then looks it up in the cache for the given `scope`.
-    If it exists, it copies it to `value_path` and returns True.
+    If it exists, it copies the file or folder to `value_path` and returns True.
     Otherwise, it returns False.
     """
 
@@ -36,19 +36,41 @@ def get_from_cache(scope: str, key_path: str, value_path: str) -> bool:
     # Hash file
     hash = _hash_file(Path(key_path))
 
-    # If hash not in cache, return False
-    cached_file_path = scope_path / hash / Path(value_path).name
-    if not cached_file_path.exists():
+    # If hash folder not in cache, return False
+    cache_hash_path = scope_path / hash
+    if not cache_hash_path.exists():
         return False
 
-    # Copy file and return True
-    shutil.copyfile(cached_file_path, value_path)
-    return True
+    # Build paths
+    value_path = Path(value_path)
+    cache_resource_path = cache_hash_path / value_path.name
+
+    # If no resource in cache, return False
+    if not cache_resource_path.exists():
+        return False
+
+    # Copy file(s) from cache_path to value_path
+    if cache_resource_path.is_dir():
+        # Assuming value_path should be a folder. We create it and copy all files (non-recursive)
+        value_path.mkdir(parents=True, exist_ok=True)
+        for item in cache_resource_path.iterdir():
+            if item.is_file():
+                shutil.copyfile(item, value_path / item.name)
+
+        return True
+    elif cache_resource_path.is_file():
+        # Assuming value_path should be a file. Copy file (overwrite if already present)
+        value_path.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(cache_resource_path, value_path)
+
+        return True
+    else:
+        return False
 
 
 def set_to_cache(scope: str, key_path: str, value_path: str):
     """
-    Hashes the bytes of the file `key_path`, then copies the file `value_path` to
+    Hashes the bytes of the file `key_path`, then copies the file or folder `value_path` to
     the cache for the given `scope`, using the hash as key.
     """
 
@@ -59,9 +81,21 @@ def set_to_cache(scope: str, key_path: str, value_path: str):
     # Hash file
     hash = _hash_file(Path(key_path))
 
-    # Build file path and create parent folder if needed
-    cached_file_path = scope_path / hash / Path(value_path).name
-    cached_file_path.parent.mkdir(parents=True, exist_ok=True)
+    # Build cache hash path and create parent folder if needed
+    cache_hash_path = scope_path / hash
+    cache_hash_path.mkdir(parents=True, exist_ok=True)
 
-    # Copy file (overwrite if already present)
-    shutil.copyfile(value_path, cached_file_path)
+    # Build paths
+    value_path = Path(value_path)
+    cache_resource_path = cache_hash_path / value_path.name
+
+    # Copy file(s) from value_path to cache_path
+    if value_path.is_dir():
+        # Assuming cache_resource_path should be a folder. We create it and copy all files (non-recursive)
+        cache_resource_path.mkdir(parents=True, exist_ok=True)
+        for item in value_path.iterdir():
+            if item.is_file():
+                shutil.copyfile(item, cache_resource_path / item.name)
+    elif value_path.is_file():
+        # Assuming value_path should be a file. Copy file (overwrite if already present)
+        shutil.copyfile(value_path, cache_resource_path)

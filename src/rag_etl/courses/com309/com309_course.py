@@ -34,10 +34,10 @@ class COM309Course(BaseCourse):
         "coursebook_link": "https://edu.epfl.ch/coursebook/en/introduction-to-quantum-information-processing-COM-309"
     }
 
-    moodle_dump_path = '/Users/hera/Documents/EPFL/2025/COM-309/moodle'
+    moodle_course_id = 14587
+    moodle_base_path = '/Users/hera/Documents/EPFL/2025/COM-309/moodle'
 
     output_path = '/Users/hera/Documents/EPFL/2025/COM-309'
-
 
     pdf_to_markdown_type_subtypes = [
         ('exam', 'previous_year_exam'),
@@ -53,7 +53,7 @@ class COM309Course(BaseCourse):
     def extractors(self) -> List[BaseExtractor]:
         """Single Moodle extractor for COM309 course content."""
         return [
-            MoodleExtractor(moodle_dump_path=self.moodle_dump_path)
+            MoodleExtractor(moodle_course_id=self.moodle_course_id, moodle_base_path=self.moodle_base_path)
         ]
 
     @property
@@ -78,7 +78,7 @@ class COM309Course(BaseCourse):
 if __name__ == '__main__':
     import sys
     logging.basicConfig(
-        level=logging.DEBUG,
+        level=logging.INFO,
         format='[%(levelname)s] [%(filename)s:%(lineno)d] %(message)s',
         handlers=[logging.StreamHandler(sys.stdout)]
     )

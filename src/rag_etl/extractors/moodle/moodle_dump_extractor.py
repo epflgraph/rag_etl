@@ -6,7 +6,7 @@ from pathlib import Path
 from rag_etl.resources import MoodleResource
 from rag_etl.extractors import BaseExtractor
 
-from rag_etl.extractors.moodle.moodle_parser import parse_index, resolve_resource
+from rag_etl.extractors.moodle.moodle_dump_parser import parse_index, resolve_resource
 
 
 class MoodleDumpExtractor(BaseExtractor):

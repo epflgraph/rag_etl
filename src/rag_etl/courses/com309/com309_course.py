@@ -41,7 +41,7 @@ class COM309Course(BaseCourse):
     def transformers(self) -> List[BaseTransformer]:
         """Single transformer that converts PDFs into Markdown text."""
         return [
-            COM309MetadataTransformer(),
+            self.metadata_transformer,
             ExtractZipTransformer(mime_types=[mt.PDF, mt.IPYNB]),
             JupyterToMarkdownTransformer(),
             PDFToMarkdownTransformer(type_subtypes=self.metadata_transformer.pdf_to_markdown_type_subtypes),

@@ -12,6 +12,30 @@ import rag_etl.utils.mime_types as mt
 
 class COM309MetadataTransformer(BaseTransformer):
 
+    course_info = {
+        "course_title": "Introduction to quantum information processing",
+        "course_id": "COM-309",
+        "academic_course": "2025-2026",
+        "semester": 1,
+        "admin_info_link": "https://moodle.epfl.ch/course/COM-309",
+        "coursebook_link": "https://edu.epfl.ch/coursebook/en/introduction-to-quantum-information-processing-COM-309"
+    }
+
+    moodle_course_id = 14587
+    moodle_base_path = '/Users/hera/Documents/EPFL/2025/COM-309/moodle'
+
+    output_path = '/Users/hera/Documents/EPFL/2025/COM-309'
+
+    pdf_to_markdown_type_subtypes = [
+        ('exam', 'previous_year_exam'),
+        ('practice', 'homework'),
+    ]
+
+    split_exercises_type_subtypes = [
+        ('exam', 'previous_year_exam'),
+        ('practice', 'homework'),
+    ]
+
     weeks = {
         '2025-09-10': 1,
         '2025-09-17': 2,

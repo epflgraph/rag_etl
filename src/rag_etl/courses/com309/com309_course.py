@@ -25,35 +25,16 @@ class COM309Course(BaseCourse):
     Course-specific pipeline for COM309.
     """
 
-    course_info = {
-        "course_title": "Introduction to quantum information processing",
-        "course_id": "COM-309",
-        "academic_course": "2025-2026",
-        "semester": 1,
-        "admin_info_link": "https://moodle.epfl.ch/course/COM-309",
-        "coursebook_link": "https://edu.epfl.ch/coursebook/en/introduction-to-quantum-information-processing-COM-309"
-    }
-
-    moodle_course_id = 14587
-    moodle_base_path = '/Users/hera/Documents/EPFL/2025/COM-309/moodle'
-
-    output_path = '/Users/hera/Documents/EPFL/2025/COM-309'
-
-    pdf_to_markdown_type_subtypes = [
-        ('exam', 'previous_year_exam'),
-        ('practice', 'homework'),
-    ]
-
-    split_exercises_type_subtypes = [
-        ('exam', 'previous_year_exam'),
-        ('practice', 'homework'),
-    ]
+    metadata_transformer = COM309MetadataTransformer()
 
     @property
     def extractors(self) -> List[BaseExtractor]:
         """Single Moodle extractor for COM309 course content."""
         return [
-            MoodleExtractor(moodle_course_id=self.moodle_course_id, moodle_base_path=self.moodle_base_path)
+            MoodleExtractor(
+                moodle_course_id=self.metadata_transformer.moodle_course_id,
+                moodle_base_path=self.metadata_transformer.moodle_base_path
+            )
         ]
 
     @property
@@ -63,15 +44,18 @@ class COM309Course(BaseCourse):
             COM309MetadataTransformer(),
             ExtractZipTransformer(mime_types=[mt.PDF, mt.IPYNB]),
             JupyterToMarkdownTransformer(),
-            PDFToMarkdownTransformer(type_subtypes=self.pdf_to_markdown_type_subtypes),
-            SplitExercisesTransformer(type_subtypes=self.split_exercises_type_subtypes),
+            PDFToMarkdownTransformer(type_subtypes=self.metadata_transformer.pdf_to_markdown_type_subtypes),
+            SplitExercisesTransformer(type_subtypes=self.metadata_transformer.split_exercises_type_subtypes),
         ]
 
     @property
     def loaders(self) -> List[BaseLoader]:
         """No loaders defined for this course."""
         return [
-            ContentMetadataLoader(output_path=self.output_path, course_info=self.course_info)
+            ContentMetadataLoader(
+                output_path=self.metadata_transformer.output_path,
+                course_info=self.metadata_transformer.course_info
+            )
         ]
 
 

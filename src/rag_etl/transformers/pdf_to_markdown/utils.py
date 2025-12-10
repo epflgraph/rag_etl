@@ -9,6 +9,8 @@ from PIL import Image
 
 from rag_etl.utils.llms import send_llm_request
 
+from rag_etl.config import CONFIG
+
 
 def render_pdf_pages(pdf_path: str, dpi: Optional[int] = None) -> List[Image.Image]:
     """
@@ -144,7 +146,7 @@ def convert_page_pdf_to_md(pil_page):
     ]
 
     # Send LLM requests and store results
-    rcp_model = 'Qwen/Qwen2.5-VL-72B-Instruct'
+    rcp_model = CONFIG['RCP_VISION_MODEL']
     md_page = send_llm_request(rcp_model, messages).strip()
 
     return md_page
@@ -186,7 +188,7 @@ def stitch_md_pages(md_pages):
         {"role": "user", "content": user_prompt},
     ]
 
-    rcp_model = 'Qwen/Qwen3-30B-A3B-Instruct-2507'
+    rcp_model = CONFIG['RCP_BASE_MODEL']
     md_text = send_llm_request(rcp_model, messages).strip()
 
     return md_text

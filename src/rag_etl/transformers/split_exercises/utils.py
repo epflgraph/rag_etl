@@ -5,6 +5,8 @@ from pydantic import BaseModel, Field
 
 from rag_etl.utils.llms import send_llm_request
 
+from rag_etl.config import CONFIG
+
 
 def split_md_into_exercises(md_path, exercises_path):
     # Normalise to Paths
@@ -58,7 +60,7 @@ Split it into separate snippets (one per exercise) following the system instruct
         exercises: List[Exercise]
 
     # Call LLM to split into exercises
-    rcp_model = 'Qwen/Qwen3-30B-A3B-Instruct-2507'
+    rcp_model = CONFIG['RCP_BASE_MODEL']
     exercise_list = send_llm_request(rcp_model, messages, response_format=ExerciseList)
 
     # Exercises could be repeated (statement and solution). Make unique by number by prioritising the solution

@@ -8,14 +8,22 @@ from rag_etl.config import CONFIG
 
 
 def send_llm_request(model, messages, response_format=None):
+    # Send request
     rcp_client = OpenAI(base_url=CONFIG['RCP_BASE_URL'], api_key=CONFIG['RCP_API_KEY'])
+    response = rcp_client.chat.completions.create(model=model, messages=messages, response_format=response_format)
+    content = response.choices[0].message.content.strip()
 
+    # Strip thinking tokens
+    thinking_tag = '</think>'
+    if thinking_tag in response:
+        content = content.split(thinking_tag)[-1].strip()
+
+    # Return parsed result if structured output
     if response_format:
-        response = rcp_client.chat.completions.parse(model=model, messages=messages, response_format=response_format)
-        return response.choices[0].message.parsed
-    else:
-        response = rcp_client.chat.completions.create(model=model, messages=messages)
-        return response.choices[0].message.content.strip()
+        return response_format.model_validate_json(content)
+
+    # Return string otherwise
+    return content
 
 
 def generate_alt_text(path: str) -> str:
@@ -37,8 +45,7 @@ def generate_alt_text(path: str) -> str:
         {"type": "image_url", "image_url": {"url": data_url}}
     ]}]
 
-    rcp_model = 'Qwen/Qwen2.5-VL-72B-Instruct'
-
+    rcp_model = CONFIG['RCP_VISION_MODEL']
     message = send_llm_request(rcp_model, messages)
 
     return message

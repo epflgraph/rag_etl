@@ -3,7 +3,7 @@ from __future__ import annotations
 import logging
 from typing import List
 
-from rag_etl.courses.common import BaseCourse
+from rag_etl.courses import BaseCourse
 from rag_etl.extractors import BaseExtractor, MoodleExtractor
 from rag_etl.transformers import (
     BaseTransformer,
@@ -15,21 +15,21 @@ from rag_etl.transformers import (
 
 from rag_etl.loaders import BaseLoader, ContentMetadataLoader
 
-from rag_etl.courses.com309.com309_metadata_transformer import COM309MetadataTransformer
+from rag_etl.courses.ragtest.ragtest_metadata_transformer import RAGTESTMetadataTransformer
 
 import rag_etl.utils.mime_types as mt
 
 
-class COM309Course(BaseCourse):
+class RAGTESTCourse(BaseCourse):
     """
-    Course-specific pipeline for COM309.
+    Course-specific pipeline for RAGTEST.
     """
 
-    metadata_transformer = COM309MetadataTransformer()
+    metadata_transformer = RAGTESTMetadataTransformer()
 
     @property
     def extractors(self) -> List[BaseExtractor]:
-        """Single Moodle extractor for COM309 course content."""
+        """Single Moodle extractor."""
         return [
             MoodleExtractor(
                 moodle_course_id=self.metadata_transformer.moodle_course_id,
@@ -67,5 +67,5 @@ if __name__ == '__main__':
         handlers=[logging.StreamHandler(sys.stdout)]
     )
 
-    course = BaseCourse.from_code('COM309')
+    course = BaseCourse.from_code('RAGTEST')
     course.run()

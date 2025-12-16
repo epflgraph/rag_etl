@@ -42,7 +42,7 @@ class RAGTESTCourse(BaseCourse):
         """Single transformer that converts PDFs into Markdown text."""
         return [
             self.metadata_transformer,
-            ExtractZipTransformer(mime_types=[mt.PDF, mt.IPYNB]),
+            ExtractZipTransformer(),
             JupyterToMarkdownTransformer(),
             PDFToMarkdownTransformer(type_subtypes=self.metadata_transformer.pdf_to_markdown_type_subtypes),
             SplitExercisesTransformer(type_subtypes=self.metadata_transformer.split_exercises_type_subtypes),

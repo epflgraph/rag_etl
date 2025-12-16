@@ -144,14 +144,14 @@ def get_is_solution(resource: BaseResource) -> bool:
     return False
 
 
-def get_processing_method(resource: BaseResource) -> Optional[str]:
+def get_processing_method_model(resource: BaseResource) -> Tuple[Optional[str], Optional[str]]:
     if resource.mime_type != mt.PDF:
-        return None
+        return None, None
 
     if (resource.type, resource.subtype) == ('theory', 'polycopie'):
-        return 'google'
+        return 'google', None
 
-    return 'gemini'
+    return 'gemini', 'gemini-2.5-pro'
 
 
 def get_number(resource: BaseResource) -> Optional[str]:

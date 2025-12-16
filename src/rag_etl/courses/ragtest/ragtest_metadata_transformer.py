@@ -11,7 +11,7 @@ from rag_etl.courses.common.utils import (
     infer_year,
     get_type_subtype,
     get_is_solution,
-    get_processing_method,
+    get_processing_method_model,
     get_number,
     get_shifted_date,
     get_from,
@@ -132,7 +132,7 @@ class RAGTESTMetadataTransformer(BaseTransformer):
             resource.is_solution = self.get_is_solution(resource)
 
             # Infer processing method
-            resource.processing_method = get_processing_method(resource)
+            resource.processing_method, resource.model = get_processing_method_model(resource)
 
             # Infer number
             resource.number = get_number(resource)

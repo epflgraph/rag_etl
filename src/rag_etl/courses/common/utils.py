@@ -168,6 +168,20 @@ def get_processing_method_model(resource: BaseResource) -> Tuple[Optional[str], 
     return 'gemini', 'gemini-2.5-pro'
 
 
+def get_one_chunk_per_page(resource: BaseResource) -> bool:
+    if (resource.type, resource.subtype) == ('theory', 'lecture_slides'):
+        return True
+
+    return False
+
+
+def get_one_chunk_per_doc(resource: BaseResource) -> bool:
+    if resource.type == 'practice':
+        return True
+
+    return False
+
+
 def get_number(resource: BaseResource) -> Optional[str]:
     if resource.week:
         return str(resource.week)

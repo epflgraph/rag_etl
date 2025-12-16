@@ -12,6 +12,8 @@ from rag_etl.courses.common.utils import (
     get_type_subtype,
     get_is_solution,
     get_processing_method_model,
+    get_one_chunk_per_page,
+    get_one_chunk_per_doc,
     get_number,
     get_shifted_date,
     get_from,
@@ -151,6 +153,10 @@ class RAGTESTMetadataTransformer(BaseTransformer):
 
             # Infer processing method
             resource.processing_method, resource.model = get_processing_method_model(resource)
+
+            # Infer one chunk flags
+            resource.one_chunk_per_page = get_one_chunk_per_page(resource)
+            resource.one_chunk_per_doc = get_one_chunk_per_doc(resource)
 
             # Infer number
             resource.number = get_number(resource)

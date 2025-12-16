@@ -55,6 +55,7 @@ class BaseResource:
         return {
             "id": self.id,
             "title": self.title,
+            "url": self.url,
             "path": self.path,
             "type": self.type,
             "subtype": self.subtype,
@@ -74,6 +75,6 @@ class BaseResource:
             "tikz": self.tikz,
             "one_chunk_per_page": self.one_chunk_per_page,
             "one_chunk_per_doc": self.one_chunk_per_doc,
-            "original_link": self.original_link,
+            "original_link": self.url,  # need url here for the pipeline, we should remove original_link and pipeline_link and just use url everywhere
             "pipeline_link": self.pipeline_link,
         }

@@ -99,7 +99,7 @@ class MoodleExtractor(BaseExtractor):
                         section_text=section['summary'],
                         tag=module_contents_tag,
                         title=f"{module['name']} > {module_contents_unique_name}",
-                        url=module_contents['fileurl'],
+                        url=module['url'],
                         path=str(module_contents_path),
                         source='moodle',
                         mime_type=module_contents['mimetype'],

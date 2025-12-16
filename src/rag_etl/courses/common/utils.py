@@ -9,45 +9,59 @@ import rag_etl.utils.mime_types as mt
 
 
 def infer_date(resource: BaseResource, start_date: date, end_date: date) -> str:
+    assert start_date <= end_date, f"Invalid dates: start_date ({start_date}) should be before end_date ({end_date})"
+
     if isinstance(resource, MoodleResource):
         text = resource.section_title
     else:
         text = resource.title.lower()
 
-    # Regex to capture "start-day - end-day month" (e.g. "3 - 4 Octob")
-    date_pattern = re.compile(r"^\s*(\d{1,2})\s*-\s*\d{1,2}\s+([A-Za-z]+)")
-
+    # Dates in format "15 April - 16 April"
+    date_pattern = re.compile(r"^\s*(\d{1,2})\s+([A-Za-z]+)\s*-\s*(\d{1,2})\s+([A-Za-z]+)\s*$")
     match = date_pattern.match(text)
+    if match:
+        start_day, start_month, _, _ = match.groups()
+        day = int(start_day)
+        month = start_month
+    else:
+        day = None
+        month = None
+
+    # Dates in format "3 - 4 Octob"
+    if day is None or month is None:
+        date_pattern = re.compile(r"^\s*(\d{1,2})\s*-\s*(\d{1,2})\s+([A-Za-z]+)")
+        match = date_pattern.match(text)
+        if match:
+            start_day, _, month = match.groups()
+            day = int(start_day)
+
+    # No day and month were found, fall back to start of semester
     if not match:
         return str(start_date)
 
-    # Extract day and month strings
-    day, month_str = match.groups()
-
-    # Normalise day to int
-    day = int(day)
-
     # Normalise month to three letters, then to int
-    month_str = month_str.strip().lower()[:3]  # normalize (Oct → oct, October → oct, octover → oct)
+    month = month.strip().lower()[:3]  # normalise (Oct → oct, October → oct, octover → oct)
     month_map = {
         "jan": 1, "feb": 2, "fev": 2, "fév": 2, "mar": 3,
         "apr": 4, "avr": 4, "may": 5, "mai": 5, "jun": 6, "jui": 6,
         "jul": 7, "aug": 8, "aou": 8, "aoû": 8,
         "sep": 9, "oct": 10, "nov": 11, "dec": 12, "déc": 12,
     }
-    month = month_map[month_str]
+    month = month_map[month]
 
-    # Infer year based on month and semester
-    year = 2025 if month >= 6 else 2026
+    # Infer year from start_date and end_date
+    for year in range(start_date.year, end_date.year + 1):
+        try:
+            inferred_date = date(year=year, month=month, day=day)
+        except ValueError:
+            # Invalid date (e.g. Feb 30, Feb 29 in non-leap year)
+            continue
 
-    # Build inferred date
-    inferred_date = date(year=year, month=month, day=int(day))
+        if start_date <= inferred_date <= end_date:
+            return str(inferred_date)
 
-    # Clamp inferred date to be within given bounds
-    inferred_date = max(start_date, inferred_date)
-    inferred_date = min(end_date, inferred_date)
-
-    return str(inferred_date)
+    # No year was found, fall back to start of semester
+    return str(start_date)
 
 
 def infer_week(resource: BaseResource, weeks: dict) -> Optional[int]:

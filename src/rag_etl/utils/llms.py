@@ -8,9 +8,21 @@ from rag_etl.config import CONFIG
 
 
 def send_llm_request(model, messages, response_format=None):
+    if response_format:
+        response_format_schema = {
+            "type": "json_schema",
+            "json_schema": {
+                "name": type(response_format).__name__,
+                "schema": response_format.model_json_schema(),
+                "strict": True,
+            },
+        }
+    else:
+        response_format_schema = None
+
     # Send request
     rcp_client = OpenAI(base_url=CONFIG['RCP_BASE_URL'], api_key=CONFIG['RCP_API_KEY'])
-    response = rcp_client.chat.completions.create(model=model, messages=messages, response_format=response_format)
+    response = rcp_client.chat.completions.create(model=model, messages=messages, response_format=response_format_schema)
     content = response.choices[0].message.content.strip()
 
     # Strip thinking tokens

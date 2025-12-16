@@ -25,7 +25,9 @@ def unzip_file(zip_path):
     """
 
     zip_path = Path(zip_path)
-    extract_dir = zip_path.parent
+
+    extract_dir = zip_path.with_suffix('')
+    extract_dir.mkdir(parents=True, exist_ok=True)
 
     with zipfile.ZipFile(zip_path, 'r') as zip_ref:
         zip_ref.extractall(extract_dir)
@@ -53,7 +55,10 @@ class ExtractZipTransformer(BaseTransformer):
     """
 
     def __init__(self, mime_types=None):
-        self.mime_types = mime_types
+        if mime_types is None:
+            self.mime_types = mt.DEFAULT_MIME_TYPES
+        else:
+            self.mime_types = mime_types
 
     def transform(self, resources: Sequence[BaseResource]) -> List[BaseResource]:
         """

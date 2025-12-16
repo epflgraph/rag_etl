@@ -14,6 +14,7 @@ DEFAULT_MIME_TYPES = [
     MARKDOWN,
     PDF,
     IPYNB,
+    ZIP,
 ]
 
 

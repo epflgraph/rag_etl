@@ -4,7 +4,7 @@ import shutil
 from pathlib import Path
 import requests
 
-from typing import List
+from typing import List, Optional
 
 import logging
 
@@ -13,6 +13,7 @@ from rag_etl.extractors import BaseExtractor
 
 from rag_etl.extractors.moodle.utils import extract_moodle_tag
 
+import rag_etl.utils.mime_types as mt
 from rag_etl.config import CONFIG
 
 
@@ -25,9 +26,14 @@ class MoodleExtractor(BaseExtractor):
         self,
         moodle_course_id: int,
         moodle_base_path: str,
+        mime_types: Optional[list[str]] = None,
     ) -> None:
         self.moodle_course_id = moodle_course_id
         self.moodle_base_path = Path(moodle_base_path)
+        if mime_types is None:
+            self.mime_types = mt.DEFAULT_MIME_TYPES
+        else:
+            self.mime_types = mime_types
 
     def extract(self) -> List[MoodleResource]:
         """
@@ -71,6 +77,10 @@ class MoodleExtractor(BaseExtractor):
                 module_path = self.moodle_base_path / module_unique_name / 'content'
 
                 for module_contents in module.get('contents', []):
+                    # Skip if mime type not in list
+                    if module_contents['mimetype'] not in self.mime_types:
+                        continue
+
                     # Download file from url
                     url = f"{module_contents['fileurl']}&token={CONFIG['MOODLE_TOKEN']}"
                     response = requests.get(url)

@@ -11,6 +11,8 @@ import logging
 from rag_etl.resources import MoodleResource
 from rag_etl.extractors import BaseExtractor
 
+from rag_etl.extractors.moodle.utils import extract_moodle_tag
+
 from rag_etl.config import CONFIG
 
 
@@ -57,8 +59,16 @@ class MoodleExtractor(BaseExtractor):
         for section in sections:
             for module in section.get('modules', []):
                 # Skip if not a 'resource' (filter Forum modules, URL modules, etc.)
-                if module['modname'] != 'resource':
+                if module['modname'] not in ('resource', 'folder'):
+                    logging.debug(f"Skipping module {module['name']} because of modname {module['modname']}")
                     continue
+
+                # Extract module tag
+                module_tag = extract_moodle_tag(module['name'])
+
+                # Build module unique name
+                module_unique_name = f"{module['modplural'][:-1]}.{module['name'].replace(':', '')}.{module['id']}"
+                module_path = self.moodle_base_path / module_unique_name / 'content'
 
                 for module_contents in module.get('contents', []):
                     # Download file from url
@@ -73,16 +83,22 @@ class MoodleExtractor(BaseExtractor):
                         continue
 
                     # Save file to disk
-                    module_unique_name = f"{module['modplural'][:-1]}.{module['name'].replace(':', '')}.{module['id']}"
-                    module_contents_path = self.moodle_base_path / module_unique_name / 'content' / module_contents['filename']
+                    module_contents_path = module_path / Path(module_contents['filepath']).relative_to('/') / module_contents['filename']
+                    module_contents_unique_name = str(module_contents_path.relative_to(module_path))
                     module_contents_path.parent.mkdir(parents=True, exist_ok=True)
                     module_contents_path.write_bytes(response.content)
+
+                    # Extract module contents tag, default to module tag
+                    module_contents_tag = extract_moodle_tag(module_contents['filename'])
+                    if not module_contents_tag:
+                        module_contents_tag = module_tag
 
                     # Append resource
                     resources.append(MoodleResource(
                         section_title=section['name'],
                         section_text=section['summary'],
-                        title=module['name'],
+                        tag=module_contents_tag,
+                        title=f"{module['name']} > {module_contents_unique_name}",
                         url=module_contents['fileurl'],
                         path=str(module_contents_path),
                         source='moodle',

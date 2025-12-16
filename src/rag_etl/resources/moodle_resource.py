@@ -13,3 +13,5 @@ class MoodleResource(BaseResource):
 
     section_title: Optional[str] = None
     section_text: Optional[str] = None
+
+    tag: Optional[str] = None

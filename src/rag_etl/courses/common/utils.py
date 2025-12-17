@@ -183,11 +183,21 @@ def get_one_chunk_per_doc(resource: BaseResource) -> bool:
 
 
 def get_number(resource: BaseResource) -> Optional[str]:
-    if resource.week:
-        return str(resource.week)
+    if resource.type == 'theory':
+        return None
 
-    if resource.year:
+    if resource.type == 'exam':
         return str(resource.year)
+
+    if resource.type == 'practice':
+        if resource.subtype == 'exercise':
+            return None
+
+        if resource.subtype == 'series':
+            return str(resource.week)
+
+        if resource.subtype == 'slt':
+            return None
 
     return None
 

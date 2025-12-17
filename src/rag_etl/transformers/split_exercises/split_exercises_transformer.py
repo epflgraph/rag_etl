@@ -61,10 +61,19 @@ class SplitExercisesTransformer(BaseTransformer):
 
             # Build resource for each exercise file
             for exercise_md_path in sorted(exercises_path.glob("*.md")):
+                # Extracted exercise number is always the sub_number, and is copied to number only if that is empty
+                sub_number = exercise_md_path.stem
+                if resource.number:
+                    number = resource.number
+                else:
+                    number = sub_number
+
+                # Create and append new resource
                 new_resource = resource.copy_with(
                     title=f"{resource.title} > Exercise {exercise_md_path.stem}",
                     path=str(exercise_md_path),
-                    sub_number=exercise_md_path.stem,
+                    number=number,
+                    sub_number=sub_number,
                     processing_method=None,
                     one_chunk_per_doc=True,
                 )

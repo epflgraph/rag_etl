@@ -25,7 +25,8 @@ class RAGTESTCourse(BaseCourse):
     Course-specific pipeline for RAGTEST.
     """
 
-    metadata_transformer = RAGTESTMetadataTransformer()
+    def __init__(self):
+        self.metadata_transformer = RAGTESTMetadataTransformer(cache=self.course_code)
 
     @property
     def extractors(self) -> List[BaseExtractor]:
@@ -42,10 +43,10 @@ class RAGTESTCourse(BaseCourse):
         """Single transformer that converts PDFs into Markdown text."""
         return [
             self.metadata_transformer,
-            ExtractZipTransformer(),
-            JupyterToMarkdownTransformer(),
-            PDFToMarkdownTransformer(type_subtypes=self.metadata_transformer.pdf_to_markdown_type_subtypes),
-            SplitExercisesTransformer(type_subtypes=self.metadata_transformer.split_exercises_type_subtypes),
+            ExtractZipTransformer(cache=self.course_code),
+            JupyterToMarkdownTransformer(cache=self.course_code),
+            PDFToMarkdownTransformer(type_subtypes=self.metadata_transformer.pdf_to_markdown_type_subtypes, cache=self.course_code),
+            SplitExercisesTransformer(type_subtypes=self.metadata_transformer.split_exercises_type_subtypes, cache=self.course_code),
         ]
 
     @property

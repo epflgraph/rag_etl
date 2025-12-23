@@ -25,7 +25,8 @@ class COM309Course(BaseCourse):
     Course-specific pipeline for COM309.
     """
 
-    metadata_transformer = COM309MetadataTransformer()
+    def __init__(self):
+        self.metadata_transformer = COM309MetadataTransformer(cache=self.course_code)
 
     @property
     def extractors(self) -> List[BaseExtractor]:
@@ -42,10 +43,10 @@ class COM309Course(BaseCourse):
         """Single transformer that converts PDFs into Markdown text."""
         return [
             self.metadata_transformer,
-            ExtractZipTransformer(mime_types=[mt.PDF, mt.IPYNB]),
-            JupyterToMarkdownTransformer(),
-            PDFToMarkdownTransformer(type_subtypes=self.metadata_transformer.pdf_to_markdown_type_subtypes),
-            SplitExercisesTransformer(type_subtypes=self.metadata_transformer.split_exercises_type_subtypes),
+            ExtractZipTransformer(mime_types=[mt.PDF, mt.IPYNB], cache=self.course_code),
+            JupyterToMarkdownTransformer(cache=self.course_code),
+            PDFToMarkdownTransformer(type_subtypes=self.metadata_transformer.pdf_to_markdown_type_subtypes, cache=self.course_code),
+            SplitExercisesTransformer(type_subtypes=self.metadata_transformer.split_exercises_type_subtypes, cache=self.course_code),
         ]
 
     @property

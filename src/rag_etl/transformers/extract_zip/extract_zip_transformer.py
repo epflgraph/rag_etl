@@ -54,7 +54,9 @@ class ExtractZipTransformer(BaseTransformer):
     Transformer that extracts zip resources replacing them with their contents.
     """
 
-    def __init__(self, mime_types=None):
+    def __init__(self, mime_types=None, **kwargs):
+        super().__init__(**kwargs)
+
         if mime_types is None:
             self.mime_types = mt.DEFAULT_MIME_TYPES
         else:

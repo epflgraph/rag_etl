@@ -20,7 +20,9 @@ class PDFToMarkdownTransformer(BaseTransformer):
     Non-PDF resources as well as resources not matching the specified type_subtypes are left unchanged.
     """
 
-    def __init__(self, type_subtypes=None) -> None:
+    def __init__(self, type_subtypes=None, **kwargs) -> None:
+        super().__init__(**kwargs)
+
         self.type_subtypes = type_subtypes
 
     def transform(self, resources: Sequence[BaseResource]) -> List[BaseResource]:

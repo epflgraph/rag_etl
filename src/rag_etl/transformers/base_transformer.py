@@ -17,13 +17,15 @@ class BaseTransformer(ABC):
     and return a new list of transformed `Resource` objects.
     """
 
+    def __init__(self, cache: str = 'default'):
+        self.cache = cache
+        self.cache_scope = f'{cache}/{self.__class__.__name__}'
+
     def get_from_cache(self, resource_path, destination_path):
-        scope = self.__class__.__name__
-        return get_from_cache(scope, resource_path, destination_path)
+        return get_from_cache(self.cache_scope, resource_path, destination_path)
 
     def set_to_cache(self, resource_path, source_path):
-        scope = self.__class__.__name__
-        set_to_cache(scope, resource_path, source_path)
+        set_to_cache(self.cache_scope, resource_path, source_path)
 
     @abstractmethod
     def transform(self, resources: Sequence[BaseResource]) -> List[BaseResource]:

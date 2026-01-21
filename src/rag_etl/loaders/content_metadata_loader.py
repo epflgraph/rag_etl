@@ -53,6 +53,9 @@ class ContentMetadataLoader(BaseLoader):
             # Make path relative to base path
             resource.path = str(content_path.relative_to(output_path) / Path(resource.path).relative_to(output_path))
 
+            # Give unique id to resource incrementally
+            resource.id = 1 + len(metadata[resource.source])
+
             # Store metadata
             metadata[resource.source].append(resource.metadata_dict())
 

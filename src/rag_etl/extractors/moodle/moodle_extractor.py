@@ -103,13 +103,22 @@ class MoodleExtractor(BaseExtractor):
                     if not module_contents_tag:
                         module_contents_tag = module_tag
 
+                    # Extract module contents url, default to module url
+                    if module_contents['fileurl']:
+                        url = module_contents['fileurl']
+                        url = url.replace('https://moodle.epfl.ch/webservice', 'https://moodle.epfl.ch')
+                        url = url.replace('?forcedownload=1', '')
+                    else:
+                        url = module['url']
+                        url = f'{url}?redirect=1'
+
                     # Append resource
                     resources.append(MoodleResource(
                         section_title=section['name'],
                         section_text=section['summary'],
                         tag=module_contents_tag,
                         title=f"{module['name']} > {module_contents_unique_name}",
-                        url=module['url'],
+                        url=url,
                         path=str(module_contents_path),
                         source='moodle',
                         mime_type=module_contents['mimetype'],

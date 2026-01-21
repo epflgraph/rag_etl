@@ -7,6 +7,8 @@ from typing import Tuple, Optional
 from rag_etl.resources import BaseResource, MoodleResource
 import rag_etl.utils.mime_types as mt
 
+from rag_etl.config import CONFIG
+
 
 def infer_date(resource: BaseResource, start_date: date, end_date: date) -> str:
     assert start_date <= end_date, f"Invalid dates: start_date ({start_date}) should be before end_date ({end_date})"
@@ -162,10 +164,7 @@ def get_processing_method_model(resource: BaseResource) -> Tuple[Optional[str], 
     if resource.mime_type != mt.PDF:
         return None, None
 
-    if (resource.type, resource.subtype) == ('theory', 'polycopie'):
-        return 'google', None
-
-    return 'gemini', 'gemini-2.5-pro'
+    return 'rcp', CONFIG['RCP_VISION_MODEL']
 
 
 def get_one_chunk_per_page(resource: BaseResource) -> bool:

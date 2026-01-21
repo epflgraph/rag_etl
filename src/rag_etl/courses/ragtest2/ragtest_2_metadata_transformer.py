@@ -1,21 +1,19 @@
 from datetime import date
 
-from typing import Sequence
+import re
+
+from typing import Sequence, Optional
 
 from rag_etl.resources import BaseResource, MoodleResource
 from rag_etl.transformers import BaseTransformer
 
 from rag_etl.courses.common.utils import (
-    infer_date,
-    infer_week,
     infer_year,
     get_type_subtype,
     get_is_solution,
     get_processing_method_model,
     get_one_chunk_per_page,
     get_one_chunk_per_doc,
-    get_number,
-    get_shifted_date,
     get_from,
 )
 
@@ -54,50 +52,49 @@ class RAGTEST2MetadataTransformer(BaseTransformer):
         '2026-06-10': 15,
     }
 
+    reversed_weeks = {week: date for date, week in weeks.items()}
+
     output_path = f"{CONFIG['BASE_PATH']}/{course_info['course_id']}"
 
     ################################################################
 
-    moodle_course_id = 15403
+    moodle_course_id = 19162
 
     moodle_base_path = f"{CONFIG['BASE_PATH']}/{course_info['course_id']}/moodle"
 
     moodle_tag_types_subtypes = {
-        'LECTURE_SLIDES': ('theory', 'lecture_slides'),
-        'LECTURE_NOTES': ('theory', 'lecture_notes'),
+        'SLIDES': ('theory', 'lecture_slides'),
         'POLYCOPIE': ('theory', 'polycopie'),
 
-        'EXERCISE': ('practice', 'exercise'),
-        'EXERCISE_SOLUTION': ('practice', 'exercise'),
-        'SERIES': ('practice', 'series'),
-        'SERIES_SOLUTION': ('practice', 'series'),
-        'SLT': ('practice', 'slt'),
-        'SLT_SOLUTION': ('practice', 'slt'),
+        'SERIE': ('practice', 'exercise'),
+        'SERIE_SOLUTION': ('practice', 'exercise'),
+
+        'SERIE_ENTRAINEMENT': ('practice', 'exercise_training'),
+        'SERIE_ENTRAINEMENT_SOLUTION': ('practice', 'exercise_training'),
+
+        'QCM': ('practice', 'qcm'),
+        'QCM_SOLUTION': ('practice', 'qcm'),
 
         'EXAM': ('exam', 'previous_year_exam'),
         'EXAM_SOLUTION': ('exam', 'previous_year_exam'),
-        'MOCK_EXAM': ('exam', 'mock_exam'),
-        'MOCK_EXAM_SOLUTION': ('exam', 'mock_exam'),
     }
 
     ################################################################
 
     pdf_to_markdown_type_subtypes = [
         ('practice', 'exercise'),
-        ('practice', 'series'),
-        ('practice', 'slt'),
+        ('practice', 'exercise_training'),
+        ('practice', 'qcm'),
 
         ('exam', 'previous_year_exam'),
-        ('exam', 'mock_exam'),
     ]
 
     split_exercises_type_subtypes = [
         ('practice', 'exercise'),
-        ('practice', 'series'),
-        ('practice', 'slt'),
+        ('practice', 'exercise_training'),
+        ('practice', 'qcm'),
 
         ('exam', 'previous_year_exam'),
-        ('exam', 'mock_exam'),
     ]
 
     ################################################################
@@ -114,17 +111,49 @@ class RAGTEST2MetadataTransformer(BaseTransformer):
     def get_is_solution(self, resource: BaseResource):
         # If Moodle resource, get from dict above according to the tags
         if isinstance(resource, MoodleResource):
-            if resource.tag and 'SOLUTION' in resource.tag:
+            if resource.tag and 'solution' in resource.tag.lower():
                 return True
 
         # Default to text matching otherwise
         return get_is_solution(resource)
 
+    def infer_week(self, resource: BaseResource) -> Optional[int]:
+        # If Moodle resource, extract week number from section_title
+        if isinstance(resource, MoodleResource):
+            match = re.search(r"\bSemaine\s+(\d+)\b", resource.section_title, flags=re.IGNORECASE)
+            return int(match.group(1)) if match else None
+
+        # Default to None otherwise
+        return None
+
+    def infer_date(self, resource: BaseResource) -> Optional[str]:
+        # If Moodle resource, extract date from dict above
+        if isinstance(resource, MoodleResource):
+            return self.reversed_weeks.get(resource.week)
+
+        # Default to None otherwise
+        return None
+
+    def get_number(self, resource: BaseResource) -> Optional[str]:
+        if resource.type == 'exam':
+            if resource.year:
+                return str(resource.year)
+            else:
+                return str(self.semester_start_date.year)
+
+        if (resource.type, resource.subtype) == ('practice', 'exercise'):
+            return str(resource.week)
+
+        if (resource.type, resource.subtype) == ('practice', 'qcm'):
+            return str(resource.year)
+
+        return None
+
     def transform(self, resources: Sequence[BaseResource]) -> Sequence[BaseResource]:
         for resource in resources:
             # Infer time-related fields, like date, week and year
-            resource.date = infer_date(resource, start_date=self.semester_start_date, end_date=self.semester_end_date)
-            resource.week = infer_week(resource, weeks=self.weeks)
+            resource.week = self.infer_week(resource)
+            resource.date = self.infer_date(resource)
             resource.year = infer_year(resource)
 
             # Infer type and subtype
@@ -141,11 +170,7 @@ class RAGTEST2MetadataTransformer(BaseTransformer):
             resource.one_chunk_per_doc = get_one_chunk_per_doc(resource)
 
             # Infer number
-            resource.number = get_number(resource)
-
-            # If it is a solution resource, we need to add a week to the date
-            if resource.is_solution:
-                resource.date = get_shifted_date(resource, weeks=self.weeks)
+            resource.number = self.get_number(resource)
 
             # Create from field with the datetime
             resource.from_ = get_from(resource)

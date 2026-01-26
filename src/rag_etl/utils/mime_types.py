@@ -7,6 +7,8 @@ ZIP = "application/zip"
 IPYNB = "application/x-ipynb+json"
 MP4 = "video/mp4"
 
+C_SOURCE = "text/x-c"
+
 mimetypes.add_type(IPYNB, ".ipynb")
 
 DEFAULT_MIME_TYPES = [

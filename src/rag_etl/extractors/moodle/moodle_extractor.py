@@ -29,6 +29,18 @@ def extract_moodle_tag(text):
     return None
 
 
+def extract_tag_number(tag):
+    match = re.search(r'_(\d+)(?:_|$)', tag)
+
+    if not match:
+        return (None, tag)
+
+    number = match.group(1)
+    rest = tag.replace(f'_{number}', '')
+
+    return (int(number), rest)
+
+
 def extract_url(module, module_contents):
     # If resource is hidden from students, do not fill in url
     if not module['visible']:
@@ -128,8 +140,6 @@ class MoodleExtractor(BaseExtractor):
         resources = []
         for section in sections:
             for module in section.get('modules', []):
-                print(module)
-
                 # Skip if not a 'resource' (filter Forum modules, URL modules, etc.)
                 if module['modname'] not in ('resource', 'folder'):
                     logging.debug(f"Skipping module {module['name']} because of modname {module['modname']}")
@@ -143,8 +153,6 @@ class MoodleExtractor(BaseExtractor):
                 module_path = self.moodle_base_path / module_unique_name / 'content'
 
                 for module_contents in module.get('contents', []):
-                    print('#' * 4, module_contents)
-
                     # Skip if mime type not in list
                     if module_contents['mimetype'] not in self.mime_types:
                         continue
@@ -157,6 +165,14 @@ class MoodleExtractor(BaseExtractor):
                     # Skip if no tag
                     if not tag:
                         continue
+
+                    # Extract metadata from tag
+                    number, tag = extract_tag_number(tag)
+                    type_ = self.tag_metadata.get(tag, {}).get('type')
+                    subtype = self.tag_metadata.get(tag, {}).get('subtype')
+                    is_solution = self.tag_metadata.get(tag, {}).get('is_solution', False)
+                    one_chunk_per_page = self.tag_metadata.get(tag, {}).get('one_chunk_per_page', False)
+                    one_chunk_per_doc = self.tag_metadata.get(tag, {}).get('one_chunk_per_doc', False)
 
                     # Download file from url
                     url = f"{module_contents['fileurl']}&token={CONFIG['MOODLE_TOKEN']}"
@@ -191,9 +207,14 @@ class MoodleExtractor(BaseExtractor):
                         path=str(module_contents_path),
                         source='moodle',
                         mime_type=module_contents['mimetype'],
+                        type=type_,
+                        subtype=subtype,
+                        number=number,
+                        is_solution=is_solution,
+                        one_chunk_per_page=one_chunk_per_page,
+                        one_chunk_per_doc=one_chunk_per_doc,
                         from_=from_,
                         until=until,
                     ))
 
-        print(resources)
         return resources

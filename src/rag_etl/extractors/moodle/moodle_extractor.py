@@ -197,6 +197,14 @@ class MoodleExtractor(BaseExtractor):
                     # Extract availability date if specified
                     from_, until = extract_from_and_until(module)
 
+                    # Processing method and model
+                    if module_contents['mimetype'] == mt.PDF:
+                        processing_method = 'rcp'
+                        model = CONFIG['RCP_VISION_MODEL']
+                    else:
+                        processing_method = None
+                        model = None
+
                     # Append resource
                     resources.append(MoodleResource(
                         section_title=section['name'],
@@ -211,6 +219,8 @@ class MoodleExtractor(BaseExtractor):
                         subtype=subtype,
                         number=number,
                         is_solution=is_solution,
+                        processing_method=processing_method,
+                        model=model,
                         one_chunk_per_page=one_chunk_per_page,
                         one_chunk_per_doc=one_chunk_per_doc,
                         from_=from_,

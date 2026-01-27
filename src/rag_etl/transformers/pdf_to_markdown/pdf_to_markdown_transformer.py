@@ -61,6 +61,7 @@ class PDFToMarkdownTransformer(BaseTransformer):
                 path=str(md_path),
                 mime_type=mt.MARKDOWN,
                 processing_method=None,
+                model=None,
             )
             transformed_resources.append(new_resource)
 

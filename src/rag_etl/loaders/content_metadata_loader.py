@@ -21,17 +21,17 @@ class ContentMetadataLoader(BaseLoader):
     The result is ready to be processed by the chatbotpipelines scripts.
     """
 
-    def __init__(self, output_path: str, course_info: dict):
-        self.output_path = output_path
+    def __init__(self, course_path: str, course_info: dict):
+        self.course_path = course_path
         self.course_info = course_info
 
     def load(self, resources: Sequence[BaseResource]) -> None:
-        logging.debug(f"Populating content and metadata folders at {self.output_path}")
+        logging.debug(f"Populating content and metadata folders at {self.course_path}")
 
         # Create paths and folders if needed
-        output_path = Path(self.output_path)
-        content_path = output_path / "content"
-        metadata_path = output_path / "metadata"
+        output_path = Path(self.course_path) / 'output'
+        content_path = output_path / 'content'
+        metadata_path = output_path / 'metadata'
 
         content_path.mkdir(parents=True, exist_ok=True)
         metadata_path.mkdir(parents=True, exist_ok=True)
@@ -44,14 +44,14 @@ class ContentMetadataLoader(BaseLoader):
                 metadata[resource.source] = []
 
             # Build actual location of the content file
-            resource_output_path = content_path / Path(resource.path).relative_to(output_path)
+            resource_output_path = content_path / Path(resource.path).relative_to(self.course_path)
             resource_output_path.parent.mkdir(parents=True, exist_ok=True)
 
             # Copy actual file
             shutil.copy(resource.path, resource_output_path.parent)
 
             # Make path relative to base path
-            resource.path = str(content_path.relative_to(output_path) / Path(resource.path).relative_to(output_path))
+            resource.path = str(content_path.relative_to(output_path) / Path(resource.path).relative_to(self.course_path))
 
             # Give unique id to resource incrementally
             resource.id = 1 + len(metadata[resource.source])

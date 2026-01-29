@@ -91,13 +91,14 @@ class RAGTEST3Course(BaseCourse):
     semester_start_date = date(year=2026, month=2, day=16)
     semester_end_date = date(year=2026, month=6, day=22)
 
-    output_path = f"{CONFIG['BASE_PATH']}/{course_info['course_id']}"
+    course_path = f"{CONFIG['BASE_PATH']}/{course_info['course_id']}"
+    output_path = f"{course_path}/output"
 
     ################################################################
 
     moodle_course_id = 19161
 
-    moodle_base_path = f"{output_path}/moodle"
+    moodle_base_path = f"{course_path}/moodle"
 
     ################################################################
 
@@ -144,7 +145,7 @@ class RAGTEST3Course(BaseCourse):
         """No loaders defined for this course."""
         return [
             ContentMetadataLoader(
-                output_path=self.output_path,
+                course_path=self.course_path,
                 course_info=self.course_info
             )
         ]

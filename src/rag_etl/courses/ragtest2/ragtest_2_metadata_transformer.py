@@ -54,7 +54,8 @@ class RAGTEST2MetadataTransformer(BaseTransformer):
 
     reversed_weeks = {week: date for date, week in weeks.items()}
 
-    output_path = f"{CONFIG['BASE_PATH']}/{course_info['course_id']}"
+    course_path = f"{CONFIG['BASE_PATH']}/{course_info['course_id']}"
+    output_path = f"{course_path}/output"
 
     ################################################################
 

@@ -52,7 +52,7 @@ class RAGTEST2Course(BaseCourse):
         """No loaders defined for this course."""
         return [
             ContentMetadataLoader(
-                output_path=self.metadata_transformer.output_path,
+                course_path=self.metadata_transformer.course_path,
                 course_info=self.metadata_transformer.course_info
             )
         ]

@@ -8,6 +8,7 @@ IPYNB = "application/x-ipynb+json"
 MP4 = "video/mp4"
 
 C_SOURCE = "text/x-c"
+TCL_SOURCE = "application/x-tcl"
 
 mimetypes.add_type(IPYNB, ".ipynb")
 

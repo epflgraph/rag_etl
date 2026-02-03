@@ -166,8 +166,14 @@ class MoodleExtractor(BaseExtractor):
                     if not tag:
                         continue
 
-                    # Extract metadata from tag
+                    # Split number and tag
                     number, tag = extract_tag_number(tag)
+
+                    # Skip if unrecognised tag
+                    if tag not in self.tag_metadata:
+                        continue
+
+                    # Extract metadata from tag
                     type_ = self.tag_metadata.get(tag, {}).get('type')
                     subtype = self.tag_metadata.get(tag, {}).get('subtype')
                     is_solution = self.tag_metadata.get(tag, {}).get('is_solution', False)

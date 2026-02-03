@@ -104,8 +104,6 @@ class CS470Course(BaseCourse):
         },
     }
 
-    additional_file_extensions = ['.cpp', '.c', '.h']
-
     semester_start_date = date(year=2026, month=2, day=16)
     semester_end_date = date(year=2026, month=6, day=22)
 

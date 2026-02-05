@@ -12,6 +12,8 @@ MD = "text/markdown"
 C_SOURCE = "text/x-c"
 TCL_SOURCE = "application/x-tcl"
 
+PYTHON_SOURCE = "text/x-python"
+
 mimetypes.add_type(IPYNB, ".ipynb")
 
 DEFAULT_MIME_TYPES = [

@@ -6,7 +6,6 @@ import shutil
 from pathlib import Path
 import requests
 
-import re
 import json
 
 from typing import List, Optional
@@ -17,28 +16,9 @@ from rag_etl.resources import MoodleResource
 from rag_etl.extractors import BaseExtractor
 
 import rag_etl.utils.mime_types as mt
+from rag_etl.utils.tags import extract_tag_and_number
+
 from rag_etl.config import CONFIG
-
-
-def extract_moodle_tag(text):
-    match = re.search(r"\[(.*?)\]", text)
-
-    if match:
-        return match.group(1)
-
-    return None
-
-
-def extract_tag_number(tag):
-    match = re.search(r'_(\d+)(?:_|$)', tag)
-
-    if not match:
-        return (None, tag)
-
-    number = match.group(1)
-    rest = tag.replace(f'_{number}', '')
-
-    return (int(number), rest)
 
 
 def extract_url(module, module_contents):
@@ -105,7 +85,12 @@ class MoodleExtractor(BaseExtractor):
     ) -> None:
         self.moodle_course_id = moodle_course_id
         self.moodle_base_path = Path(moodle_base_path)
-        self.tag_metadata = tag_metadata
+
+        if tag_metadata:
+            self.tag_metadata = tag_metadata
+        else:
+            self.tag_metadata = {}
+
         if mime_types is None:
             self.mime_types = mt.DEFAULT_MIME_TYPES
         else:
@@ -145,8 +130,8 @@ class MoodleExtractor(BaseExtractor):
                     logging.debug(f"Skipping module {module['name']} because of modname {module['modname']}")
                     continue
 
-                # Extract module tag
-                module_tag = extract_moodle_tag(module['name'])
+                # Extract module tag and number
+                module_tag, module_number = extract_tag_and_number(module['name'])
 
                 # Build module unique name
                 module_unique_name = f"{module['modplural'][:-1]}.{module['name'].replace(':', '')}.{module['id']}"
@@ -157,20 +142,14 @@ class MoodleExtractor(BaseExtractor):
                     if module_contents['mimetype'] not in self.mime_types:
                         continue
 
-                    # Extract module contents tag, default to module tag
-                    tag = extract_moodle_tag(module_contents['filename'])
+                    # Extract module contents tag and number, default to module ones
+                    tag, number = extract_tag_and_number(module_contents['filename'])
                     if not tag:
                         tag = module_tag
+                        number = module_number
 
-                    # Skip if no tag
-                    if not tag:
-                        continue
-
-                    # Split number and tag
-                    number, tag = extract_tag_number(tag)
-
-                    # Skip if unrecognised tag
-                    if tag not in self.tag_metadata:
+                    # Skip if no tag or unrecognised tag
+                    if not tag or tag not in self.tag_metadata:
                         continue
 
                     # Extract metadata from tag

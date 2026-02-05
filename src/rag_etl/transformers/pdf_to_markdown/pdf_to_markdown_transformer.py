@@ -36,7 +36,7 @@ class PDFToMarkdownTransformer(BaseTransformer):
 
         for resource in resources:
             # Skip if resource is not in the specified list of types and subtypes
-            if self.type_subtypes and (resource.type, resource.subtype) not in self.type_subtypes:
+            if self.type_subtypes is not None and (resource.type, resource.subtype) not in self.type_subtypes:
                 transformed_resources.append(resource)
                 continue
 
@@ -50,9 +50,10 @@ class PDFToMarkdownTransformer(BaseTransformer):
             md_path = pdf_path.with_suffix(".md")
 
             # Only convert if not cached
+            logging.info(f"Retrieving {resource.path} → {md_path.name} from cache")
             cached = self.get_from_cache(pdf_path, md_path)
             if not cached:
-                logging.debug(f"Converting {resource.path} → {md_path.name}")
+                logging.info(f"Converting {resource.path} → {md_path.name}")
                 convert_pdf_to_md(pdf_path, md_path)
                 self.set_to_cache(pdf_path, md_path)
 

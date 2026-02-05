@@ -35,7 +35,7 @@ class SplitExercisesTransformer(BaseTransformer):
 
         for resource in resources:
             # Skip if resource is not in the specified list of types and subtypes
-            if self.type_subtypes and (resource.type, resource.subtype) not in self.type_subtypes:
+            if self.type_subtypes is not None and (resource.type, resource.subtype) not in self.type_subtypes:
                 transformed_resources.append(resource)
                 continue
 

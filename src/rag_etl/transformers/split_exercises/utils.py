@@ -1,3 +1,4 @@
+import logging
 from pathlib import Path
 
 from typing import List
@@ -511,11 +512,18 @@ you should output
     rcp_model = CONFIG['RCP_BASE_MODEL']
     exercise_list = send_llm_request(rcp_model, messages, response_format=ExerciseList)
 
+    # Return if no exercises
+    if not exercise_list.exercises:
+        return
+
     # Retrieve snippets from lines
     snippets = {}
     for exercise in exercise_list.exercises:
-        # Raise if lines make no sense
-        assert 1 <= exercise.start_line <= exercise.end_line <= len(md_lines), f"Exercise lines out of bounds: start {exercise.start_line}, end {exercise.end_line}, total {len(md_lines)}"
+        # Skip if lines make no sense
+        lines_make_sense = 1 <= exercise.start_line <= exercise.end_line <= len(md_lines)
+        if not lines_make_sense:
+            logging.warning(f"While splitting {md_path} got exercise lines out of bounds: start {exercise.start_line}, end {exercise.end_line}, total {len(md_lines)}. Skipping...")
+            continue
 
         # Fetch snippet from original document
         snippet = "\n".join(md_lines[exercise.start_line - 1: exercise.end_line])

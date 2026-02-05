@@ -16,9 +16,17 @@ requires-python = ">=3.12"
 
 # optional: your runtime dependencies
 dependencies = [
-    "python-dotenv"
-#    "pandas",
-#    "requests",
+    "python-dotenv",
+    "pandas",
+    "requests",
+    "openai",
+    "lxml",
+    "google-genai",
+    "bs4",
+    "nbformat",
+    "nbconvert",
+    "pymupdf",
+    "Pillow",
 ]
 
 [tool.setuptools]
@@ -29,10 +37,10 @@ where = ["src"]
 
 [project.optional-dependencies]
 dev = [
-#    "pytest",
-#    "black",
-#    "ruff",
-#    "mypy",
+    "pytest",
+    "black",
+    "ruff",
+    "mypy",
 ]
 
 [tool.pytest.ini_options]

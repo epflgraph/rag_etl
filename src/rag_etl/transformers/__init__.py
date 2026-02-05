@@ -4,6 +4,7 @@ from rag_etl.transformers.extract_zip import ExtractZipTransformer
 from rag_etl.transformers.jupyter_to_markdown import JupyterToMarkdownTransformer
 from rag_etl.transformers.pdf_to_markdown import PDFToMarkdownTransformer
 from rag_etl.transformers.split_exercises import SplitExercisesTransformer
+from rag_etl.transformers.video_to_json import VideoToJSONTransformer
 
 __all__ = [
     "BaseTransformer",
@@ -11,4 +12,5 @@ __all__ = [
     "JupyterToMarkdownTransformer",
     "PDFToMarkdownTransformer",
     "SplitExercisesTransformer",
+    "VideoToJSONTransformer",
 ]

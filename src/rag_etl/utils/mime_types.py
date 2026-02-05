@@ -6,6 +6,8 @@ PDF = "application/pdf"
 ZIP = "application/zip"
 IPYNB = "application/x-ipynb+json"
 MP4 = "video/mp4"
+JSON = "application/json"
+MD = "text/markdown"
 
 C_SOURCE = "text/x-c"
 TCL_SOURCE = "application/x-tcl"

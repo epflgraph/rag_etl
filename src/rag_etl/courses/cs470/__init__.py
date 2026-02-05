@@ -1,5 +1,5 @@
-from rag_etl.courses.ragtest3.ragtest_3_course import RAGTEST3Course
+from rag_etl.courses.cs470.cs470_course import CS470Course
 
 __all__ = [
-    "RAGTEST3Course",
+    "CS470Course",
 ]

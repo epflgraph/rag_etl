@@ -36,4 +36,10 @@ def extract_tag_and_number(text):
     number = match.group(1)
     rest = tag.replace(f'_{number}', '')
 
-    return (rest, int(number))
+    # Try to cast to int and then to string ("05" -> "5" but "5A" -> "5A")
+    try:
+        number = str(int(number))
+    except Exception:
+        pass
+
+    return (rest, number)

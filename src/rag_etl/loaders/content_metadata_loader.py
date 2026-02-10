@@ -33,6 +33,10 @@ class ContentMetadataLoader(BaseLoader):
         content_path = output_path / 'content'
         metadata_path = output_path / 'metadata'
 
+        # Empty output_path if it exists
+        if output_path.exists():
+            shutil.rmtree(output_path)
+
         content_path.mkdir(parents=True, exist_ok=True)
         metadata_path.mkdir(parents=True, exist_ok=True)
 

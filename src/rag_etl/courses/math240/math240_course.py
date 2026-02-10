@@ -22,93 +22,53 @@ import rag_etl.utils.mime_types as mt
 from rag_etl.config import CONFIG
 
 
-class CS470Course(BaseCourse):
+class MATH240Course(BaseCourse):
     """
-    Course-specific pipeline for CS470.
+    Course-specific pipeline for MATH240.
     """
 
     course_info = {
-        "course_title": "Advanced computer architecture",
-        "course_id": "CS470",
+        "course_title": "Statistique",
+        "course_id": "MATH240",
         "academic_course": "2025-2026",
         "semester": 2,
-        "admin_info_link": "https://moodle.epfl.ch/course/view.php?id=15017",
-        "coursebook_link": "https://edu.epfl.ch/coursebook/en/advanced-computer-architecture-CS-470"
+        "admin_info_link": "https://moodle.epfl.ch/course/view.php?id=10071",
+        "coursebook_link": "https://edu.epfl.ch/coursebook/en/statistics-MATH-240"
     }
 
     tag_metadata = {
-        'SLIDES': {
-            'type': 'theory',
-            'subtype': 'lecture_slides',
-            'one_chunk_per_page': True,
-            'one_chunk_per_doc': False,
-            'pdf_to_markdown': False,
-            'split_exercises': False,
+        "SLIDES": {
+            "type": "theory",
+            "subtype": "lecture_slides",
+            "one_chunk_per_page": True,
+            "one_chunk_per_doc": False,
+            "pdf_to_markdown": False,
+            "split_exercises": False,
         },
-        'REFERENCE': {
-            'type': 'theory',
-            'subtype': 'recommended_reading',
-            'one_chunk_per_page': False,
-            'one_chunk_per_doc': False,
-            'pdf_to_markdown': False,
-            'split_exercises': False,
+        "EXERCICE": {
+            "type": "practice",
+            "subtype": "serie",
+            "one_chunk_per_page": False,
+            "one_chunk_per_doc": True,
+            "pdf_to_markdown": True,
+            "split_exercises": True,
         },
-        'EXAM': {
-            'type': 'exam',
-            'subtype': 'previous_year_exam',
-            'one_chunk_per_page': False,
-            'one_chunk_per_doc': False,
-            'pdf_to_markdown': True,
-            'split_exercises': True,
+        "EXERCICE_SOLUTION": {
+            "type": "practice",
+            "subtype": "serie",
+            "one_chunk_per_page": False,
+            "one_chunk_per_doc": True,
+            "pdf_to_markdown": True,
+            "split_exercises": True,
+            "is_solution": True,
         },
-        'LAB_ASSIGNMENT': {
-            'type': 'practice',
-            'subtype': 'lab',
-            'one_chunk_per_page': True,
-            'one_chunk_per_doc': False,
-            'pdf_to_markdown': False,
-            'split_exercises': False,
-        },
-        'LAB_SLIDES': {
-            'type': 'practice',
-            'subtype': 'lab',
-            'one_chunk_per_page': True,
-            'one_chunk_per_doc': False,
-            'pdf_to_markdown': False,
-            'split_exercises': False,
-        },
-        'LAB_MATERIAL': {
-            'type': 'practice',
-            'subtype': 'lab',
-            'one_chunk_per_page': False,
-            'one_chunk_per_doc': True,
-            'pdf_to_markdown': False,
-            'split_exercises': False,
-        },
-        'LAB_SOLUTION': {
-            'type': 'practice',
-            'subtype': 'lab',
-            'is_solution': True,
-            'one_chunk_per_page': False,
-            'one_chunk_per_doc': True,
-            'pdf_to_markdown': False,
-            'split_exercises': False,
-        },
-        'HOMEWORK': {
-            'type': 'practice',
-            'subtype': 'exercise',
-            'one_chunk_per_page': False,
-            'one_chunk_per_doc': True,
-            'pdf_to_markdown': False,
-            'split_exercises': False,
-        },
-        'SUBTITLES': {
-            'type': 'theory',
-            'subtype': 'video_subtitles',
-            'one_chunk_per_page': False,
-            'one_chunk_per_doc': False,
-            'pdf_to_markdown': False,
-            'split_exercises': False,
+        "TEXTBOOK": {
+            "type": "theory",
+            "subtype": "textbook",
+            "one_chunk_per_page": False,
+            "one_chunk_per_doc": False,
+            "pdf_to_markdown": False,
+            "split_exercises": False,
         },
     }
 
@@ -120,7 +80,7 @@ class CS470Course(BaseCourse):
 
     ################################################################
 
-    moodle_course_id = 15017
+    moodle_course_id = 10071
 
     moodle_base_path = f"{course_path}/moodle"
 
@@ -180,5 +140,5 @@ if __name__ == '__main__':
         handlers=[logging.StreamHandler(sys.stdout)]
     )
 
-    course = BaseCourse.from_code('CS470')
+    course = BaseCourse.from_code('MATH240')
     course.run()

@@ -72,7 +72,7 @@ class MICRO315Course(BaseCourse):
         },
         'LIB': {
             'type': 'practice',
-            'subtype': 'lab',
+            'subtype': 'lab_lib',
             'one_chunk_per_page': False,
             'one_chunk_per_doc': False,
             'pdf_to_markdown': False,
@@ -80,7 +80,7 @@ class MICRO315Course(BaseCourse):
         },
         'WIKI': {
             'type': 'practice',
-            'subtype': 'lab',
+            'subtype': 'lab_wiki',
             'one_chunk_per_page': False,
             'one_chunk_per_doc': False,
             'pdf_to_markdown': False,
@@ -163,7 +163,7 @@ if __name__ == '__main__':
     import sys
     logging.basicConfig(
         level=logging.INFO,
-        format='[%(levelname)s] [%(filename)s:%(lineno)d] %(message)s',
+        format='[%(asctime)s] [%(levelname)s] [%(filename)s:%(lineno)d] %(message)s',
         handlers=[logging.StreamHandler(sys.stdout)]
     )
 

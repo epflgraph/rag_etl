@@ -156,7 +156,7 @@ if __name__ == '__main__':
     import sys
     logging.basicConfig(
         level=logging.INFO,
-        format='[%(levelname)s] [%(filename)s:%(lineno)d] %(message)s',
+        format='[%(asctime)s] [%(levelname)s] [%(filename)s:%(lineno)d] %(message)s',
         handlers=[logging.StreamHandler(sys.stdout)]
     )
 

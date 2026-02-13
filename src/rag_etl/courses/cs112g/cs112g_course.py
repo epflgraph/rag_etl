@@ -4,11 +4,18 @@ from datetime import date
 
 import logging
 from rag_etl.courses import BaseCourse
-from rag_etl.extractors import BaseExtractor, MOOCExtractor, EdDiscussionExtractor
+from rag_etl.extractors import (
+    BaseExtractor,
+    MOOCExtractor,
+    MoodleExtractor,
+    EdDiscussionExtractor,
+)
 from rag_etl.transformers import (
     BaseTransformer,
     PDFToMarkdownTransformer,
     VideoToJSONTransformer,
+    ExtractZipTransformer,
+    SplitExercisesTransformer,
 )
 
 from rag_etl.loaders import BaseLoader, ContentMetadataLoader
@@ -16,6 +23,8 @@ from rag_etl.loaders import BaseLoader, ContentMetadataLoader
 import rag_etl.utils.mime_types as mt
 
 from rag_etl.config import CONFIG
+
+from typing import Tuple, List
 
 
 class CS112GCourse(BaseCourse):
@@ -30,24 +39,74 @@ class CS112GCourse(BaseCourse):
         "semester": 2,
         "admin_info_link": "",
         "coursebook_link": None,
-        "course_language": "French",  # ask Aitor to add this
+        "course_language": "French",
     }
 
     tag_metadata = {
-        "ASSIGNMENT": {
+        "SLIDES": {
+            "type": "theory",
+            "subtype": "lecture_slides",
+            "one_chunk_per_page": True,
+            "one_chunk_per_doc": False,
+            "pdf_to_markdown": False,
+            "split_exercises": False,
+        },
+        "PROJECT": {
+            "type": "practice",
+            "subtype": "project",
+            "one_chunk_per_page": False,
+            "one_chunk_per_doc": True,
+            "pdf_to_markdown": True,
+            "split_exercises": True,
+        },
+        "MIDTERM_EXAM": {
+            "type": "exam",
+            "subtype": "midterm_exam",
+            "one_chunk_per_page": False,
+            "one_chunk_per_doc": True,
+            "pdf_to_markdown": True,
+            "split_exercises": True,
+        },
+        "MIDTERM_EXAM_SOLUTION": {
+            "type": "exam",
+            "subtype": "midterm_exam",
+            "one_chunk_per_page": False,
+            "one_chunk_per_doc": True,
+            "pdf_to_markdown": True,
+            "split_exercises": True,
+            "is_solution": True,
+        },
+        "EXAM": {
+            "type": "exam",
+            "subtype": "previous_year_exam",
+            "one_chunk_per_page": False,
+            "one_chunk_per_doc": True,
+            "pdf_to_markdown": True,
+            "split_exercises": True,
+        },
+        "EXAM_SOLUTION": {
+            "type": "exam",
+            "subtype": "previous_year_exam",
+            "one_chunk_per_page": False,
+            "one_chunk_per_doc": True,
+            "pdf_to_markdown": True,
+            "split_exercises": True,
+            "is_solution": True,
+        },
+        "MOOC_ASSIGNMENT": {
             "type": "practice",
             "subtype": "assignment",
             "one_chunk_per_page": False,
             "one_chunk_per_doc": True,
-            "pdf_to_markdown": False,
-            "split_exercises": False,
+            "pdf_to_markdown": True,
+            "split_exercises": True,
             "is_video": False,
             "is_gemini_processed_video": False,
             "processing_method": None,
             "model": None,
         },
-        "TUTORIAL": {
-            "type": "theory",
+        "MOOC_TUTORIAL_SOLUTION": {
+            "type": "practice",
             "subtype": "tutorial",
             "one_chunk_per_page": False,
             "one_chunk_per_doc": True,
@@ -57,8 +116,9 @@ class CS112GCourse(BaseCourse):
             "is_gemini_processed_video": False,
             "processing_method": None,
             "model": None,
+            "is_solution": True,
         },
-        "LECTURE_NOTES": {
+        "MOOC_LECTURE_NOTES": {
             "type": "theory",
             "subtype": "lecture_notes",
             "one_chunk_per_page": False,
@@ -70,7 +130,7 @@ class CS112GCourse(BaseCourse):
             "processing_method": None,
             "model": None,
         },
-        "RECOMMENDED_READING": {
+        "MOOC_RECOMMENDED_READING": {
             "type": "theory",
             "subtype": "recommended_reading",
             "one_chunk_per_page": False,
@@ -82,7 +142,7 @@ class CS112GCourse(BaseCourse):
             "processing_method": None,
             "model": None,
         },
-        "QUIZ": {
+        "MOOC_QUIZ": {
             "type": "practice",
             "subtype": "quiz",
             "one_chunk_per_page": False,
@@ -94,7 +154,32 @@ class CS112GCourse(BaseCourse):
             "processing_method": None,
             "model": None,
         },
-        "VIDEO_LECTURE": {
+        "MOOC_EXERCISES": {
+            "type": "practice",
+            "subtype": "exercises",
+            "one_chunk_per_page": False,
+            "one_chunk_per_doc": True,
+            "pdf_to_markdown": True,
+            "split_exercises": True,
+            "is_video": False,
+            "is_gemini_processed_video": False,
+            "processing_method": None,
+            "model": None,
+        },
+        "MOOC_EXERCISES_SOLUTION": {
+            "type": "practice",
+            "subtype": "exercises",
+            "one_chunk_per_page": False,
+            "one_chunk_per_doc": True,
+            "pdf_to_markdown": True,
+            "split_exercises": True,
+            "is_video": False,
+            "is_gemini_processed_video": False,
+            "processing_method": None,
+            "model": None,
+            "is_solution": True,
+        },
+        "MOOC_VIDEO": {
             "type": "theory",
             "subtype": "video_lecture",
             "one_chunk_per_page": False,
@@ -104,57 +189,7 @@ class CS112GCourse(BaseCourse):
             "is_video": True,
             "is_gemini_processed_video": True,
             "processing_method": "gemini",
-            "model": "gemini-2.5-flash",
-        },
-        "EXAM": {
-            "type": "exam",
-            "subtype": "previous_year_exam",
-            "one_chunk_per_page": False,
-            "one_chunk_per_doc": True,
-            "pdf_to_markdown": True,
-            "split_exercises": True,
-            "is_video": False,
-            "is_gemini_processed_video": False,
-            "processing_method": None,
-            "model": None,
-        },
-        "EXAM_SOLUTION": {
-            "type": "exam",
-            "subtype": "previous_year_exam",
-            "one_chunk_per_page": False,
-            "one_chunk_per_doc": True,
-            "pdf_to_markdown": True,
-            "split_exercises": True,
-            "is_video": False,
-            "is_gemini_processed_video": False,
-            "processing_method": None,
-            "model": None,
-            "is_solution": True,
-        },
-        "MOCK_EXAM": {
-            "type": "exam",
-            "subtype": "previous_year_exam",
-            "one_chunk_per_page": False,
-            "one_chunk_per_doc": True,
-            "pdf_to_markdown": True,
-            "split_exercises": True,
-            "is_video": False,
-            "is_gemini_processed_video": False,
-            "processing_method": None,
-            "model": None,
-        },
-        "MOCK_EXAM_SOLUTION": {
-            "type": "exam",
-            "subtype": "previous_year_exam",
-            "one_chunk_per_page": False,
-            "one_chunk_per_doc": True,
-            "pdf_to_markdown": True,
-            "split_exercises": True,
-            "is_video": False,
-            "is_gemini_processed_video": False,
-            "processing_method": None,
-            "model": None,
-            "is_solution": True,
+            "model": "gemini-2.5-pro",
         },
     }
 
@@ -165,8 +200,13 @@ class CS112GCourse(BaseCourse):
     course_path = f"{CONFIG['BASE_PATH']}/{course_info['course_id']}"
     output_path = f"{course_path}/output"
 
-    moodle_course_id = None
-    moodle_base_path = f"{course_path}/mooc"
+    mooc_base_path = f"{course_path}/mooc"
+
+    mime_types = mt.DEFAULT_MIME_TYPES + [mt.C_SOURCE]
+
+    moodle_course_id = 5571
+
+    moodle_base_path = f"{course_path}/moodle"
 
     @property
     def pdf_to_markdown_type_subtypes(self) -> list[tuple[str, str]]:
@@ -177,31 +217,43 @@ class CS112GCourse(BaseCourse):
         ]
 
     @property
+    def split_exercises_type_subtypes(self) -> List[Tuple[str, str]]:
+        return [
+            (self.tag_metadata[tag].get("type"), self.tag_metadata[tag].get("subtype"))
+            for tag in self.tag_metadata
+            if self.tag_metadata[tag].get("split_exercises")
+        ]
+
+    @property
     def extractors(self) -> list[BaseExtractor]:
         """Single MOOC extractor."""
         return [
             MOOCExtractor(
+                mooc_base_path=self.mooc_base_path,
+                tag_metadata=self.tag_metadata,
+                mime_types=(self.mime_types + [mt.MP4, mt.MD, mt.JSON]),
+            ),
+            MoodleExtractor(
                 moodle_course_id=self.moodle_course_id,
                 moodle_base_path=self.moodle_base_path,
                 tag_metadata=self.tag_metadata,
-                mime_types=(mt.DEFAULT_MIME_TYPES + [mt.MP4, mt.MD, mt.JSON]),
+                mime_types=self.mime_types,
             ),
-            EdDiscussionExtractor(
-                moodle_course_id=self.moodle_course_id,
-                ed_discussion_base_path=self.course_path,
-                tags=self.tag_metadata.keys(),
-                tag_metadata=self.tag_metadata,
-                mime_types=(mt.DEFAULT_MIME_TYPES + [mt.MD]),
-                academic_year="2024-2025",
-                categories=[
-                    "theory",
-                    "practice",
-                    "exam",
-                ],
-                language=self.course_info["course_language"],
-                semester=self.course_info["semester"],
-                include_student_endorsed=True,
-            ),
+            # EdDiscussionExtractor(
+            #     ed_discussion_base_path=self.course_path,
+            #     tags=self.tag_metadata.keys(),
+            #     tag_metadata=self.tag_metadata,
+            #     mime_types=(mt.DEFAULT_MIME_TYPES + [mt.MD]),
+            #     academic_year="2024-2025",
+            #     categories=[
+            #         "theory",
+            #         "practice",
+            #         "exam",
+            #     ],
+            #     language=self.course_info["course_language"],
+            #     semester=self.course_info["semester"],
+            #     include_student_endorsed=True,
+            # ),
         ]
 
     @property
@@ -209,8 +261,12 @@ class CS112GCourse(BaseCourse):
         """Single transformer that converts PDFs into Markdown text."""
         return [
             VideoToJSONTransformer(cache=self.course_code),
+            ExtractZipTransformer(cache=self.course_code),
             PDFToMarkdownTransformer(
                 type_subtypes=self.pdf_to_markdown_type_subtypes, cache=self.course_code
+            ),
+            SplitExercisesTransformer(
+                type_subtypes=self.split_exercises_type_subtypes, cache=self.course_code
             ),
         ]
 

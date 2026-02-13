@@ -7,6 +7,7 @@ import logging
 from collections.abc import Sequence
 from rag_etl.transformers.video_to_json.utils import process_video_from_url
 
+
 import rag_etl.utils.mime_types as mt
 
 from rag_etl.config import CONFIG
@@ -47,9 +48,13 @@ class VideoToJSONTransformer(BaseTransformer):
             # Build paths of JSON file
             new_filename = f"{safe_stem}_{resource.model}.json"
 
-            # parents[2] goes up 3 levels
-            json_path = p.parents[2] / "mooc" / "video" / new_filename
+            downloaded_video_filename = f"{safe_stem}_{resource.model}.mp4"
+
+            # parents[1] goes up 2 levels
+            json_path = p.parents[1] / "video" / new_filename
             # json_path.parent.mkdir(parents=True, exist_ok=True)
+
+            downloaded_video_path = p.parents[1] / "video" / downloaded_video_filename
 
             # Only process video if not cached
             cached = self.get_from_cache(resource.path, json_path)
@@ -59,7 +64,7 @@ class VideoToJSONTransformer(BaseTransformer):
                     input_video_url=resource.url,
                     model_name=resource.model,
                     client=client,
-                    mime_type=mt.MP4,
+                    download_path=downloaded_video_path,
                 )
 
                 json_path.write_text(
@@ -73,6 +78,7 @@ class VideoToJSONTransformer(BaseTransformer):
                 path=str(json_path),
                 mime_type=mt.JSON,
                 processing_method=None,
+                model=None,
             )
             transformed_resources.append(new_resource)
 

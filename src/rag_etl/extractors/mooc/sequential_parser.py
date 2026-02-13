@@ -17,6 +17,7 @@ class SequentialParser:
         self,
         course_path: str,
         elem_sequential: _Element,
+        tag_metadata: dict | None = None,
     ) -> list[MOOCResource]:
         """Parse a MOOC sequential"""
 
@@ -41,6 +42,7 @@ class SequentialParser:
                 vertical_parser.parse(
                     course_path=course_path,
                     elem_vertical=elem_vertical,
+                    tag_metadata=tag_metadata,
                 )
             )
 

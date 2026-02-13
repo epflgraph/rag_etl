@@ -23,7 +23,6 @@ class EdDiscussionExtractor(BaseExtractor):
 
     def __init__(
         self,
-        moodle_course_id: int,
         ed_discussion_base_path: str,
         academic_year: str,
         tags: list[str],
@@ -35,7 +34,6 @@ class EdDiscussionExtractor(BaseExtractor):
         force_regeneration: bool = False,
         mime_types: list[str] | None = None,
     ) -> None:
-        self.moodle_course_id = moodle_course_id
         self.ed_discussion_base_path = Path(ed_discussion_base_path)
         self.academic_year = academic_year
         self.tags = tags

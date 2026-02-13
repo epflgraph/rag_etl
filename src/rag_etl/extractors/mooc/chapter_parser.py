@@ -17,6 +17,7 @@ class ChapterParser:
         self,
         course_path: str,
         chapter_filename: str,
+        tag_metadata: dict | None = None,
     ) -> list[MOOCResource]:
         """Parse a MOOC chapter"""
 
@@ -38,6 +39,7 @@ class ChapterParser:
                 sequential_parser.parse(
                     elem_sequential=elem_sequential,
                     course_path=course_path,
+                    tag_metadata=tag_metadata,
                 )
             )
 

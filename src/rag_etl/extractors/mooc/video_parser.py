@@ -27,6 +27,7 @@ class VideoParser:
         course_path: str,
         elem_vertical: _Element,
         vertical_display_name: str,
+        tag_metadata: dict,
     ) -> MOOCResource | None:
         """Parse a MOOC video"""
 
@@ -65,17 +66,23 @@ class VideoParser:
         else:
             return None
 
+        # tag_name = "VIDEO"
+        tag_name = "MOOC_VIDEO"
+        tag_dict = tag_metadata.get(tag_name)
+
         mooc_resource_title = vertical_display_name + " - " + video_title
         return MOOCResource(
-            source="MOOC",
+            source="mooc",
             title=mooc_resource_title,
             url=video_url,
             path=Path(video_xml_path),
             mime_type="video/mp4",
             is_video=True,
             is_gemini_processed_video=True,
-            processing_method="gemini",
-            model="gemini-2.5-flash",
-            tag="VIDEO_LECTURE",
+            tag=tag_name,
+            type=tag_dict.get("type"),
+            subtype=tag_dict.get("subtype"),
+            processing_method=tag_dict.get("processing_method"),
+            model=tag_dict.get("model"),
             vertical=vertical_display_name,
         )

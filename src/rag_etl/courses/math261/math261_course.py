@@ -6,7 +6,7 @@ import logging
 from typing import List, Tuple
 
 from rag_etl.courses import BaseCourse
-from rag_etl.extractors import BaseExtractor, MoodleExtractor, LocalFolderExtractor
+from rag_etl.extractors import BaseExtractor, MoodleExtractor
 from rag_etl.transformers import (
     BaseTransformer,
     ExtractZipTransformer,
@@ -22,69 +22,78 @@ import rag_etl.utils.mime_types as mt
 from rag_etl.config import CONFIG
 
 
-class MICRO315Course(BaseCourse):
+class MATH261Course(BaseCourse):
     """
-    Course-specific pipeline for MICRO315.
+    Course-specific pipeline for MATH261.
     """
 
     course_info = {
-        "course_title": "Systèmes embarqués et robotique",
-        "course_id": "MICRO315",
+        "course_title": "Discrete optimization",
+        "course_id": "MATH261",
         "academic_course": "2025-2026",
         "semester": 2,
-        "admin_info_link": "https://moodle.epfl.ch/course/view.php?id=467",
-        "coursebook_link": "https://edu.epfl.ch/coursebook/fr/systemes-embarques-et-robotique-MICRO-315"
+        "admin_info_link": "https://moodle.epfl.ch/course/view.php?id=16050",
+        "coursebook_link": "https://edu.epfl.ch/coursebook/en/discrete-optimization-MATH-261"
     }
 
     tag_metadata = {
-        'SLIDES': {
-            'type': 'theory',
-            'subtype': 'lecture_slides',
-            'one_chunk_per_page': True,
-            'one_chunk_per_doc': False,
-            'pdf_to_markdown': False,
-            'split_exercises': False,
+        "SLIDES": {
+            "type": "theory",
+            "subtype": "lecture_slides",
+            "one_chunk_per_page": True,
+            "one_chunk_per_doc": False,
+            "pdf_to_markdown": False,
+            "split_exercises": False,
         },
-        'REF': {
-            'type': 'theory',
-            'subtype': 'recommended_reading',
-            'one_chunk_per_page': False,
-            'one_chunk_per_doc': False,
-            'pdf_to_markdown': False,
-            'split_exercises': False,
+        "POLYCOPIE": {
+            "type": "theory",
+            "subtype": "polycopie",
+            "one_chunk_per_page": False,
+            "one_chunk_per_doc": False,
+            "pdf_to_markdown": False,
+            "split_exercises": False,
         },
-        'TP': {
-            'type': 'practice',
-            'subtype': 'lab',
-            'one_chunk_per_page': False,
-            'one_chunk_per_doc': False,
-            'pdf_to_markdown': False,
-            'split_exercises': False,
+        "LECTURE_NOTES": {
+            "type": "theory",
+            "subtype": "lecture_notes",
+            "one_chunk_per_page": False,
+            "one_chunk_per_doc": False,
+            "pdf_to_markdown": False,
+            "split_exercises": False,
         },
-        'TP_SOLUTION': {
-            'type': 'practice',
-            'subtype': 'lab',
-            'is_solution': True,
-            'one_chunk_per_page': False,
-            'one_chunk_per_doc': False,
-            'pdf_to_markdown': False,
-            'split_exercises': False,
+        "EXAM": {
+            "type": "exam",
+            "subtype": "previous_year_exam",
+            "one_chunk_per_page": False,
+            "one_chunk_per_doc": True,
+            "pdf_to_markdown": True,
+            "split_exercises": True,
         },
-        'LIB': {
-            'type': 'practice',
-            'subtype': 'lab_lib',
-            'one_chunk_per_page': False,
-            'one_chunk_per_doc': False,
-            'pdf_to_markdown': False,
-            'split_exercises': False,
+        "EXAM_SOLUTION": {
+            "type": "exam",
+            "subtype": "previous_year_exam",
+            "one_chunk_per_page": False,
+            "one_chunk_per_doc": True,
+            "pdf_to_markdown": True,
+            "split_exercises": True,
+            "is_solution": True,
         },
-        'WIKI': {
-            'type': 'practice',
-            'subtype': 'lab_wiki',
-            'one_chunk_per_page': False,
-            'one_chunk_per_doc': False,
-            'pdf_to_markdown': False,
-            'split_exercises': False,
+        "ASSIGNMENT": {
+            "type": "practice",
+            "subtype": "assignment",
+            "one_chunk_per_page": False,
+            "one_chunk_per_doc": True,
+            "pdf_to_markdown": True,
+            "split_exercises": True,
+        },
+        "ASSIGNMENT_SOLUTION": {
+            "type": "practice",
+            "subtype": "assignment_solution",
+            "one_chunk_per_page": False,
+            "one_chunk_per_doc": True,
+            "pdf_to_markdown": True,
+            "split_exercises": True,
+            "is_solution": True,
         },
     }
 
@@ -94,15 +103,9 @@ class MICRO315Course(BaseCourse):
     course_path = f"{CONFIG['BASE_PATH']}/{course_info['course_id']}"
     output_path = f"{course_path}/output"
 
-    mime_types = mt.DEFAULT_MIME_TYPES + [mt.C_SOURCE] + [mt.PYTHON_SOURCE]
-
     ################################################################
 
-    local_folder_base_path = f"{course_path}/local"
-
-    ################################################################
-
-    moodle_course_id = 467
+    moodle_course_id = 16050
 
     moodle_base_path = f"{course_path}/moodle"
 
@@ -127,16 +130,11 @@ class MICRO315Course(BaseCourse):
     @property
     def extractors(self) -> List[BaseExtractor]:
         return [
-            LocalFolderExtractor(
-                folder_base_path=self.local_folder_base_path,
-                tag_metadata=self.tag_metadata,
-                mime_types=self.mime_types,
-            ),
             MoodleExtractor(
                 moodle_course_id=self.moodle_course_id,
                 moodle_base_path=self.moodle_base_path,
                 tag_metadata=self.tag_metadata,
-                mime_types=self.mime_types,
+                mime_types=(mt.DEFAULT_MIME_TYPES + [mt.C_SOURCE]),
             )
         ]
 
@@ -167,5 +165,5 @@ if __name__ == '__main__':
         handlers=[logging.StreamHandler(sys.stdout)]
     )
 
-    course = BaseCourse.from_code('MICRO315')
+    course = BaseCourse.from_code('MATH261')
     course.run()

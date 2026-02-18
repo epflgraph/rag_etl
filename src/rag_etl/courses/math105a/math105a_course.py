@@ -22,33 +22,25 @@ import rag_etl.utils.mime_types as mt
 from rag_etl.config import CONFIG
 
 
-class PHYS108Course(BaseCourse):
+class MATH105aCourse(BaseCourse):
     """
-    Course-specific pipeline for PHYS108.
+    Course-specific pipeline for MATH105a.
     """
 
     course_info = {
-        "course_title": "Physique générale : fluides et électromagnétisme",
-        "course_id": "PHYS108",
+        "course_title": "Analyse avancée II - analyse vectorielle",
+        "course_id": "MATH105a",
         "academic_course": "2025-2026",
         "semester": 2,
-        "admin_info_link": "https://moodle.epfl.ch/course/view.php?id=15382",
-        "coursebook_link": "https://edu.epfl.ch/coursebook/fr/physique-generale-fluides-et-electromagnetisme-PHYS-108"
+        "admin_info_link": "https://moodle.epfl.ch/course/view.php?id=18875",
+        "coursebook_link": "https://edu.epfl.ch/coursebook/fr/analyse-avancee-ii-analyse-vectorielle-MATH-105-A"
     }
 
     tag_metadata = {
-        "FORMULARY": {
+        "POLYCOPIE": {
             "type": "theory",
-            "subtype": "cheatsheet",
+            "subtype": "polycopie",
             "one_chunk_per_page": False,
-            "one_chunk_per_doc": False,
-            "pdf_to_markdown": False,
-            "split_exercises": False,
-        },
-        "SLIDES": {
-            "type": "theory",
-            "subtype": "lecture_slides",
-            "one_chunk_per_page": True,
             "one_chunk_per_doc": False,
             "pdf_to_markdown": False,
             "split_exercises": False,
@@ -70,17 +62,34 @@ class PHYS108Course(BaseCourse):
             "split_exercises": True,
             "is_solution": True,
         },
-        "SERIE_SUPPLEMENTAIRE": {
+        "DEVOIR": {
             "type": "practice",
-            "subtype": "serie_supplementaire",
+            "subtype": "devoir",
             "one_chunk_per_page": False,
             "one_chunk_per_doc": True,
             "pdf_to_markdown": True,
             "split_exercises": True,
         },
-        "SERIE_SUPPLEMENTAIRE_SOLUTION": {
+        "DEVOIR_SOLUTION": {
             "type": "practice",
-            "subtype": "serie_supplementaire",
+            "subtype": "devoir",
+            "one_chunk_per_page": False,
+            "one_chunk_per_doc": True,
+            "pdf_to_markdown": True,
+            "split_exercises": True,
+            "is_solution": True,
+        },
+        "MOCK_EXAM": {
+            "type": "exam",
+            "subtype": "mock_exam",
+            "one_chunk_per_page": False,
+            "one_chunk_per_doc": True,
+            "pdf_to_markdown": True,
+            "split_exercises": True,
+        },
+        "MOCK_EXAM_SOLUTION": {
+            "type": "exam",
+            "subtype": "mock_exam",
             "one_chunk_per_page": False,
             "one_chunk_per_doc": True,
             "pdf_to_markdown": True,
@@ -114,7 +123,7 @@ class PHYS108Course(BaseCourse):
 
     ################################################################
 
-    moodle_course_id = 15382
+    moodle_course_id = 18875
 
     moodle_base_path = f"{course_path}/moodle"
 
@@ -144,7 +153,7 @@ class PHYS108Course(BaseCourse):
                 moodle_course_id=self.moodle_course_id,
                 moodle_base_path=self.moodle_base_path,
                 tag_metadata=self.tag_metadata,
-                mime_types=(mt.DEFAULT_MIME_TYPES + [mt.C_SOURCE]),
+                mime_types=mt.DEFAULT_MIME_TYPES,
             )
         ]
 
@@ -177,5 +186,5 @@ if __name__ == '__main__':
         handlers=[logging.StreamHandler(sys.stdout)]
     )
 
-    course = BaseCourse.from_code('PHYS108')
+    course = BaseCourse.from_code('MATH105a')
     course.run()

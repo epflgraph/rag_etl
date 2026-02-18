@@ -22,29 +22,21 @@ import rag_etl.utils.mime_types as mt
 from rag_etl.config import CONFIG
 
 
-class PHYS108Course(BaseCourse):
+class CS202Course(BaseCourse):
     """
-    Course-specific pipeline for PHYS108.
+    Course-specific pipeline for CS202.
     """
 
     course_info = {
-        "course_title": "Physique générale : fluides et électromagnétisme",
-        "course_id": "PHYS108",
+        "course_title": "Computer systems",
+        "course_id": "CS202",
         "academic_course": "2025-2026",
         "semester": 2,
-        "admin_info_link": "https://moodle.epfl.ch/course/view.php?id=15382",
-        "coursebook_link": "https://edu.epfl.ch/coursebook/fr/physique-generale-fluides-et-electromagnetisme-PHYS-108"
+        "admin_info_link": "https://moodle.epfl.ch/course/view.php?id=18346",
+        "coursebook_link": "https://edu.epfl.ch/coursebook/en/computer-systems-CS-202"
     }
 
     tag_metadata = {
-        "FORMULARY": {
-            "type": "theory",
-            "subtype": "cheatsheet",
-            "one_chunk_per_page": False,
-            "one_chunk_per_doc": False,
-            "pdf_to_markdown": False,
-            "split_exercises": False,
-        },
         "SLIDES": {
             "type": "theory",
             "subtype": "lecture_slides",
@@ -53,7 +45,7 @@ class PHYS108Course(BaseCourse):
             "pdf_to_markdown": False,
             "split_exercises": False,
         },
-        "SERIE": {
+        "EXERCISES": {
             "type": "practice",
             "subtype": "serie",
             "one_chunk_per_page": False,
@@ -61,7 +53,7 @@ class PHYS108Course(BaseCourse):
             "pdf_to_markdown": True,
             "split_exercises": True,
         },
-        "SERIE_SOLUTION": {
+        "EXERCISES_SOLUTION": {
             "type": "practice",
             "subtype": "serie",
             "one_chunk_per_page": False,
@@ -70,17 +62,34 @@ class PHYS108Course(BaseCourse):
             "split_exercises": True,
             "is_solution": True,
         },
-        "SERIE_SUPPLEMENTAIRE": {
+        "CASE_STUDY": {
             "type": "practice",
-            "subtype": "serie_supplementaire",
+            "subtype": "case_study",
             "one_chunk_per_page": False,
             "one_chunk_per_doc": True,
             "pdf_to_markdown": True,
             "split_exercises": True,
         },
-        "SERIE_SUPPLEMENTAIRE_SOLUTION": {
+        "CASE_STUDY_SOLUTION": {
             "type": "practice",
-            "subtype": "serie_supplementaire",
+            "subtype": "case_study",
+            "one_chunk_per_page": False,
+            "one_chunk_per_doc": True,
+            "pdf_to_markdown": True,
+            "split_exercises": True,
+            "is_solution": True,
+        },
+        "MIDTERM_EXAM": {
+            "type": "exam",
+            "subtype": "midterm_exam",
+            "one_chunk_per_page": False,
+            "one_chunk_per_doc": True,
+            "pdf_to_markdown": True,
+            "split_exercises": True,
+        },
+        "MIDTERM_EXAM_SOLUTION": {
+            "type": "exam",
+            "subtype": "midterm_exam",
             "one_chunk_per_page": False,
             "one_chunk_per_doc": True,
             "pdf_to_markdown": True,
@@ -114,7 +123,7 @@ class PHYS108Course(BaseCourse):
 
     ################################################################
 
-    moodle_course_id = 15382
+    moodle_course_id = 18346
 
     moodle_base_path = f"{course_path}/moodle"
 
@@ -138,7 +147,6 @@ class PHYS108Course(BaseCourse):
 
     @property
     def extractors(self) -> List[BaseExtractor]:
-        """Single Moodle extractor."""
         return [
             MoodleExtractor(
                 moodle_course_id=self.moodle_course_id,
@@ -150,7 +158,6 @@ class PHYS108Course(BaseCourse):
 
     @property
     def transformers(self) -> List[BaseTransformer]:
-        """Single transformer that converts PDFs into Markdown text."""
         return [
             ExtractZipTransformer(cache=self.course_code),
             JupyterToMarkdownTransformer(cache=self.course_code),
@@ -160,7 +167,6 @@ class PHYS108Course(BaseCourse):
 
     @property
     def loaders(self) -> List[BaseLoader]:
-        """No loaders defined for this course."""
         return [
             ContentMetadataLoader(
                 course_path=self.course_path,
@@ -177,5 +183,5 @@ if __name__ == '__main__':
         handlers=[logging.StreamHandler(sys.stdout)]
     )
 
-    course = BaseCourse.from_code('PHYS108')
+    course = BaseCourse.from_code('CS202')
     course.run()

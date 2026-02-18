@@ -6,7 +6,7 @@ import logging
 from typing import List, Tuple
 
 from rag_etl.courses import BaseCourse
-from rag_etl.extractors import BaseExtractor, MoodleExtractor, LocalFolderExtractor
+from rag_etl.extractors import BaseExtractor, MoodleExtractor
 from rag_etl.transformers import (
     BaseTransformer,
     ExtractZipTransformer,
@@ -22,69 +22,70 @@ import rag_etl.utils.mime_types as mt
 from rag_etl.config import CONFIG
 
 
-class MICRO315Course(BaseCourse):
+class ME524Course(BaseCourse):
     """
-    Course-specific pipeline for MICRO315.
+    Course-specific pipeline for ME524Course.
     """
 
     course_info = {
-        "course_title": "Systèmes embarqués et robotique",
-        "course_id": "MICRO315",
+        "course_title": "Advanced control systems",
+        "course_id": "ME524",
         "academic_course": "2025-2026",
         "semester": 2,
-        "admin_info_link": "https://moodle.epfl.ch/course/view.php?id=467",
-        "coursebook_link": "https://edu.epfl.ch/coursebook/fr/systemes-embarques-et-robotique-MICRO-315"
+        "admin_info_link": "https://moodle.epfl.ch/course/view.php?id=15024",
+        "coursebook_link": "https://edu.epfl.ch/coursebook/en/advanced-control-systems-ME-524"
     }
 
     tag_metadata = {
-        'SLIDES': {
-            'type': 'theory',
-            'subtype': 'lecture_slides',
-            'one_chunk_per_page': True,
-            'one_chunk_per_doc': False,
-            'pdf_to_markdown': False,
-            'split_exercises': False,
+        "SLIDES": {
+            "type": "theory",
+            "subtype": "lecture_slides",
+            "one_chunk_per_page": True,
+            "one_chunk_per_doc": False,
+            "pdf_to_markdown": False,
+            "split_exercises": False,
         },
-        'REF': {
-            'type': 'theory',
-            'subtype': 'recommended_reading',
-            'one_chunk_per_page': False,
-            'one_chunk_per_doc': False,
-            'pdf_to_markdown': False,
-            'split_exercises': False,
+        "COURSE_NOTES": {
+            "type": "theory",
+            "subtype": "course_notes",
+            "one_chunk_per_page": True,
+            "one_chunk_per_doc": False,
+            "pdf_to_markdown": False,
+            "split_exercises": False,
         },
-        'TP': {
-            'type': 'practice',
-            'subtype': 'lab',
-            'one_chunk_per_page': False,
-            'one_chunk_per_doc': False,
-            'pdf_to_markdown': False,
-            'split_exercises': False,
+        "EXERCISE": {
+            "type": "practice",
+            "subtype": "exercise",
+            "one_chunk_per_page": False,
+            "one_chunk_per_doc": True,
+            "pdf_to_markdown": True,
+            "split_exercises": True,
         },
-        'TP_SOLUTION': {
-            'type': 'practice',
-            'subtype': 'lab',
-            'is_solution': True,
-            'one_chunk_per_page': False,
-            'one_chunk_per_doc': False,
-            'pdf_to_markdown': False,
-            'split_exercises': False,
+        "EXERCISE_SOLUTION": {
+            "type": "practice",
+            "subtype": "exercise_solution",
+            "one_chunk_per_page": False,
+            "one_chunk_per_doc": True,
+            "pdf_to_markdown": True,
+            "split_exercises": True,
+            "is_solution": True,
         },
-        'LIB': {
-            'type': 'practice',
-            'subtype': 'lab_lib',
-            'one_chunk_per_page': False,
-            'one_chunk_per_doc': False,
-            'pdf_to_markdown': False,
-            'split_exercises': False,
+        "SERIE": {
+            "type": "practice",
+            "subtype": "serie",
+            "one_chunk_per_page": False,
+            "one_chunk_per_doc": True,
+            "pdf_to_markdown": True,
+            "split_exercises": True,
         },
-        'WIKI': {
-            'type': 'practice',
-            'subtype': 'lab_wiki',
-            'one_chunk_per_page': False,
-            'one_chunk_per_doc': False,
-            'pdf_to_markdown': False,
-            'split_exercises': False,
+        "SERIE_SOLUTION": {
+            "type": "practice",
+            "subtype": "serie",
+            "one_chunk_per_page": False,
+            "one_chunk_per_doc": True,
+            "pdf_to_markdown": True,
+            "split_exercises": True,
+            "is_solution": True,
         },
     }
 
@@ -94,15 +95,9 @@ class MICRO315Course(BaseCourse):
     course_path = f"{CONFIG['BASE_PATH']}/{course_info['course_id']}"
     output_path = f"{course_path}/output"
 
-    mime_types = mt.DEFAULT_MIME_TYPES + [mt.C_SOURCE] + [mt.PYTHON_SOURCE]
-
     ################################################################
 
-    local_folder_base_path = f"{course_path}/local"
-
-    ################################################################
-
-    moodle_course_id = 467
+    moodle_course_id = 15024
 
     moodle_base_path = f"{course_path}/moodle"
 
@@ -126,22 +121,19 @@ class MICRO315Course(BaseCourse):
 
     @property
     def extractors(self) -> List[BaseExtractor]:
+        """Single Moodle extractor."""
         return [
-            LocalFolderExtractor(
-                folder_base_path=self.local_folder_base_path,
-                tag_metadata=self.tag_metadata,
-                mime_types=self.mime_types,
-            ),
             MoodleExtractor(
                 moodle_course_id=self.moodle_course_id,
                 moodle_base_path=self.moodle_base_path,
                 tag_metadata=self.tag_metadata,
-                mime_types=self.mime_types,
+                mime_types=mt.DEFAULT_MIME_TYPES,
             )
         ]
 
     @property
     def transformers(self) -> List[BaseTransformer]:
+        """Single transformer that converts PDFs into Markdown text."""
         return [
             ExtractZipTransformer(cache=self.course_code),
             JupyterToMarkdownTransformer(cache=self.course_code),
@@ -151,6 +143,7 @@ class MICRO315Course(BaseCourse):
 
     @property
     def loaders(self) -> List[BaseLoader]:
+        """No loaders defined for this course."""
         return [
             ContentMetadataLoader(
                 course_path=self.course_path,
@@ -167,5 +160,5 @@ if __name__ == '__main__':
         handlers=[logging.StreamHandler(sys.stdout)]
     )
 
-    course = BaseCourse.from_code('MICRO315')
+    course = BaseCourse.from_code('ME524')
     course.run()

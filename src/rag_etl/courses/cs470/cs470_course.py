@@ -102,6 +102,14 @@ class CS470Course(BaseCourse):
             'pdf_to_markdown': False,
             'split_exercises': False,
         },
+        'SUBTITLES': {
+            'type': 'theory',
+            'subtype': 'video_subtitles',
+            'one_chunk_per_page': False,
+            'one_chunk_per_doc': False,
+            'pdf_to_markdown': False,
+            'split_exercises': False,
+        },
     }
 
     semester_start_date = date(year=2026, month=2, day=16)
@@ -136,7 +144,6 @@ class CS470Course(BaseCourse):
 
     @property
     def extractors(self) -> List[BaseExtractor]:
-        """Single Moodle extractor."""
         return [
             MoodleExtractor(
                 moodle_course_id=self.moodle_course_id,
@@ -148,7 +155,6 @@ class CS470Course(BaseCourse):
 
     @property
     def transformers(self) -> List[BaseTransformer]:
-        """Single transformer that converts PDFs into Markdown text."""
         return [
             ExtractZipTransformer(cache=self.course_code),
             JupyterToMarkdownTransformer(cache=self.course_code),
@@ -158,7 +164,6 @@ class CS470Course(BaseCourse):
 
     @property
     def loaders(self) -> List[BaseLoader]:
-        """No loaders defined for this course."""
         return [
             ContentMetadataLoader(
                 course_path=self.course_path,
@@ -171,7 +176,7 @@ if __name__ == '__main__':
     import sys
     logging.basicConfig(
         level=logging.INFO,
-        format='[%(levelname)s] [%(filename)s:%(lineno)d] %(message)s',
+        format='[%(asctime)s] [%(levelname)s] [%(filename)s:%(lineno)d] %(message)s',
         handlers=[logging.StreamHandler(sys.stdout)]
     )
 

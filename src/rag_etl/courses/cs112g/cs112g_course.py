@@ -33,12 +33,12 @@ class CS112GCourse(BaseCourse):
     """
 
     course_info = {
-        "course_title": "Intro to C++",
-        "course_id": "cs112g",
+        "course_title": "Programmation orientée objet",
+        "course_id": "CS112g",
         "academic_course": "2025-2026",
         "semester": 2,
-        "admin_info_link": "",
-        "coursebook_link": None,
+        "admin_info_link": "https://moodle.epfl.ch/course/view.php?id=5571",
+        "coursebook_link": "https://edu.epfl.ch/coursebook/fr/programmation-orientee-objet-CS-112-G",
         "course_language": "French",
     }
 
@@ -196,7 +196,6 @@ class CS112GCourse(BaseCourse):
     semester_start_date = date(year=2026, month=2, day=16)
     semester_end_date = date(year=2026, month=6, day=22)
 
-    # now course_path
     course_path = f"{CONFIG['BASE_PATH']}/{course_info['course_id']}"
     output_path = f"{course_path}/output"
 

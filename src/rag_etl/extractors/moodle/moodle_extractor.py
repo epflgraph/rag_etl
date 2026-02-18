@@ -17,6 +17,7 @@ from rag_etl.extractors import BaseExtractor
 
 import rag_etl.utils.mime_types as mt
 from rag_etl.utils.tags import split_tag_number_text
+from rag_etl.utils.encoding import sanitize_for_filename
 
 from rag_etl.config import CONFIG
 
@@ -143,10 +144,11 @@ class MoodleExtractor(BaseExtractor):
                     continue
 
                 # Extract module tag and number
-                module_tag, module_number, module["name"] = split_tag_number_text(module["name"])
+                module_tag, module_number, module_title = split_tag_number_text(module["name"])
 
                 # Build module unique name
                 module_unique_name = f"{module['modplural'][:-1]}.{module['name'].replace(':', '')}.{module['id']}"
+                module_unique_name = sanitize_for_filename(module_unique_name)
                 module_path = self.moodle_base_path / module_unique_name / "content"
 
                 for module_contents in module.get("contents", []):
@@ -155,7 +157,7 @@ class MoodleExtractor(BaseExtractor):
                         continue
 
                     # Extract module contents tag and number, default to module ones
-                    tag, number, module_contents["filename"] = split_tag_number_text(module_contents["filename"])
+                    tag, number, title = split_tag_number_text(module_contents["filename"])
                     if not tag:
                         tag = module_tag
                         number = module_number
@@ -186,8 +188,11 @@ class MoodleExtractor(BaseExtractor):
                         continue
 
                     # Save file to disk
-                    module_contents_path = module_path / Path(module_contents['filepath']).relative_to('/') / module_contents['filename']
-                    module_contents_unique_name = str(module_contents_path.relative_to(module_path))
+                    module_contents_path = (
+                        module_path
+                        / Path(module_contents["filepath"]).relative_to("/")
+                        / sanitize_for_filename(module_contents["filename"])
+                    )
                     module_contents_path.parent.mkdir(parents=True, exist_ok=True)
                     module_contents_path.write_bytes(response.content)
 
@@ -211,7 +216,7 @@ class MoodleExtractor(BaseExtractor):
                             section_title=section["name"],
                             section_text=section["summary"],
                             tag=tag,
-                            title=f"{module['name']} > {module_contents_unique_name}",
+                            title=f"{module_title} > {title}",
                             url=url,
                             path=str(module_contents_path),
                             source="moodle",

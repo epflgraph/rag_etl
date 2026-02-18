@@ -1,40 +1,42 @@
 import re
 
 
-def extract_tag(text):
+def split_tag_text(text):
     """
-    Extract tag from text (e.g. for "[SERIE_3] Serie 3" returns "SERIE_3").
+    Split tag from text (e.g. for "[SERIE_3] Serie 3" returns ("SERIE_3", "Serie 3")).
     """
 
     match = re.search(r"\[(.*?)\]", text)
 
     if match:
-        return match.group(1)
+        tag = match.group(1)
+        text = re.sub(r"\s*\[.*?\]\s*", "", text, count=1).strip()
+        return (tag, text)
 
-    return None
+    return (None, text)
 
 
-def extract_tag_and_number(text):
+def split_tag_number_text(text):
     """
-    Extract tag and number from text (e.g. for "[SERIE_3] Serie 3" returns ("SERIE", 3)).
+    Extract tag and number from text (e.g. for "[SERIE_3] Serie 3" returns ("SERIE", "3", "Serie 3")).
     """
 
-    tag = extract_tag(text)
+    tag, text = split_tag_text(text)
 
-    # If no tag, return Nones
+    # If no tag, return
     if tag is None:
-        return (None, None)
+        return (None, None, text)
 
     # Try to extract number from tag
     match = re.search(r'_(\d+)(?:_|$)', tag)
 
     # If no number, return only tag
     if not match:
-        return (tag, None)
+        return (tag, None, text)
 
     # If number, remove it from tag and return both separately
     number = match.group(1)
-    rest = tag.replace(f'_{number}', '')
+    tag = re.sub(rf'_{number}', '', tag, count=1)
 
     # Try to cast to int and then to string ("05" -> "5" but "5A" -> "5A")
     try:
@@ -42,4 +44,4 @@ def extract_tag_and_number(text):
     except Exception:
         pass
 
-    return (rest, number)
+    return (tag, number, text)

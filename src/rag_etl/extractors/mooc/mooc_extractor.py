@@ -18,7 +18,7 @@ class MOOCExtractor(BaseExtractor):
         tag_metadata: dict | None = None,
         mime_types: list[str] | None = None,
     ) -> None:
-        self.mooc_base_path = Path(mooc_base_path)
+        self.mooc_base_path = mooc_base_path
         self.tag_metadata = tag_metadata
         if mime_types is None:
             self.mime_types = mt.DEFAULT_MIME_TYPES

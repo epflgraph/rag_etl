@@ -11,7 +11,7 @@ from bs4.element import Tag, NavigableString
 from rag_etl.resources.mooc_resource import MOOCResource
 from rag_etl.extractors.mooc.utils import load_root_elem_from_mooc_xml, clean_text
 
-from rag_etl.utils.tags import extract_tag_and_number
+from rag_etl.utils.tags import split_tag_number_text
 from rag_etl.utils import resolve_path
 
 import rag_etl.utils.mime_types as mt
@@ -209,29 +209,27 @@ class HtmlParser:
         logger.debug(f"mooc_resource_title={mooc_resource_title}")
         # module_tag = extract_tag(mooc_resource_title)
 
-        module_tag, module_number = extract_tag_and_number(mooc_resource_title)
+        module_tag, module_number, mooc_resource_title = split_tag_number_text(mooc_resource_title)
         logger.debug(f"title module_tag={module_tag}")
         logger.debug(f"title module_number={module_number}")
+        logger.debug(f"title mooc_resource_title={mooc_resource_title}")
 
         # Extract text from HTML
         html_text = html_path.read_text(encoding="utf-8")
 
         if not module_tag:
-            # Loook for tags inside the HTML
-            module_tag, module_number = extract_tag_and_number(html_text)
+            # Look for tags inside the HTML
+            module_tag, module_number, html_text = split_tag_number_text(html_text)
+
             if not module_tag:
                 logger.warning(
                     "HtmlParser: no module tag found in title nor html content:"
                 )
                 return []
-            else:
-                html_text = html_text.replace(f"[{module_tag}]", "")
 
             logger.debug(f"inside html module_tag={module_tag}")
             logger.debug(f"inside html module_number={module_number}")
-        else:
-            mooc_resource_title = mooc_resource_title.replace(f"[{module_tag}]", "")
-            logger.debug(f"mooc_resource_title={mooc_resource_title}")
+            logger.debug(f"inside html html_text={html_text}")
 
         if module_tag not in tag_metadata.keys():
             return []
@@ -292,12 +290,8 @@ class HtmlParser:
 
                 # We don't extract tags from the PDF files, we use the one extracted from the HTML title or content
                 if not module_tag:
-                    logger.warning(
-                        "HtmlParser: no module tag found in title: %s", resource_title
-                    )
+                    logger.warning(f"HtmlParser: no module tag found in title: {resource_title}")
                     return []
-
-                resource_title = resource_title.replace(f"[{module_tag}]", "")
 
                 logger.debug(f"module_tag={module_tag}")
                 tag_dict = tag_metadata.get(module_tag)
@@ -311,7 +305,7 @@ class HtmlParser:
                     source="mooc",
                     url="",
                     path=str(resource_path),
-                    mime_type=mt.guess_mime_type(str(resource_path)),
+                    mime_type=mime_type,
                     type=tag_dict.get("type"),
                     subtype=tag_dict.get("subtype"),
                     number=module_number,

@@ -11,7 +11,7 @@ from rag_etl.resources import LocalResource
 from rag_etl.extractors import BaseExtractor
 
 import rag_etl.utils.mime_types as mt
-from rag_etl.utils.tags import extract_tag_and_number
+from rag_etl.utils.tags import split_tag_number_text
 
 from rag_etl.config import CONFIG
 
@@ -43,7 +43,7 @@ class LocalFolderExtractor(BaseExtractor):
 
     def extract_closest_tag_and_number(self, path):
         # Extract tag and number from current path
-        tag, number = extract_tag_and_number(path.name)
+        tag, number, _ = split_tag_number_text(path.name)
 
         # If found, return them
         if tag:

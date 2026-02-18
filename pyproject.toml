@@ -27,6 +27,7 @@ dependencies = [
     "nbconvert",
     "pymupdf",
     "Pillow",
+    "pathvalidate",     # sanitise user-input strings to use as filenames
 ]
 
 [tool.setuptools]

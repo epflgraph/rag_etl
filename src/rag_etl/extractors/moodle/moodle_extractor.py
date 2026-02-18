@@ -16,8 +16,8 @@ from rag_etl.resources import MoodleResource
 from rag_etl.extractors import BaseExtractor
 
 import rag_etl.utils.mime_types as mt
-from rag_etl.utils.tags import extract_tag_and_number
-from rag_etl.utils.encoding import normalize_for_compare
+from rag_etl.utils.tags import split_tag_number_text
+from rag_etl.utils.encoding import sanitize_for_filename
 
 from rag_etl.config import CONFIG
 
@@ -140,16 +140,15 @@ class MoodleExtractor(BaseExtractor):
             for module in section.get("modules", []):
                 # Skip if not a 'resource' (filter Forum modules, URL modules, etc.)
                 if module["modname"] not in ("resource", "folder"):
-                    logging.debug(
-                        f"Skipping module {module['name']} because of modname {module['modname']}"
-                    )
+                    logging.debug(f"Skipping module {module['name']} because of modname {module['modname']}")
                     continue
 
                 # Extract module tag and number
-                module_tag, module_number = extract_tag_and_number(module["name"])
+                module_tag, module_number, module_title = split_tag_number_text(module["name"])
 
                 # Build module unique name
                 module_unique_name = f"{module['modplural'][:-1]}.{module['name'].replace(':', '')}.{module['id']}"
+                module_unique_name = sanitize_for_filename(module_unique_name)
                 module_path = self.moodle_base_path / module_unique_name / "content"
 
                 for module_contents in module.get("contents", []):
@@ -158,28 +157,24 @@ class MoodleExtractor(BaseExtractor):
                         continue
 
                     # Extract module contents tag and number, default to module ones
-                    tag, number = extract_tag_and_number(module_contents["filename"])
+                    tag, number, title = split_tag_number_text(module_contents["filename"])
                     if not tag:
                         tag = module_tag
                         number = module_number
+
                     if number is not None:
                         number = str(number)
+
                     # Skip if no tag or unrecognised tag
                     if not tag or tag not in self.tag_metadata:
                         continue
 
                     # Extract metadata from tag
-                    type_ = self.tag_metadata.get(tag, {}).get("type")
-                    subtype = self.tag_metadata.get(tag, {}).get("subtype")
-                    is_solution = self.tag_metadata.get(tag, {}).get(
-                        "is_solution", False
-                    )
-                    one_chunk_per_page = self.tag_metadata.get(tag, {}).get(
-                        "one_chunk_per_page", False
-                    )
-                    one_chunk_per_doc = self.tag_metadata.get(tag, {}).get(
-                        "one_chunk_per_doc", False
-                    )
+                    type_ = self.tag_metadata.get(tag, {}).get('type')
+                    subtype = self.tag_metadata.get(tag, {}).get('subtype')
+                    is_solution = self.tag_metadata.get(tag, {}).get('is_solution', False)
+                    one_chunk_per_page = self.tag_metadata.get(tag, {}).get('one_chunk_per_page', False)
+                    one_chunk_per_doc = self.tag_metadata.get(tag, {}).get('one_chunk_per_doc', False)
 
                     # Download file from url
                     url = f"{module_contents['fileurl']}&token={CONFIG['MOODLE_TOKEN']}"
@@ -189,25 +184,14 @@ class MoodleExtractor(BaseExtractor):
                     try:
                         response.raise_for_status()  # Raises an error if download fails
                     except requests.HTTPError:
-                        logging.debug(
-                            f"Download failed for file {module['name']} > {module_contents['filename']}. Ignoring..."
-                        )
-                        print("CCC")
+                        logging.debug(f"Download failed for file {module['name']} > {module_contents['filename']}. Ignoring...")
                         continue
 
                     # Save file to disk
                     module_contents_path = (
                         module_path
                         / Path(module_contents["filepath"]).relative_to("/")
-                        / module_contents["filename"]
-                    )
-                    # print("Comple" in str(module_contents_path))
-                    # print("Complé" in str(module_contents_path))
-                    # module_contents_path = normalize_for_compare(module_contents_path)
-                    # print("Comple" in str(module_contents_path))
-                    # print("Complé" in str(module_contents_path))
-                    module_contents_unique_name = str(
-                        module_contents_path.relative_to(module_path)
+                        / sanitize_for_filename(module_contents["filename"])
                     )
                     module_contents_path.parent.mkdir(parents=True, exist_ok=True)
                     module_contents_path.write_bytes(response.content)
@@ -226,16 +210,13 @@ class MoodleExtractor(BaseExtractor):
                         processing_method = None
                         model = None
 
-                    name = section["name"].replace(f"[{module_tag}]", "")  # new
-                    title = f"{name} > {module_contents_unique_name}"
                     # Append resource
                     resources.append(
                         MoodleResource(
                             section_title=section["name"],
                             section_text=section["summary"],
                             tag=tag,
-                            title=title,
-                            # title=section["name"],
+                            title=f"{module_title} > {title}",
                             url=url,
                             path=str(module_contents_path),
                             source="moodle",
@@ -252,4 +233,5 @@ class MoodleExtractor(BaseExtractor):
                             until=until,
                         )
                     )
+
         return resources

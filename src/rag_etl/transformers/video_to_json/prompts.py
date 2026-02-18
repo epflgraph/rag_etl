@@ -11,12 +11,12 @@ Analyze in-depth the entire given video, and provide:
 
 3. Two lists (in English and in French) of at least five and at most 10 keywords that describe the contents of the whole video.
 
-4. Create video segments (VideoUnderstandingSegment) ranging from 3 to 180 seconds, depending on the changes in the video. We want to start a new video segment when there is a noticeable change in slides or content.
+4. Create video segments (VideoUnderstandingSegment) ranging from 3 to 120 seconds, depending on the changes in the video. We want to start a new video segment when there is a change in slides or content.
 Rules: 
 - Video segments must be consecutive, with no gaps, and the end_time of each segment must match the start_time of the next.
-- The end_time of the last video segment should match the video's end.
-- Within each video segment, we want to select the key video frame (key_frame_time) with the most visual information.
-- This video keyframe will be, in most cases, the last video frame of the video segment (unless you are confident that it should be another frame)
+- The end_time of the last video segment should match the video's end time. e.g., if the duration of the video is 00:08:13,000, the end_time from the last video segment MUST be 00:08:13,000.
+- Within each video segment, we want to select the key video frame (key_frame_time) with the most visual information (e.g., if text on screen, with the maximum amount of text on screen)
+- This video keyframe will be, in most cases, the last video frame of the video segment (unless you are confident that there is another frame with more visual information)
 
 For each video segment (VideoUnderstandingSegment), provide the following:
 4.1. The start_time and end_time of the video segment in SRT (hours:minutes:seconds,milliseconds) format
@@ -63,10 +63,10 @@ For each video segment (VideoUnderstandingSegment), provide the following:
 # Here is some C++ code in the video frame
 using namespace std;
 ```           
-
 - **General Remarks**:
 - When the video frame contains software, do NOT extract text from its interface. e.g., skip words from the navigation menu: File, Preferences, Edit, etc.
 - Ignore the presenter's pen or pointer.
 - Ignore if there is a title of the course, name of the university (EPFL), or name of the teacher.
 - Ignore if there is a small video window with the teacher.
+- Ignore background images used in the slides from the video.
 """

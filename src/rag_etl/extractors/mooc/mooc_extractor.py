@@ -14,13 +14,11 @@ class MOOCExtractor(BaseExtractor):
 
     def __init__(
         self,
-        moodle_course_id: int,
-        moodle_base_path: str,
+        mooc_base_path: str,
         tag_metadata: dict | None = None,
         mime_types: list[str] | None = None,
     ) -> None:
-        self.moodle_course_id = moodle_course_id
-        self.moodle_base_path = Path(moodle_base_path)
+        self.mooc_base_path = Path(mooc_base_path)
         self.tag_metadata = tag_metadata
         if mime_types is None:
             self.mime_types = mt.DEFAULT_MIME_TYPES
@@ -34,5 +32,6 @@ class MOOCExtractor(BaseExtractor):
 
         course_parser = CourseParser()
         return course_parser.parse(
-            course_path=self.moodle_base_path,
+            course_path=self.mooc_base_path,
+            tag_metadata=self.tag_metadata,
         )

@@ -21,6 +21,7 @@ class VerticalParser:
         self,
         course_path: str,
         elem_vertical: _Element,
+        tag_metadata: dict | None = None,
     ) -> list[MOOCResource]:
         """Parse a MOOC vertical"""
 
@@ -47,6 +48,7 @@ class VerticalParser:
                     course_path=course_path,
                     elem_vertical=child,
                     vertical_display_name=vertical_display_name,
+                    tag_metadata=tag_metadata,
                 )
                 # Extend the returned list of resources
                 if html_extracted_resources is not None:
@@ -58,6 +60,7 @@ class VerticalParser:
                     course_path=course_path,
                     elem_vertical=child,
                     vertical_display_name=vertical_display_name,
+                    tag_metadata=tag_metadata,
                 )
                 # Extend the returned list of resources
                 if quiz_extracted_resources is not None:
@@ -69,6 +72,7 @@ class VerticalParser:
                     course_path=course_path,
                     elem_vertical=child,
                     vertical_display_name=vertical_display_name,
+                    tag_metadata=tag_metadata,
                 )
                 # Append the returned resource
                 if video_resource is not None:

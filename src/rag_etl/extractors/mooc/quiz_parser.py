@@ -5,7 +5,6 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from lxml.etree import _Element
-import re
 
 import rag_etl.utils.mime_types as mt
 from rag_etl.resources.mooc_resource import MOOCResource
@@ -57,6 +56,7 @@ class QuizParser:
         course_path: str,
         elem_vertical: _Element,
         vertical_display_name: str,
+        tag_metadata: dict,
     ) -> list[MOOCResource]:
         mooc_resources: list[MOOCResource] = []
 
@@ -95,45 +95,49 @@ class QuizParser:
         # assignment vs solution used by Tutor Bot
         number_str = self.extract_quiz_number(resource_title=resource_title)
 
+        # tag_name = "QUIZ"
+        tag_name = "MOOC_QUIZ"
+        tag_dict = tag_metadata.get(tag_name)
+
         # Quiz
         quiz_res: MOOCResource = MOOCResource(
+            source="mooc",
             title=resource_title,
-            source="MOOC",
             url="",
             path=str(quiz_md_path),
             mime_type=mt.guess_mime_type(str(quiz_md_path)),
             is_video=False,
             is_solution=False,
             is_gemini_processed_video=False,
-            processing_method=None,
             model=None,
-            tag="QUIZ",
-            type="theory",
-            subtype="quiz",
+            tag=tag_name,
+            type=tag_dict.get("type"),
+            subtype=tag_dict.get("subtype"),
             number=number_str,
-            one_chunk_per_page=False,
-            one_chunk_per_doc=True,
+            one_chunk_per_page=tag_dict.get("one_chunk_per_page"),
+            one_chunk_per_doc=tag_dict.get("one_chunk_per_doc"),
+            processing_method=tag_dict.get("processing_method"),
         )
         mooc_resources.append(quiz_res)
 
         # Quiz with solution
         quiz_sol_res: MOOCResource = MOOCResource(
+            source="mooc",
             title=resource_title,
-            source="MOOC",
             url="",
             path=str(quiz_sol_md_path),
             mime_type=mt.guess_mime_type(str(quiz_sol_md_path)),
             is_video=False,
             is_solution=True,
             is_gemini_processed_video=False,
-            processing_method=None,
             model=None,
-            tag="QUIZ",
-            type="theory",
-            subtype="quiz",
+            tag=tag_name,
+            type=tag_dict.get("type"),
+            subtype=tag_dict.get("subtype"),
             number=number_str,
-            one_chunk_per_page=False,
-            one_chunk_per_doc=True,
+            one_chunk_per_page=tag_dict.get("one_chunk_per_page"),
+            one_chunk_per_doc=tag_dict.get("one_chunk_per_doc"),
+            processing_method=tag_dict.get("processing_method"),
         )
         mooc_resources.append(quiz_sol_res)
 
@@ -290,16 +294,21 @@ class QuizParser:
         if sol is None:
             return None
 
-        chunks: list[str] = []
-        for node in sol.iter():
-            if node is sol:
-                continue
-            if node.tag in {"p", "div"}:
-                md = self.xml_to_markdown(node)
-                if md.strip():
-                    chunks.append(md)
+        # <solution><div class="detailed-solution"><p>...</p>...</div></solution>
+        container = (
+            sol.find("./div[@class='detailed-solution']") or sol.find("./div") or sol
+        )
 
-        out = normalize_markdown("\n\n".join(chunks))
+        chunks: list[str] = []
+
+        for p in container.findall("./p"):
+            md = self.xml_to_markdown(p)
+            if md.strip():
+                chunks.append(md)
+
+        solution_text = "\n\n".join(chunks)
+        solution_text = solution_text.replace("Explanation", "")
+        out = normalize_markdown(solution_text)
         return out or None
 
     def render_markdown(self, quiz: QuizData, include_solutions: bool) -> str:

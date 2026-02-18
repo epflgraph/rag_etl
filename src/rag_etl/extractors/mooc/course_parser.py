@@ -15,6 +15,7 @@ class CourseParser:
     def parse(
         self,
         course_path: str,
+        tag_metadata: dict | None = None,
     ) -> list[MOOCResource]:
         """Parse a MOOC course"""
 
@@ -29,10 +30,11 @@ class CourseParser:
                 chapter_parser.parse(
                     course_path=course_path,
                     chapter_filename=chapter_filename,
+                    tag_metadata=tag_metadata,
                 )
             )
 
-        for item in items:
-            logger.debug(f"item={item}")
+        # for item in items:
+        #     logger.debug(f"item={item}")
 
         return items

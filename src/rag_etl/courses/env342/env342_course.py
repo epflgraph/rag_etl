@@ -4,7 +4,7 @@ from datetime import date
 
 import logging
 from rag_etl.courses import BaseCourse
-from rag_etl.extractors import BaseExtractor, MOOCExtractor, LocalFolderExtractor
+from rag_etl.extractors import BaseExtractor, MOOCExtractor, EdDiscussionExtractor
 from rag_etl.transformers import (
     BaseTransformer,
     PDFToMarkdownTransformer,
@@ -18,59 +18,43 @@ import rag_etl.utils.mime_types as mt
 from rag_etl.config import CONFIG
 
 
-class MGT645Course(BaseCourse):
+class ENV342Course(BaseCourse):
     """
-    Course-specific pipeline for MGT-645.
+    Course-specific pipeline for ENV-342.
     """
 
     course_info = {
-        "course_title": "From lab to market: key steps",
-        "course_id": "mgt645",
+        "course_title": "Geographic Information System",
+        "course_id": "env342",
         "academic_course": "2025-2026",
         "semester": 2,
         "admin_info_link": "",
         "coursebook_link": None,
+        "course_language": "French",  # ask Aitor to add this
     }
 
+    # [SLIDES]
+    # [POLYCOPIE]
+    # [EXERCISE_SIG_x]
+    # [EXERCISE_GEO_x]
+    # [PROJET_x]
+    # [EXAMEN_x]
+
     tag_metadata = {
-        "ASSIGNMENT": {
+        "MOOC_VIDEO": {
+            "type": "theory",
+            "subtype": "video_lecture",
+            "one_chunk_per_page": False,
+            "one_chunk_per_doc": False,
+            "pdf_to_markdown": False,
+            "split_exercises": False,
+            "is_video": True,
+            "is_gemini_processed_video": True,
+            "processing_method": "gemini",
+            "model": "gemini-2.5-pro",
+        },
+        "MOOC_QUIZ": {
             "type": "practice",
-            "subtype": "assignment",
-            "one_chunk_per_page": False,
-            "one_chunk_per_doc": True,
-            "pdf_to_markdown": False,
-            "split_exercises": False,
-            "is_video": False,
-            "is_gemini_processed_video": False,
-            "processing_method": None,
-            "model": None,
-        },
-        "LECTURE_NOTES": {
-            "type": "theory",
-            "subtype": "lecture_notes",
-            "one_chunk_per_page": False,
-            "one_chunk_per_doc": False,
-            "pdf_to_markdown": False,
-            "split_exercises": False,
-            "is_video": False,
-            "is_gemini_processed_video": False,
-            "processing_method": None,
-            "model": None,
-        },
-        "RECOMMENDED_READING": {
-            "type": "theory",
-            "subtype": "recommended_reading",
-            "one_chunk_per_page": False,
-            "one_chunk_per_doc": False,
-            "pdf_to_markdown": False,
-            "split_exercises": False,
-            "is_video": False,
-            "is_gemini_processed_video": False,
-            "processing_method": None,
-            "model": None,
-        },
-        "QUIZ": {
-            "type": "theory",
             "subtype": "quiz",
             "one_chunk_per_page": False,
             "one_chunk_per_doc": True,
@@ -81,28 +65,17 @@ class MGT645Course(BaseCourse):
             "processing_method": None,
             "model": None,
         },
-        "VIDEO": {
-            "type": "theory",
-            "subtype": "video_lecture",
-            "one_chunk_per_page": False,
-            "one_chunk_per_doc": False,
-            "pdf_to_markdown": False,
-            "split_exercises": False,
-            "is_video": True,
-            "is_gemini_processed_video": True,
-            "processing_method": "gemini",
-            "model": "gemini-3-flash-preview",
-        },
     }
 
     semester_start_date = date(year=2026, month=2, day=16)
     semester_end_date = date(year=2026, month=6, day=22)
 
+    # now course_path
     course_path = f"{CONFIG['BASE_PATH']}/{course_info['course_id']}"
     output_path = f"{course_path}/output"
 
-    mooc_base_path = f"{course_path}/mooc"
-    local_base_path = f"{course_path}/local"
+    mooc_base_path_gis_1 = f"{course_path}/mooc_gis_1"
+    mooc_base_path_gis_2 = f"{course_path}/mooc_gis_2"
 
     @property
     def pdf_to_markdown_type_subtypes(self) -> list[tuple[str, str]]:
@@ -114,17 +87,17 @@ class MGT645Course(BaseCourse):
 
     @property
     def extractors(self) -> list[BaseExtractor]:
-        """Single Moodle extractor."""
+        """Single MOOC extractor."""
         return [
             MOOCExtractor(
-                mooc_base_path=self.mooc_base_path,
+                mooc_base_path=self.mooc_base_path_gis_1,
                 tag_metadata=self.tag_metadata,
                 mime_types=(mt.DEFAULT_MIME_TYPES + [mt.MP4, mt.MD, mt.JSON]),
             ),
-            LocalFolderExtractor(
-                folder_base_path=self.local_base_path,
+            MOOCExtractor(
+                mooc_base_path=self.mooc_base_path_gis_2,
                 tag_metadata=self.tag_metadata,
-                mime_types=(mt.DEFAULT_MIME_TYPES),
+                mime_types=(mt.DEFAULT_MIME_TYPES + [mt.MP4, mt.MD, mt.JSON]),
             ),
         ]
 
@@ -143,7 +116,8 @@ class MGT645Course(BaseCourse):
         """No loaders defined for this course."""
         return [
             ContentMetadataLoader(
-                course_path=self.course_path, course_info=self.course_info
+                course_path=self.course_path,
+                course_info=self.course_info,
             )
         ]
 
@@ -152,10 +126,10 @@ if __name__ == "__main__":
     import sys
 
     logging.basicConfig(
-        level=logging.INFO,
-        format='[%(asctime)s] [%(levelname)s] [%(filename)s:%(lineno)d] %(message)s',
+        level=logging.DEBUG,
+        format="[%(levelname)s] [%(filename)s:%(lineno)d] %(message)s",
         handlers=[logging.StreamHandler(sys.stdout)],
     )
 
-    course = BaseCourse.from_code("MGT645")
+    course = BaseCourse.from_code("ENV342")
     course.run()

@@ -22,18 +22,18 @@ import rag_etl.utils.mime_types as mt
 from rag_etl.config import CONFIG
 
 
-class ME524Course(BaseCourse):
+class CS202Course(BaseCourse):
     """
-    Course-specific pipeline for ME524Course.
+    Course-specific pipeline for CS202.
     """
 
     course_info = {
-        "course_title": "Advanced control systems",
-        "course_id": "ME524",
+        "course_title": "Computer systems",
+        "course_id": "CS202",
         "academic_course": "2025-2026",
         "semester": 2,
-        "admin_info_link": "https://moodle.epfl.ch/course/view.php?id=15024",
-        "coursebook_link": "https://edu.epfl.ch/coursebook/en/advanced-control-systems-ME-524"
+        "admin_info_link": "https://moodle.epfl.ch/course/view.php?id=18346",
+        "coursebook_link": "https://edu.epfl.ch/coursebook/en/computer-systems-CS-202"
     }
 
     tag_metadata = {
@@ -45,42 +45,68 @@ class ME524Course(BaseCourse):
             "pdf_to_markdown": False,
             "split_exercises": False,
         },
-        "COURSE_NOTES": {
-            "type": "theory",
-            "subtype": "course_notes",
-            "one_chunk_per_page": True,
-            "one_chunk_per_doc": False,
-            "pdf_to_markdown": False,
-            "split_exercises": False,
-        },
-        "EXERCISE": {
+        "EXERCISES": {
             "type": "practice",
-            "subtype": "exercise",
+            "subtype": "serie",
             "one_chunk_per_page": False,
             "one_chunk_per_doc": True,
             "pdf_to_markdown": True,
             "split_exercises": True,
         },
-        "EXERCISE_SOLUTION": {
+        "EXERCISES_SOLUTION": {
             "type": "practice",
-            "subtype": "exercise_solution",
+            "subtype": "serie",
             "one_chunk_per_page": False,
             "one_chunk_per_doc": True,
             "pdf_to_markdown": True,
             "split_exercises": True,
             "is_solution": True,
         },
-        "SERIE": {
+        "CASE_STUDY": {
             "type": "practice",
-            "subtype": "serie",
+            "subtype": "case_study",
             "one_chunk_per_page": False,
             "one_chunk_per_doc": True,
             "pdf_to_markdown": True,
             "split_exercises": True,
         },
-        "SERIE_SOLUTION": {
+        "CASE_STUDY_SOLUTION": {
             "type": "practice",
-            "subtype": "serie",
+            "subtype": "case_study",
+            "one_chunk_per_page": False,
+            "one_chunk_per_doc": True,
+            "pdf_to_markdown": True,
+            "split_exercises": True,
+            "is_solution": True,
+        },
+        "MIDTERM_EXAM": {
+            "type": "exam",
+            "subtype": "midterm_exam",
+            "one_chunk_per_page": False,
+            "one_chunk_per_doc": True,
+            "pdf_to_markdown": True,
+            "split_exercises": True,
+        },
+        "MIDTERM_EXAM_SOLUTION": {
+            "type": "exam",
+            "subtype": "midterm_exam",
+            "one_chunk_per_page": False,
+            "one_chunk_per_doc": True,
+            "pdf_to_markdown": True,
+            "split_exercises": True,
+            "is_solution": True,
+        },
+        "EXAM": {
+            "type": "exam",
+            "subtype": "previous_year_exam",
+            "one_chunk_per_page": False,
+            "one_chunk_per_doc": True,
+            "pdf_to_markdown": True,
+            "split_exercises": True,
+        },
+        "EXAM_SOLUTION": {
+            "type": "exam",
+            "subtype": "previous_year_exam",
             "one_chunk_per_page": False,
             "one_chunk_per_doc": True,
             "pdf_to_markdown": True,
@@ -97,7 +123,7 @@ class ME524Course(BaseCourse):
 
     ################################################################
 
-    moodle_course_id = 15024
+    moodle_course_id = 18346
 
     moodle_base_path = f"{course_path}/moodle"
 
@@ -121,19 +147,17 @@ class ME524Course(BaseCourse):
 
     @property
     def extractors(self) -> List[BaseExtractor]:
-        """Single Moodle extractor."""
         return [
             MoodleExtractor(
                 moodle_course_id=self.moodle_course_id,
                 moodle_base_path=self.moodle_base_path,
                 tag_metadata=self.tag_metadata,
-                mime_types=mt.DEFAULT_MIME_TYPES,
+                mime_types=(mt.DEFAULT_MIME_TYPES + [mt.C_SOURCE]),
             )
         ]
 
     @property
     def transformers(self) -> List[BaseTransformer]:
-        """Single transformer that converts PDFs into Markdown text."""
         return [
             ExtractZipTransformer(cache=self.course_code),
             JupyterToMarkdownTransformer(cache=self.course_code),
@@ -143,7 +167,6 @@ class ME524Course(BaseCourse):
 
     @property
     def loaders(self) -> List[BaseLoader]:
-        """No loaders defined for this course."""
         return [
             ContentMetadataLoader(
                 course_path=self.course_path,
@@ -160,5 +183,5 @@ if __name__ == '__main__':
         handlers=[logging.StreamHandler(sys.stdout)]
     )
 
-    course = BaseCourse.from_code('ME524')
+    course = BaseCourse.from_code('CS202')
     course.run()

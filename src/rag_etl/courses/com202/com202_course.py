@@ -33,7 +33,7 @@ class COM202Course(BaseCourse):
         "academic_course": "2025-2026",
         "semester": 2,
         "admin_info_link": "",
-        "coursebook_link": None,
+        "coursebook_link": "https://edu.epfl.ch/coursebook/en/signal-processing-COM-202",
     }
 
     tag_metadata = {
@@ -131,7 +131,7 @@ class COM202Course(BaseCourse):
         },
         "HANDOUT": {
             "type": "theory",
-            "subtype": "handout",
+            "subtype": "recommended_reading",
             "one_chunk_per_page": False,
             "one_chunk_per_doc": False,
             "pdf_to_markdown": False,
@@ -174,16 +174,16 @@ class COM202Course(BaseCourse):
             "subtype": "mooc_practice_homework",
             "one_chunk_per_page": False,
             "one_chunk_per_doc": True,
-            "pdf_to_markdown": False,
-            "split_exercises": False,
+            "pdf_to_markdown": True,
+            "split_exercises": True,
         },
         "MOOC_PRACTICE_HOMEWORK_SOLUTION": {
             "type": "practice",
             "subtype": "mooc_practice_homework",
             "one_chunk_per_page": False,
             "one_chunk_per_doc": True,
-            "pdf_to_markdown": False,
-            "split_exercises": False,
+            "pdf_to_markdown": True,
+            "split_exercises": True,
             "is_solution": True,
         },
         "MOOC_LECTURE_NOTES": {

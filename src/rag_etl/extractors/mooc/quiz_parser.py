@@ -95,7 +95,6 @@ class QuizParser:
         # assignment vs solution used by Tutor Bot
         number_str = self.extract_quiz_number(resource_title=resource_title)
 
-        # tag_name = "QUIZ"
         tag_name = "MOOC_QUIZ"
         tag_dict = tag_metadata.get(tag_name)
 
@@ -124,7 +123,7 @@ class QuizParser:
         quiz_sol_res: MOOCResource = MOOCResource(
             source="mooc",
             title=resource_title,
-            url="",
+            url=None,
             path=str(quiz_sol_md_path),
             mime_type=mt.guess_mime_type(str(quiz_sol_md_path)),
             is_video=False,

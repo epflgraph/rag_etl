@@ -66,7 +66,6 @@ class VideoParser:
         else:
             return None
 
-        # tag_name = "VIDEO"
         tag_name = "MOOC_VIDEO"
         tag_dict = tag_metadata.get(tag_name)
 

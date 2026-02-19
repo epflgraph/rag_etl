@@ -12,7 +12,7 @@ from rag_etl.resources.mooc_resource import MOOCResource
 from rag_etl.extractors.mooc.utils import load_root_elem_from_mooc_xml, clean_text
 
 from rag_etl.utils.tags import split_tag_number_text
-from rag_etl.utils import resolve_path
+from rag_etl.utils import sanitize_for_filename
 
 import rag_etl.utils.mime_types as mt
 
@@ -24,6 +24,15 @@ class HtmlParser:
     """
     HTML Parser for MOOCs.
     """
+
+    pdf_default_processing_method = "rcp"
+    pdf_default_model = "Qwen/Qwen3-VL-235B-A22B-Thinking-fp8"
+
+    @staticmethod
+    def get_plain_text(html_text: str) -> str:
+        """Parse HTML and return plain text (for tag extraction)."""
+        soup = BeautifulSoup(html_text, "html.parser")
+        return soup.get_text()
 
     def convert_html_text_to_markdown(self, html_text: str) -> str:
         """Convert HTML content to Markdown with BeautifulSoup"""
@@ -209,7 +218,9 @@ class HtmlParser:
         logger.debug(f"mooc_resource_title={mooc_resource_title}")
         # module_tag = extract_tag(mooc_resource_title)
 
-        module_tag, module_number, mooc_resource_title = split_tag_number_text(mooc_resource_title)
+        module_tag, module_number, mooc_resource_title = split_tag_number_text(
+            mooc_resource_title
+        )
         logger.debug(f"title module_tag={module_tag}")
         logger.debug(f"title module_number={module_number}")
         logger.debug(f"title mooc_resource_title={mooc_resource_title}")
@@ -218,15 +229,24 @@ class HtmlParser:
         html_text = html_path.read_text(encoding="utf-8")
 
         if not module_tag:
-            # Look for tags inside the HTML
-            module_tag, module_number, html_text = split_tag_number_text(html_text)
+            plain_text = self.get_plain_text(html_text)
 
+            # Look for tags inside the HTML
+            module_tag, module_number, html_text = split_tag_number_text(plain_text)
             if not module_tag:
                 logger.warning(
                     "HtmlParser: no module tag found in title nor html content:"
                 )
                 return []
+            else:
+                # html_text = html_text.replace(f"[{module_tag}]", "")
+                if module_number is not None:
+                    original_tag = f"{module_tag}_{module_number}"
+                else:
+                    original_tag = module_tag
+                html_text = html_text.replace(f"[{original_tag}]", "")
 
+            logger.debug(f"inside html html_text={html_text}")
             logger.debug(f"inside html module_tag={module_tag}")
             logger.debug(f"inside html module_number={module_number}")
             logger.debug(f"inside html html_text={html_text}")
@@ -244,12 +264,14 @@ class HtmlParser:
         markdown_path.write_text(md_text, encoding="utf-8")
 
         mime_type = mt.guess_mime_type(str(markdown_path))
+        if module_number is not None:
+            module_number = str(module_number)
 
         # Create resource
         html_resource: MOOCResource = MOOCResource(
             source="mooc",
+            url=None,
             title=mooc_resource_title,
-            url="",
             path=markdown_path,
             mime_type=mime_type,
             type=tag_dict.get("type"),
@@ -279,7 +301,7 @@ class HtmlParser:
                     Path(resource_path).exists(),
                     repr(str(resource_path)),
                 )
-                resource_path = resolve_path(resource_path)
+                resource_path = sanitize_for_filename(resource_path)
                 logger.debug("resource_path= %s", str(resource_path))
                 mime_type = mt.guess_mime_type(str(resource_path))
 
@@ -290,7 +312,9 @@ class HtmlParser:
 
                 # We don't extract tags from the PDF files, we use the one extracted from the HTML title or content
                 if not module_tag:
-                    logger.warning(f"HtmlParser: no module tag found in title: {resource_title}")
+                    logger.warning(
+                        f"HtmlParser: no module tag found in title: {resource_title}"
+                    )
                     return []
 
                 logger.debug(f"module_tag={module_tag}")
@@ -299,11 +323,17 @@ class HtmlParser:
                 if module_number is not None:
                     module_number = str(module_number)
 
+                if ext == "pdf":
+                    processing_method = tag_dict.get(
+                        "processing_method", self.pdf_default_processing_method
+                    )
+                    model = tag_dict.get("model", self.pdf_default_model)
+
                 # Create resource and append it
                 mooc_resource: MOOCResource = MOOCResource(
                     title=resource_title,
                     source="mooc",
-                    url="",
+                    url=None,
                     path=str(resource_path),
                     mime_type=mime_type,
                     type=tag_dict.get("type"),
@@ -311,8 +341,8 @@ class HtmlParser:
                     number=module_number,
                     one_chunk_per_page=tag_dict.get("one_chunk_per_page"),
                     one_chunk_per_doc=tag_dict.get("one_chunk_per_doc"),
-                    processing_method=tag_dict.get("processing_method"),
-                    model=tag_dict.get("model"),
+                    processing_method=processing_method,
+                    model=model,
                     is_video=False,
                     is_gemini_processed_video=False,
                 )

@@ -15,6 +15,7 @@ from rag_etl.extractors.mooc.utils import (
     escape_markdown,
 )
 
+
 logger = logging.getLogger(__name__)
 
 
@@ -102,7 +103,7 @@ class QuizParser:
         quiz_res: MOOCResource = MOOCResource(
             source="mooc",
             title=resource_title,
-            url="",
+            url=None,
             path=str(quiz_md_path),
             mime_type=mt.guess_mime_type(str(quiz_md_path)),
             is_video=False,

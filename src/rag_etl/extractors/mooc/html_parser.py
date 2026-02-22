@@ -1,7 +1,7 @@
 import logging
 from pathlib import Path
 from lxml.etree import _Element
-from urllib.parse import urljoin, urlparse
+from urllib.parse import urljoin
 import re
 import unicodedata
 from bs4 import BeautifulSoup
@@ -9,7 +9,11 @@ from bs4.element import Tag, NavigableString
 
 
 from rag_etl.resources.mooc_resource import MOOCResource
-from rag_etl.extractors.mooc.utils import load_root_elem_from_mooc_xml, clean_text
+from rag_etl.extractors.mooc.utils import (
+    clean_text,
+    load_root_elem_from_mooc_xml,
+    get_filename_via_assets,
+)
 
 from rag_etl.utils.tags import split_tag_number_text
 from rag_etl.utils import sanitize_for_filename
@@ -28,16 +32,8 @@ class HtmlParser:
     pdf_default_processing_method = "rcp"
     pdf_default_model = "Qwen/Qwen3-VL-235B-A22B-Thinking-fp8"
 
-    @staticmethod
-    def get_plain_text(html_text: str) -> str:
-        """Parse HTML and return plain text (for tag extraction)."""
-        soup = BeautifulSoup(html_text, "html.parser")
-        return soup.get_text()
-
-    def convert_html_text_to_markdown(self, html_text: str) -> str:
-        """Convert HTML content to Markdown with BeautifulSoup"""
-
-        soup = BeautifulSoup(html_text, "html.parser")
+    def convert_html_text_to_markdown(self, soup: BeautifulSoup) -> str:
+        """Convert HTML text to Markdown with BeautifulSoup"""
 
         self.remove_noise(soup)
         self.remove_empty_paragraphs(soup)
@@ -189,6 +185,7 @@ class HtmlParser:
         course_path: str,
         elem_vertical: _Element,
         vertical_display_name: str,
+        assets_map: dict[str, str],
         tag_metadata: dict,
     ) -> list[MOOCResource]:
         """Parse a MOOC HTML file"""
@@ -211,12 +208,10 @@ class HtmlParser:
 
         html_display_name = root_html.get("display_name", "")
         mooc_resource_title = vertical_display_name + " - " + html_display_name
+        logger.debug(f"mooc_resource_title={mooc_resource_title}")
 
         # Extract tag
         module_number = None
-        # module_tag = self.extract_mooc_tag(mooc_resource_title)
-        logger.debug(f"mooc_resource_title={mooc_resource_title}")
-        # module_tag = extract_tag(mooc_resource_title)
 
         module_tag, module_number, mooc_resource_title = split_tag_number_text(
             mooc_resource_title
@@ -226,20 +221,22 @@ class HtmlParser:
         logger.debug(f"title mooc_resource_title={mooc_resource_title}")
 
         # Extract text from HTML
-        html_text = html_path.read_text(encoding="utf-8")
+        try:
+            html_text = html_path.read_text(encoding="utf-8")
+        except Exception as e:
+            logger.warning("Exception when reading HTML file %s: %s", html_path, e)
+            return []
+
+        soup = BeautifulSoup(html_text, "html.parser")
 
         if not module_tag:
-            plain_text = self.get_plain_text(html_text)
+            plain_text = soup.get_text()
 
             # Look for tags inside the HTML
             module_tag, module_number, html_text = split_tag_number_text(plain_text)
             if not module_tag:
-                logger.warning(
-                    "HtmlParser: no module tag found in title nor html content:"
-                )
                 return []
             else:
-                # html_text = html_text.replace(f"[{module_tag}]", "")
                 if module_number is not None:
                     original_tag = f"{module_tag}_{module_number}"
                 else:
@@ -257,11 +254,20 @@ class HtmlParser:
         tag_dict = tag_metadata.get(module_tag)
 
         # HTML to MarkDown
-        md_text = self.convert_html_text_to_markdown(html_text=html_text)
+        md_text = self.convert_html_text_to_markdown(soup)
+
+        # We sanitize the filename of the MarkDown file we create
+        markdown_filename = sanitize_for_filename(markdown_filename)
 
         # Write MarkDown to file in the same HTML folder
         markdown_path = Path(course_path) / "html" / markdown_filename
-        markdown_path.write_text(md_text, encoding="utf-8")
+
+        Path(markdown_path).write_text(md_text, encoding="utf-8")
+        logger.debug(
+            "markdown_path exists? %s (%s)",
+            Path(markdown_path).exists(),
+            repr(markdown_path),
+        )
 
         mime_type = mt.guess_mime_type(str(markdown_path))
         if module_number is not None:
@@ -272,7 +278,7 @@ class HtmlParser:
             source="mooc",
             url=None,
             title=mooc_resource_title,
-            path=markdown_path,
+            path=str(markdown_path),
             mime_type=mime_type,
             type=tag_dict.get("type"),
             subtype=tag_dict.get("subtype"),
@@ -290,20 +296,46 @@ class HtmlParser:
                 html_text=html_text, extension=ext
             )
             for linked in links:
-                # If it's an URL skip
+                # If it's an URL skip it
                 if "http" in linked:
                     continue
 
-                parsed = urlparse(linked)
-                resource_path = Path(course_path) / parsed.path.lstrip("/")
-                logger.info(
+                logger.debug(f"linked={linked}")
+                linked_path = Path(linked)
+                directory = linked_path.parent
+                filename = linked_path.name
+
+                relative_path = directory / filename
+
+                # We remove the leading '/' in '/static/'
+                relative_path = relative_path.relative_to("/")
+                logger.debug(f"course_path={course_path}")
+                logger.debug(f"relative_path={relative_path}")
+                resource_path = Path(course_path) / relative_path
+
+                resource_path_exists = resource_path.exists()
+                logger.debug(
                     "resource_path exists? %s (%s)",
-                    Path(resource_path).exists(),
-                    repr(str(resource_path)),
+                    resource_path_exists,
+                    repr(resource_path),
                 )
-                resource_path = sanitize_for_filename(resource_path)
-                logger.debug("resource_path= %s", str(resource_path))
-                mime_type = mt.guess_mime_type(str(resource_path))
+                if not resource_path_exists:
+                    resource_path = get_filename_via_assets(
+                        course_path, linked, assets_map
+                    )
+                    resource_path_exists = resource_path.exists()
+                    if not resource_path_exists:
+                        logger.warning(
+                            "Missing asset: href=%r resolved=%s", linked, resource_path
+                        )
+
+                    logger.debug(
+                        "resource_path resolved exists? %s (%s)",
+                        resource_path_exists,
+                        repr(resource_path),
+                    )
+
+                mime_type = mt.guess_mime_type(resource_path)
 
                 resource_title = self.generate_title_for_found_resource(
                     html_title=html_display_name,
@@ -312,10 +344,7 @@ class HtmlParser:
 
                 # We don't extract tags from the PDF files, we use the one extracted from the HTML title or content
                 if not module_tag:
-                    logger.warning(
-                        f"HtmlParser: no module tag found in title: {resource_title}"
-                    )
-                    return []
+                    continue
 
                 logger.debug(f"module_tag={module_tag}")
                 tag_dict = tag_metadata.get(module_tag)
@@ -323,6 +352,7 @@ class HtmlParser:
                 if module_number is not None:
                     module_number = str(module_number)
 
+                # Set processing method and model for PDFs
                 if ext == "pdf":
                     processing_method = tag_dict.get(
                         "processing_method", self.pdf_default_processing_method

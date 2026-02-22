@@ -169,23 +169,6 @@ class COM202Course(BaseCourse):
             "processing_method": "gemini",
             "model": "gemini-2.5-pro",
         },
-        "MOOC_PRACTICE_HOMEWORK": {
-            "type": "practice",
-            "subtype": "mooc_practice_homework",
-            "one_chunk_per_page": False,
-            "one_chunk_per_doc": True,
-            "pdf_to_markdown": True,
-            "split_exercises": True,
-        },
-        "MOOC_PRACTICE_HOMEWORK_SOLUTION": {
-            "type": "practice",
-            "subtype": "mooc_practice_homework",
-            "one_chunk_per_page": False,
-            "one_chunk_per_doc": True,
-            "pdf_to_markdown": True,
-            "split_exercises": True,
-            "is_solution": True,
-        },
         "MOOC_LECTURE_NOTES": {
             "type": "theory",
             "subtype": "mooc_lecture_notes",
@@ -275,7 +258,7 @@ if __name__ == "__main__":
     logging.basicConfig(
         # level=logging.INFO,
         level=logging.DEBUG,
-        format='[%(asctime)s] [%(levelname)s] [%(filename)s:%(lineno)d] %(message)s',
+        format="[%(asctime)s] [%(levelname)s] [%(filename)s:%(lineno)d] %(message)s",
         handlers=[logging.StreamHandler(sys.stdout)],
     )
 

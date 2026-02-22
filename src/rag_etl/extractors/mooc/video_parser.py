@@ -74,7 +74,7 @@ class VideoParser:
             source="mooc",
             title=mooc_resource_title,
             url=video_url,
-            path=Path(video_xml_path),
+            path=str(video_xml_path),
             mime_type="video/mp4",
             is_video=True,
             is_gemini_processed_video=True,

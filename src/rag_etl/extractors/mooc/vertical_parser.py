@@ -21,6 +21,7 @@ class VerticalParser:
         self,
         course_path: str,
         elem_vertical: _Element,
+        assets_map: dict[str, str],
         tag_metadata: dict | None = None,
     ) -> list[MOOCResource]:
         """Parse a MOOC vertical"""
@@ -48,6 +49,7 @@ class VerticalParser:
                     course_path=course_path,
                     elem_vertical=child,
                     vertical_display_name=vertical_display_name,
+                    assets_map=assets_map,
                     tag_metadata=tag_metadata,
                 )
                 # Extend the returned list of resources

@@ -1,9 +1,7 @@
 from rag_etl.utils.llms import send_llm_request
-from rag_etl.utils.encoding import resolve_path, normalize_for_compare, sanitize_for_filename
+from rag_etl.utils.encoding import sanitize_for_filename
 
 __all__ = [
     "send_llm_request",
-    "resolve_path",
-    "normalize_for_compare",
     "sanitize_for_filename",
 ]

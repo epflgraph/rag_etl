@@ -19,6 +19,8 @@ TCL_SOURCE = "application/x-tcl"
 
 PYTHON_SOURCE = "text/x-python"
 
+MATLAB_SOURCE = "text/x-matlab"
+
 mimetypes.add_type(IPYNB, ".ipynb")
 
 DEFAULT_MIME_TYPES = [

@@ -67,6 +67,11 @@ class VideoToJSONTransformer(BaseTransformer):
                     download_path=downloaded_video_path,
                 )
 
+                if json_data is None:
+                    # TODO retry on failure or at least print the content or plausible reason why it failed
+                    logger.debug(f"Failed to convert {resource.path} into {json_path}. Skipping to prevent a failure later on...")
+                    continue
+
                 json_path.write_text(
                     json.dumps(json_data, indent=2, ensure_ascii=False),
                     encoding="utf-8",

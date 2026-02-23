@@ -354,10 +354,8 @@ class HtmlParser:
 
                 # Set processing method and model for PDFs
                 if ext == "pdf":
-                    processing_method = tag_dict.get(
-                        "processing_method", self.pdf_default_processing_method
-                    )
-                    model = tag_dict.get("model", self.pdf_default_model)
+                    processing_method = self.pdf_default_processing_method
+                    model = self.pdf_default_model
 
                 # Create resource and append it
                 mooc_resource: MOOCResource = MOOCResource(

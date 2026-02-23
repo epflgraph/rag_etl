@@ -33,7 +33,7 @@ class COM202Course(BaseCourse):
         "academic_course": "2025-2026",
         "semester": 2,
         "admin_info_link": "",
-        "coursebook_link": None,
+        "coursebook_link": "https://edu.epfl.ch/coursebook/en/signal-processing-COM-202",
     }
 
     tag_metadata = {
@@ -131,7 +131,7 @@ class COM202Course(BaseCourse):
         },
         "HANDOUT": {
             "type": "theory",
-            "subtype": "handout",
+            "subtype": "recommended_reading",
             "one_chunk_per_page": False,
             "one_chunk_per_doc": False,
             "pdf_to_markdown": False,
@@ -168,23 +168,6 @@ class COM202Course(BaseCourse):
             "is_gemini_processed_video": True,
             "processing_method": "gemini",
             "model": "gemini-2.5-pro",
-        },
-        "MOOC_PRACTICE_HOMEWORK": {
-            "type": "practice",
-            "subtype": "mooc_practice_homework",
-            "one_chunk_per_page": False,
-            "one_chunk_per_doc": True,
-            "pdf_to_markdown": False,
-            "split_exercises": False,
-        },
-        "MOOC_PRACTICE_HOMEWORK_SOLUTION": {
-            "type": "practice",
-            "subtype": "mooc_practice_homework",
-            "one_chunk_per_page": False,
-            "one_chunk_per_doc": True,
-            "pdf_to_markdown": False,
-            "split_exercises": False,
-            "is_solution": True,
         },
         "MOOC_LECTURE_NOTES": {
             "type": "theory",
@@ -275,7 +258,7 @@ if __name__ == "__main__":
     logging.basicConfig(
         # level=logging.INFO,
         level=logging.DEBUG,
-        format='[%(asctime)s] [%(levelname)s] [%(filename)s:%(lineno)d] %(message)s',
+        format="[%(asctime)s] [%(levelname)s] [%(filename)s:%(lineno)d] %(message)s",
         handlers=[logging.StreamHandler(sys.stdout)],
     )
 

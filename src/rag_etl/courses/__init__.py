@@ -19,6 +19,9 @@ from rag_etl.courses.bioeng310 import BIOENG310Course
 from rag_etl.courses.me331 import ME331Course
 from rag_etl.courses.mse236 import MSE236Course
 from rag_etl.courses.cs233 import CS233Course
+from rag_etl.courses.swissunidemo import SWISSUNIDEMOCourse
+from rag_etl.courses.fin405 import FIN405Course
+from rag_etl.courses.math535 import MATH535Course
 
 __all__ = [
     "BaseCourse",
@@ -42,4 +45,7 @@ __all__ = [
     "ME331Course",
     "MSE236Course",
     "CS233Course",
+    "SWISSUNIDEMOCourse",
+    "FIN405Course",
+    "MATH535Course",
 ]

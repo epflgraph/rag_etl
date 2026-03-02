@@ -4,6 +4,7 @@ import re
 
 import nbformat
 from nbconvert import MarkdownExporter
+from nbconvert.preprocessors import Preprocessor
 
 from rag_etl.utils.llms import generate_alt_text
 
@@ -29,8 +30,30 @@ def convert_ipynb_to_md(ipynb_path, md_path):
     with open(ipynb_path, "r", encoding="utf-8") as f:
         notebook_node = nbformat.read(f, as_version=4)
 
+    # Preprocessor to clean style and script tags
+    class CleanHTMLTagsPreprocessor(Preprocessor):
+        TAG_RE = re.compile(
+            r"<(style|script).*?>.*?</\1>",
+            flags=re.DOTALL | re.IGNORECASE,
+        )
+
+        def preprocess_cell(self, cell, resources, index):
+            # Remove from HTML outputs
+            if cell.cell_type == "code" and "outputs" in cell:
+                for output in cell.outputs:
+                    if "text/html" in output.get("data", {}):
+                        html = output["data"]["text/html"]
+                        output["data"]["text/html"] = self.TAG_RE.sub("", html)
+
+            # Optional: also clean markdown cells
+            if cell.cell_type == "markdown":
+                cell.source = self.TAG_RE.sub("", cell.source)
+
+            return cell, resources
+
     # Export to markdown
     markdown_exporter = MarkdownExporter()
+    markdown_exporter.register_preprocessor(CleanHTMLTagsPreprocessor(), enabled=True)
     text, _ = markdown_exporter.from_notebook_node(notebook_node)
 
     ################################################################

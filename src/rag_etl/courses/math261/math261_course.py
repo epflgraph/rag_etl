@@ -88,7 +88,7 @@ class MATH261Course(BaseCourse):
         },
         "ASSIGNMENT_SOLUTION": {
             "type": "practice",
-            "subtype": "assignment_solution",
+            "subtype": "assignment",
             "one_chunk_per_page": False,
             "one_chunk_per_doc": True,
             "pdf_to_markdown": True,

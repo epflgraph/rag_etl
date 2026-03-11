@@ -22,18 +22,18 @@ import rag_etl.utils.mime_types as mt
 from rag_etl.config import CONFIG
 
 
-class MATH261Course(BaseCourse):
+class PHYS106bCourse(BaseCourse):
     """
-    Course-specific pipeline for MATH261.
+    Course-specific pipeline for PHYS106b.
     """
 
     course_info = {
-        "course_title": "Discrete optimization",
-        "course_id": "MATH261",
+        "course_title": "Physique générale : thermodynamique",
+        "course_id": "PHYS106b",
         "academic_course": "2025-2026",
         "semester": 2,
-        "admin_info_link": "https://moodle.epfl.ch/course/view.php?id=16050",
-        "coursebook_link": "https://edu.epfl.ch/coursebook/en/discrete-optimization-MATH-261"
+        "admin_info_link": "https://moodle.epfl.ch/course/view.php?id=17235",
+        "coursebook_link": "https://edu.epfl.ch/coursebook/fr/physique-generale-thermodynamique-PHYS-106-B"
     }
 
     tag_metadata = {
@@ -53,21 +53,47 @@ class MATH261Course(BaseCourse):
             "pdf_to_markdown": False,
             "split_exercises": False,
         },
+        "FORMULARY": {
+            "type": "theory",
+            "subtype": "formulary",
+            "one_chunk_per_page": False,
+            "one_chunk_per_doc": True,
+            "pdf_to_markdown": False,
+            "split_exercises": False,
+        },
         "LECTURE_NOTES": {
             "type": "theory",
             "subtype": "lecture_notes",
-            "one_chunk_per_page": False,
+            "one_chunk_per_page": True,
             "one_chunk_per_doc": False,
             "pdf_to_markdown": False,
             "split_exercises": False,
         },
-        "EXAM": {
-            "type": "exam",
-            "subtype": "previous_year_exam",
+        "SERIE": {
+            "type": "practice",
+            "subtype": "serie",
             "one_chunk_per_page": False,
             "one_chunk_per_doc": True,
             "pdf_to_markdown": True,
             "split_exercises": True,
+        },
+        "SERIE_SOLUTION": {
+            "type": "practice",
+            "subtype": "serie",
+            "one_chunk_per_page": False,
+            "one_chunk_per_doc": True,
+            "pdf_to_markdown": True,
+            "split_exercises": True,
+            "is_solution": True,
+        },
+        "QUIZ_SOLUTION": {
+            "type": "practice",
+            "subtype": "quiz",
+            "one_chunk_per_page": False,
+            "one_chunk_per_doc": True,
+            "pdf_to_markdown": True,
+            "split_exercises": True,
+            "is_solution": True,
         },
         "EXAM_SOLUTION": {
             "type": "exam",
@@ -78,17 +104,17 @@ class MATH261Course(BaseCourse):
             "split_exercises": True,
             "is_solution": True,
         },
-        "ASSIGNMENT": {
-            "type": "practice",
-            "subtype": "assignment",
+        "MOCK_EXAM": {
+            "type": "exam",
+            "subtype": "mock_exam",
             "one_chunk_per_page": False,
             "one_chunk_per_doc": True,
             "pdf_to_markdown": True,
             "split_exercises": True,
         },
-        "ASSIGNMENT_SOLUTION": {
-            "type": "practice",
-            "subtype": "assignment",
+        "MOCK_EXAM_SOLUTION": {
+            "type": "exam",
+            "subtype": "mock_exam",
             "one_chunk_per_page": False,
             "one_chunk_per_doc": True,
             "pdf_to_markdown": True,
@@ -105,7 +131,7 @@ class MATH261Course(BaseCourse):
 
     ################################################################
 
-    moodle_course_id = 16050
+    moodle_course_id = 17235
 
     moodle_base_path = f"{course_path}/moodle"
 
@@ -129,6 +155,7 @@ class MATH261Course(BaseCourse):
 
     @property
     def extractors(self) -> List[BaseExtractor]:
+        """Single Moodle extractor."""
         return [
             MoodleExtractor(
                 moodle_course_id=self.moodle_course_id,
@@ -140,6 +167,7 @@ class MATH261Course(BaseCourse):
 
     @property
     def transformers(self) -> List[BaseTransformer]:
+        """Single transformer that converts PDFs into Markdown text."""
         return [
             ExtractZipTransformer(cache=self.course_code),
             JupyterToMarkdownTransformer(cache=self.course_code),
@@ -149,6 +177,7 @@ class MATH261Course(BaseCourse):
 
     @property
     def loaders(self) -> List[BaseLoader]:
+        """No loaders defined for this course."""
         return [
             ContentMetadataLoader(
                 course_path=self.course_path,
@@ -165,5 +194,5 @@ if __name__ == '__main__':
         handlers=[logging.StreamHandler(sys.stdout)]
     )
 
-    course = BaseCourse.from_code('MATH261')
+    course = BaseCourse.from_code('PHYS106b')
     course.run()

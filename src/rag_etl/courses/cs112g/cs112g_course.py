@@ -27,7 +27,7 @@ from rag_etl.config import CONFIG
 from typing import Tuple, List
 
 
-class CS112GCourse(BaseCourse):
+class CS112gCourse(BaseCourse):
     """
     Course-specific pipeline for CS-112(g).
     """
@@ -284,10 +284,10 @@ if __name__ == "__main__":
     import sys
 
     logging.basicConfig(
-        level=logging.DEBUG,
+        level=logging.INFO,
         format="[%(asctime)s] [%(levelname)s] [%(filename)s:%(lineno)d] %(message)s",
         handlers=[logging.StreamHandler(sys.stdout)],
     )
 
-    course = BaseCourse.from_code("CS112G")
+    course = BaseCourse.from_code("CS112g")
     course.run()

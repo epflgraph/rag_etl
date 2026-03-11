@@ -22,18 +22,18 @@ import rag_etl.utils.mime_types as mt
 from rag_etl.config import CONFIG
 
 
-class MATH261Course(BaseCourse):
+class BIOENG310Course(BaseCourse):
     """
-    Course-specific pipeline for MATH261.
+    Course-specific pipeline for BIOENG310.
     """
 
     course_info = {
-        "course_title": "Discrete optimization",
-        "course_id": "MATH261",
+        "course_title": "Neuroscience foundations for engineers",
+        "course_id": "BIOENG310",
         "academic_course": "2025-2026",
         "semester": 2,
-        "admin_info_link": "https://moodle.epfl.ch/course/view.php?id=16050",
-        "coursebook_link": "https://edu.epfl.ch/coursebook/en/discrete-optimization-MATH-261"
+        "admin_info_link": "https://moodle.epfl.ch/course/view.php?id=18626",
+        "coursebook_link": "https://edu.epfl.ch/coursebook/en/neuroscience-foundations-for-engineers-BIOENG-310"
     }
 
     tag_metadata = {
@@ -45,50 +45,34 @@ class MATH261Course(BaseCourse):
             "pdf_to_markdown": False,
             "split_exercises": False,
         },
-        "POLYCOPIE": {
-            "type": "theory",
-            "subtype": "polycopie",
-            "one_chunk_per_page": False,
-            "one_chunk_per_doc": False,
-            "pdf_to_markdown": False,
-            "split_exercises": False,
-        },
-        "LECTURE_NOTES": {
-            "type": "theory",
-            "subtype": "lecture_notes",
-            "one_chunk_per_page": False,
-            "one_chunk_per_doc": False,
-            "pdf_to_markdown": False,
-            "split_exercises": False,
-        },
-        "EXAM": {
-            "type": "exam",
-            "subtype": "previous_year_exam",
+        "EXERCISE": {
+            "type": "practice",
+            "subtype": "exercise",
             "one_chunk_per_page": False,
             "one_chunk_per_doc": True,
             "pdf_to_markdown": True,
             "split_exercises": True,
         },
-        "EXAM_SOLUTION": {
-            "type": "exam",
-            "subtype": "previous_year_exam",
+        "EXERCISE_SOLUTION": {
+            "type": "practice",
+            "subtype": "exercise",
             "one_chunk_per_page": False,
             "one_chunk_per_doc": True,
             "pdf_to_markdown": True,
             "split_exercises": True,
             "is_solution": True,
         },
-        "ASSIGNMENT": {
-            "type": "practice",
-            "subtype": "assignment",
+        "RECOMMENDED_READING": {
+            "type": "theory",
+            "subtype": "recommended_reading",
             "one_chunk_per_page": False,
-            "one_chunk_per_doc": True,
-            "pdf_to_markdown": True,
-            "split_exercises": True,
+            "one_chunk_per_doc": False,
+            "pdf_to_markdown": False,
+            "split_exercises": False,
         },
-        "ASSIGNMENT_SOLUTION": {
-            "type": "practice",
-            "subtype": "assignment",
+        "EXAMPLE_QUESTION_XX_SOLUTION": {
+            "type": "exam_example",
+            "subtype": "exam_example",
             "one_chunk_per_page": False,
             "one_chunk_per_doc": True,
             "pdf_to_markdown": True,
@@ -105,7 +89,7 @@ class MATH261Course(BaseCourse):
 
     ################################################################
 
-    moodle_course_id = 16050
+    moodle_course_id = 18626
 
     moodle_base_path = f"{course_path}/moodle"
 
@@ -165,5 +149,5 @@ if __name__ == '__main__':
         handlers=[logging.StreamHandler(sys.stdout)]
     )
 
-    course = BaseCourse.from_code('MATH261')
+    course = BaseCourse.from_code('BIOENG310')
     course.run()

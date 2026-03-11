@@ -22,25 +22,25 @@ import rag_etl.utils.mime_types as mt
 from rag_etl.config import CONFIG
 
 
-class MATH261Course(BaseCourse):
+class MSE236Course(BaseCourse):
     """
-    Course-specific pipeline for MATH261.
+    Course-specific pipeline for MSE236.
     """
 
     course_info = {
-        "course_title": "Discrete optimization",
-        "course_id": "MATH261",
+        "course_title": "Métaux et alliages",
+        "course_id": "MSE236",
         "academic_course": "2025-2026",
         "semester": 2,
-        "admin_info_link": "https://moodle.epfl.ch/course/view.php?id=16050",
-        "coursebook_link": "https://edu.epfl.ch/coursebook/en/discrete-optimization-MATH-261"
+        "admin_info_link": "https://moodle.epfl.ch/course/view.php?id=14553",
+        "coursebook_link": "https://edu.epfl.ch/coursebook/fr/metaux-et-alliages-MSE-236"
     }
 
     tag_metadata = {
-        "SLIDES": {
+        "ARTICLE": {
             "type": "theory",
-            "subtype": "lecture_slides",
-            "one_chunk_per_page": True,
+            "subtype": "article",
+            "one_chunk_per_page": False,
             "one_chunk_per_doc": False,
             "pdf_to_markdown": False,
             "split_exercises": False,
@@ -49,6 +49,22 @@ class MATH261Course(BaseCourse):
             "type": "theory",
             "subtype": "polycopie",
             "one_chunk_per_page": False,
+            "one_chunk_per_doc": False,
+            "pdf_to_markdown": False,
+            "split_exercises": False,
+        },
+        "FORMULARY": {
+            "type": "theory",
+            "subtype": "formulary",
+            "one_chunk_per_page": False,
+            "one_chunk_per_doc": False,
+            "pdf_to_markdown": False,
+            "split_exercises": False,
+        },
+        "SLIDES": {
+            "type": "theory",
+            "subtype": "lecture_slides",
+            "one_chunk_per_page": True,
             "one_chunk_per_doc": False,
             "pdf_to_markdown": False,
             "split_exercises": False,
@@ -78,17 +94,17 @@ class MATH261Course(BaseCourse):
             "split_exercises": True,
             "is_solution": True,
         },
-        "ASSIGNMENT": {
+        "SERIE": {
             "type": "practice",
-            "subtype": "assignment",
+            "subtype": "serie",
             "one_chunk_per_page": False,
             "one_chunk_per_doc": True,
             "pdf_to_markdown": True,
             "split_exercises": True,
         },
-        "ASSIGNMENT_SOLUTION": {
+        "SERIE_SOLUTION": {
             "type": "practice",
-            "subtype": "assignment",
+            "subtype": "serie",
             "one_chunk_per_page": False,
             "one_chunk_per_doc": True,
             "pdf_to_markdown": True,
@@ -105,7 +121,7 @@ class MATH261Course(BaseCourse):
 
     ################################################################
 
-    moodle_course_id = 16050
+    moodle_course_id = 14553
 
     moodle_base_path = f"{course_path}/moodle"
 
@@ -165,5 +181,5 @@ if __name__ == '__main__':
         handlers=[logging.StreamHandler(sys.stdout)]
     )
 
-    course = BaseCourse.from_code('MATH261')
+    course = BaseCourse.from_code('MSE236')
     course.run()

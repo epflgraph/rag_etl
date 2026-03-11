@@ -32,7 +32,7 @@ class ENV342Course(BaseCourse):
 
     course_info = {
         "course_title": "Geographic Information System",
-        "course_id": "env342",
+        "course_id": "ENV342",
         "academic_course": "2025-2026",
         "semester": 2,
         "admin_info_link": "",

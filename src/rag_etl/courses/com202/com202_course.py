@@ -29,7 +29,7 @@ class COM202Course(BaseCourse):
 
     course_info = {
         "course_title": "Digital Signal Processing",
-        "course_id": "com202",
+        "course_id": "COM202",
         "academic_course": "2025-2026",
         "semester": 2,
         "admin_info_link": "",
@@ -185,7 +185,6 @@ class COM202Course(BaseCourse):
     course_path = f"{CONFIG['BASE_PATH']}/{course_info['course_id']}"
     output_path = f"{course_path}/output"
 
-    moodle_course_id = None
     mooc_base_path = f"{course_path}/mooc"
 
     mime_types = mt.DEFAULT_MIME_TYPES + [mt.C_SOURCE] + [mt.IPYNB] + [mt.PYTHON_SOURCE]
@@ -256,8 +255,7 @@ if __name__ == "__main__":
     import sys
 
     logging.basicConfig(
-        # level=logging.INFO,
-        level=logging.DEBUG,
+        level=logging.INFO,
         format="[%(asctime)s] [%(levelname)s] [%(filename)s:%(lineno)d] %(message)s",
         handlers=[logging.StreamHandler(sys.stdout)],
     )

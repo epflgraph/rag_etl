@@ -41,20 +41,22 @@ class LocalFolderExtractor(BaseExtractor):
         else:
             self.mime_types = mime_types
 
-    def extract_closest_tag_and_number(self, path):
+    def extract_closest_tag_number_text(self, path):
         # Extract tag and number from current path
-        tag, number, _ = split_tag_number_text(path.name)
+        tag, number, text = split_tag_number_text(path.name)
 
         # If found, return them
         if tag:
-            return (tag, number)
+            return (tag, number, text)
 
         # If base is a proper subpath of path, we recurse
         if path.is_relative_to(self.folder_base_path) and not self.folder_base_path.is_relative_to(path):
-            return self.extract_closest_tag_and_number(path.parent)
+            tag, number, text = self.extract_closest_tag_number_text(path.parent)
+            text = f"{text} > {path.name}"
+            return (tag, number, text)
 
         # Otherwise we stop
-        return (None, None)
+        return (None, None, None)
 
     def extract_closest_metadata(self, path, metadata_file):
         # Try to get metadata from current path
@@ -107,7 +109,9 @@ class LocalFolderExtractor(BaseExtractor):
                     continue
 
                 # Extract tag from filename
-                tag, number = self.extract_closest_tag_and_number(file_path)
+                tag, number, title = self.extract_closest_tag_number_text(file_path)
+                if not title:
+                    title = str(file_path.relative_to(self.folder_base_path))
 
                 # Skip if no tag
                 if not tag:
@@ -142,7 +146,7 @@ class LocalFolderExtractor(BaseExtractor):
                 # Append resource
                 resources.append(LocalResource(
                     tag=tag,
-                    title=str(file_path.relative_to(self.folder_base_path)),
+                    title=title,
                     url=url,
                     path=str(file_path),
                     source='local',

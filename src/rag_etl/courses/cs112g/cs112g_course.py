@@ -201,7 +201,7 @@ class CS112gCourse(BaseCourse):
 
     mooc_base_path = f"{course_path}/mooc"
 
-    mime_types = mt.DEFAULT_MIME_TYPES + [mt.C_SOURCE]
+    mime_types = mt.DEFAULT_MIME_TYPES
 
     moodle_course_id = 5571
 
@@ -230,7 +230,7 @@ class CS112gCourse(BaseCourse):
             MOOCExtractor(
                 mooc_base_path=self.mooc_base_path,
                 tag_metadata=self.tag_metadata,
-                mime_types=(self.mime_types + [mt.MP4, mt.MD, mt.JSON]),
+                mime_types=(self.mime_types + [mt.MP4, mt.JSON]),
             ),
             MoodleExtractor(
                 moodle_course_id=self.moodle_course_id,
@@ -242,7 +242,7 @@ class CS112gCourse(BaseCourse):
             #     ed_discussion_base_path=self.course_path,
             #     tags=self.tag_metadata.keys(),
             #     tag_metadata=self.tag_metadata,
-            #     mime_types=(mt.DEFAULT_MIME_TYPES + [mt.MD]),
+            #     mime_types=(mt.DEFAULT_MIME_TYPES),
             #     academic_year="2024-2025",
             #     categories=[
             #         "theory",

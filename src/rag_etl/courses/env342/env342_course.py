@@ -161,7 +161,7 @@ class ENV342Course(BaseCourse):
 
     moodle_course_id = 4081
 
-    mime_types = mt.DEFAULT_MIME_TYPES + [mt.PYTHON_SOURCE, mt.MATLAB_SOURCE]
+    mime_types = mt.DEFAULT_MIME_TYPES + [mt.MATLAB_SOURCE]
 
     moodle_base_path = f"{course_path}/moodle"
 
@@ -188,12 +188,12 @@ class ENV342Course(BaseCourse):
             MOOCExtractor(
                 mooc_base_path=self.mooc_base_path_gis_1,
                 tag_metadata=self.tag_metadata,
-                mime_types=(mt.DEFAULT_MIME_TYPES + [mt.MP4, mt.MD, mt.JSON]),
+                mime_types=(mt.DEFAULT_MIME_TYPES + [mt.MP4, mt.JSON]),
             ),
             MOOCExtractor(
                 mooc_base_path=self.mooc_base_path_gis_2,
                 tag_metadata=self.tag_metadata,
-                mime_types=(mt.DEFAULT_MIME_TYPES + [mt.MP4, mt.MD, mt.JSON]),
+                mime_types=(mt.DEFAULT_MIME_TYPES + [mt.MP4, mt.JSON]),
             ),
             MoodleExtractor(
                 moodle_course_id=self.moodle_course_id,

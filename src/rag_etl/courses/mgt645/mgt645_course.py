@@ -119,7 +119,7 @@ class MGT645Course(BaseCourse):
             MOOCExtractor(
                 mooc_base_path=self.mooc_base_path,
                 tag_metadata=self.tag_metadata,
-                mime_types=(mt.DEFAULT_MIME_TYPES + [mt.MP4, mt.MD, mt.JSON]),
+                mime_types=(mt.DEFAULT_MIME_TYPES + [mt.MP4, mt.JSON]),
             ),
             LocalFolderExtractor(
                 folder_base_path=self.local_base_path,

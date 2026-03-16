@@ -187,7 +187,7 @@ class COM202Course(BaseCourse):
 
     mooc_base_path = f"{course_path}/mooc"
 
-    mime_types = mt.DEFAULT_MIME_TYPES + [mt.C_SOURCE] + [mt.IPYNB] + [mt.PYTHON_SOURCE]
+    mime_types = mt.DEFAULT_MIME_TYPES
 
     moodle_course_id = 18253
 
@@ -216,7 +216,7 @@ class COM202Course(BaseCourse):
             MOOCExtractor(
                 mooc_base_path=self.mooc_base_path,
                 tag_metadata=self.tag_metadata,
-                mime_types=(mt.DEFAULT_MIME_TYPES + [mt.MP4, mt.MD, mt.JSON]),
+                mime_types=(mt.DEFAULT_MIME_TYPES + [mt.MP4, mt.JSON]),
             ),
             MoodleExtractor(
                 moodle_course_id=self.moodle_course_id,

@@ -187,12 +187,18 @@ class MoodleExtractor(BaseExtractor):
                         logging.debug(f"Download failed for file {module['name']} > {module_contents['filename']}. Ignoring...")
                         continue
 
-                    # Save file to disk
+                    # Build download path for file
                     module_contents_path = (
                         module_path
                         / Path(module_contents["filepath"]).relative_to("/")
                         / sanitize_for_filename(module_contents["filename"])
                     )
+
+                    # Add .pdf extension if not there
+                    if not module_contents_path.suffix and module_contents["mimetype"] == mt.PDF:
+                        module_contents_path = module_contents_path.with_suffix(".pdf")
+
+                    # Save file to disk
                     module_contents_path.parent.mkdir(parents=True, exist_ok=True)
                     module_contents_path.write_bytes(response.content)
 
@@ -234,4 +240,7 @@ class MoodleExtractor(BaseExtractor):
                         )
                     )
 
+
+        print(resources)
+        dksjdksjdkj
         return resources

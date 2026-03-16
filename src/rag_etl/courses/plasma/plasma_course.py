@@ -53,7 +53,7 @@ class PLASMACourse(BaseCourse):
     course_path = f"{CONFIG['BASE_PATH']}/{course_info['course_id']}"
     output_path = f"{course_path}/output"
 
-    mime_types = mt.DEFAULT_MIME_TYPES + [mt.C_SOURCE] + [mt.PYTHON_SOURCE]
+    mime_types = mt.DEFAULT_MIME_TYPES
 
     ################################################################
 

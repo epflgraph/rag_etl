@@ -109,7 +109,7 @@ class SWISSUNIDEMOCourse(BaseCourse):
                 moodle_course_id=self.moodle_course_id,
                 moodle_base_path=self.moodle_base_path,
                 tag_metadata=self.tag_metadata,
-                mime_types=(mt.DEFAULT_MIME_TYPES + [mt.C_SOURCE]),
+                mime_types=(mt.DEFAULT_MIME_TYPES),
             )
         ]
 

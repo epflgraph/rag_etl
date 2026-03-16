@@ -240,7 +240,4 @@ class MoodleExtractor(BaseExtractor):
                         )
                     )
 
-
-        print(resources)
-        dksjdksjdkj
         return resources

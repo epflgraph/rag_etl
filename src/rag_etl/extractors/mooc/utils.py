@@ -5,6 +5,7 @@ import re
 from html import unescape
 from urllib.parse import unquote
 import unicodedata
+from rag_etl.utils import sanitize_for_filename
 
 logger = logging.getLogger(__name__)
 
@@ -114,5 +115,6 @@ def get_filename_via_assets(
     compare_key = cmp_key(href_name)
 
     real_name = assets_map.get(compare_key, href_name)
+    real_name = sanitize_for_filename(real_name)
 
     return Path(course_path) / "static" / real_name

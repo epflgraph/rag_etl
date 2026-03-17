@@ -304,6 +304,7 @@ class HtmlParser:
                 linked_path = Path(linked)
                 directory = linked_path.parent
                 filename = linked_path.name
+                filename = sanitize_for_filename(filename)
 
                 relative_path = directory / filename
 
@@ -311,6 +312,8 @@ class HtmlParser:
                 relative_path = relative_path.relative_to("/")
                 logger.debug(f"course_path={course_path}")
                 logger.debug(f"relative_path={relative_path}")
+                logger.debug(f"filename={filename}")
+
                 resource_path = Path(course_path) / relative_path
 
                 resource_path_exists = resource_path.exists()

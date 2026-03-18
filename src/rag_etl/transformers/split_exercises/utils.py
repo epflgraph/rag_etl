@@ -1,6 +1,8 @@
 import logging
 from pathlib import Path
 
+import re
+
 from typing import List
 from pydantic import BaseModel, Field
 
@@ -9,79 +11,47 @@ from rag_etl.utils.llms import send_llm_request
 from rag_etl.config import CONFIG
 
 
-def old_split_md_into_exercises(md_path, exercises_path):
-    # Normalise to Paths
-    md_path = Path(md_path)
-    exercises_path = Path(exercises_path)
+def split_by_most_common_heading(md_text: str):
+    heading_pattern = re.compile(r'^(#{1,6})\s+(.+)', re.MULTILINE)
+    matches = heading_pattern.findall(md_text)
 
-    # Read Markdown file to be split
-    md_text = md_path.read_text(encoding='utf-8')
+    if not matches:
+        logging.warning(f"No headings found in Markdown code. Trying without splitting...")
+        return [md_text]
 
-    # Prepare prompts
-    system_prompt = """
-You are a careful Markdown document segmenter.
-Your task is to read a long Markdown file containing multiple exercises and split it into separate snippets, one per exercise.
-You also need to identify the exercise numbers as well as whether the snippets correspond to the exercise statement or the solution.  
+    # Count heading levels
+    counts = {}
+    for hashes, _ in matches:
+        level = len(hashes)
+        counts[level] = counts.get(level, 0) + 1
 
-Rules:
-- Infer exercise boundaries according to headings. Typically, exercises start with a heading containing the text "Exercise N", "Problem N" or even "Solution N".
-- Ignore any introductory or preface material that appears before the first exercise.
-- If an exercise (e.g. "Exercise 1") appears more than once (for instance, this can happen with the exercise statement and solution), produce a snippet for each occurrence.
-- Preserve all Markdown exactly as written.
-  - Keep code blocks, math, images, tables, and formatting intact.
-  - Do not modify or reformat text within each exercise.
-  - Keep footnotes in the exercise they are referenced in, even if they appear later in the document.
-- Ensure each snippet is self-contained and logically complete.
-- Each exercise should include its title, text, and any associated content.
-- The goal is to produce clean, coherent exercise segments suitable for saving as individual Markdown files.
-"""
+    # Find most common level
+    most_common_level = max(counts, key=counts.get)
 
-    user_prompt = f"""
-Here's a Markdown file containing multiple exercises.
-Split it into separate snippets (one per exercise) following the system instructions.
+    # Split on that level (keep headings using lookahead)
+    split_pattern = re.compile(
+        rf'(?=^#{{{most_common_level}}}\s+)',
+        re.MULTILINE
+    )
 
----
+    sections = split_pattern.split(md_text)
 
-{md_text}
-"""
+    return [s.strip() for s in sections if s.strip()]
 
-    # Prepare messages
-    messages = [
-        {"role": "system", "content": system_prompt},
-        {"role": "user", "content": user_prompt},
-    ]
 
-    # Prepare response format
-    class Exercise(BaseModel):
-        snippet: str = Field(..., description="The Markdown snippet of one exercise. Nothing else.")
-        number: str = Field(..., description="The exercise number, as referenced in its Markdown snippet. Typically an integer.")
-        is_solution: bool = Field(..., description="Whether the Markdown snippet contains the solution of the exercise, as opposed to only the .")
+def merge_up_to_max_lines(sections, max_lines):
+    if len(sections) < 2:
+        return sections
 
-    class ExerciseList(BaseModel):
-        exercises: List[Exercise]
+    first = sections[0]
+    second = sections[1]
 
-    # Call LLM to split into exercises
-    rcp_model = CONFIG['RCP_BASE_MODEL']
-    exercise_list = send_llm_request(rcp_model, messages, response_format=ExerciseList)
+    if len(first.splitlines()) + len(second.splitlines()) <= max_lines:
+        new_first = '\n'.join([first, second])
+        new_sections = [new_first] + sections[2:]
+        return merge_up_to_max_lines(new_sections, max_lines)
 
-    # Exercises could be repeated (statement and solution). Make unique by number by prioritising the solution
-    exercises = {}
-    for exercise in exercise_list.exercises:
-        if not exercise.number:
-            continue
-
-        if exercise.is_solution or exercise.number not in exercises:
-            exercises[exercise.number] = exercise
-
-    exercises = list(exercises.values())
-
-    # Store exercises as individual Markdown files
-    exercises_path.mkdir(parents=True, exist_ok=True)
-    for exercise in exercises:
-        exercise_path = exercises_path / exercise.number
-        exercise_path = exercise_path.with_suffix('.md')
-
-        exercise_path.write_text(exercise.snippet, encoding="utf-8")
+    return [first] + merge_up_to_max_lines(sections[1:], max_lines)
 
 
 def split_md_into_exercises(md_path, exercises_path):
@@ -89,17 +59,7 @@ def split_md_into_exercises(md_path, exercises_path):
     md_path = Path(md_path)
     exercises_path = Path(exercises_path)
 
-    # Read Markdown file to be split
-    md_text = md_path.read_text(encoding='utf-8')
-
-    # Annotate Markdown with line numbers (ensuring empty line at the end)
-    md_lines = md_text.splitlines()
-    annotated_md_text = "\n".join(
-        [f"[L{i}] {line}" for i, line in enumerate(md_lines, start=1)]
-        + [""]
-    )
-
-    # Prepare prompts
+    # Prepare system prompt
     system_prompt = """
 You are a careful Markdown document segmenter.
 Your task is to read a long Markdown file, annotated with line numbers, containing multiple exercises and split it into separate chunks, one per exercise.
@@ -492,12 +452,6 @@ you should output
   
 """
 
-    # Prepare messages
-    messages = [
-        {"role": "system", "content": system_prompt},
-        {"role": "user", "content": annotated_md_text},
-    ]
-
     # Prepare response format
     class Exercise(BaseModel):
         start_line: int = Field(..., description="The first line of the Markdown chunk. Its contents are included in the chunk.")
@@ -508,41 +462,72 @@ you should output
     class ExerciseList(BaseModel):
         exercises: List[Exercise]
 
-    # Call LLM to split into exercises
-    rcp_model = CONFIG['RCP_BASE_MODEL']
-    exercise_list = send_llm_request(rcp_model, messages, response_format=ExerciseList)
+    # Read Markdown file to be split
+    md_text = md_path.read_text(encoding='utf-8')
 
-    # Return if no exercises
-    if not exercise_list.exercises:
-        return
+    # Split by most common heading then try to merge as much as possible not exceeding the max lines
+    max_lines = 2000
+    md_texts = split_by_most_common_heading(md_text)
+    md_texts = merge_up_to_max_lines(md_texts, max_lines)
 
-    # Retrieve snippets from lines
-    snippets = {}
-    for exercise in exercise_list.exercises:
-        # Skip if lines make no sense
-        lines_make_sense = 1 <= exercise.start_line <= exercise.end_line <= len(md_lines)
-        if not lines_make_sense:
-            logging.warning(f"While splitting {md_path} got exercise lines out of bounds: start {exercise.start_line}, end {exercise.end_line}, total {len(md_lines)}. Skipping...")
+    if len(md_texts) >= 2:
+        all_n_lines = [md_text.splitlines() for md_text in md_texts]
+        logging.info(f"Splitting {md_path} into {len(md_texts)} chunks (of {all_n_lines} lines) to extract exercises.")
+
+    all_snippets = {}
+    for md_text in md_texts:
+        # Split into lines
+        md_lines = md_text.splitlines()
+
+        # Annotate Markdown with line numbers (ensuring empty line at the end)
+        annotated_md_text = "\n".join(
+            [f"[L{i}] {line}" for i, line in enumerate(md_lines, start=1)]
+            + [""]
+        )
+
+        # Prepare messages
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": annotated_md_text},
+        ]
+
+        # Call LLM to split into exercises
+        exercise_list = send_llm_request(CONFIG['RCP_BASE_MODEL'], messages, response_format=ExerciseList)
+
+        # Skip if no exercises
+        if not exercise_list.exercises:
             continue
 
-        # Fetch snippet from original document
-        snippet = "\n".join(md_lines[exercise.start_line - 1: exercise.end_line])
+        # Retrieve snippets from lines
+        snippets = {}
+        for exercise in exercise_list.exercises:
+            # Skip if lines make no sense
+            lines_make_sense = 1 <= exercise.start_line <= exercise.end_line <= len(md_lines)
+            if not lines_make_sense:
+                logging.warning(f"While splitting {md_path} got exercise lines out of bounds: start {exercise.start_line}, end {exercise.end_line}, total {len(md_lines)}. Skipping...")
+                continue
 
-        # Store snippet in object
-        if (exercise.number, exercise.is_solution) in snippets:
-            snippets[(exercise.number, exercise.is_solution)] += snippet
-        else:
-            snippets[(exercise.number, exercise.is_solution)] = snippet
+            # Fetch snippet from original document
+            snippet = "\n".join(md_lines[exercise.start_line - 1: exercise.end_line])
+
+            # Store snippet in object
+            if (exercise.number, exercise.is_solution) in snippets:
+                snippets[(exercise.number, exercise.is_solution)] += snippet
+            else:
+                snippets[(exercise.number, exercise.is_solution)] = snippet
+
+        # Merge snippets
+        all_snippets = all_snippets | snippets
 
     # Exercises could be repeated (statement and solution). Make unique by number by prioritising the solution
-    snippets = {
+    all_snippets = {
         (number, is_solution): value
-        for (number, is_solution), value in snippets.items()
-        if is_solution or not snippets.get((number, True))
+        for (number, is_solution), value in all_snippets.items()
+        if is_solution or not all_snippets.get((number, True))
     }
 
     # Store exercises as individual Markdown files
     exercises_path.mkdir(parents=True, exist_ok=True)
-    for number, is_solution in snippets:
+    for (number, is_solution) in all_snippets:
         exercise_path = exercises_path / f"{number}.md"
-        exercise_path.write_text(snippets[(number, is_solution)], encoding="utf-8")
+        exercise_path.write_text(all_snippets[(number, is_solution)], encoding="utf-8")

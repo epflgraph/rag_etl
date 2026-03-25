@@ -1,4 +1,4 @@
-from rag_etl.courses.cmirestricted.cmi_restricted_course import CMIRestrictedCourse
+from rag_etl.courses.cmirestricted.cmirestricted_course import CMIRestrictedCourse
 
 __all__ = [
     "CMIRestrictedCourse",

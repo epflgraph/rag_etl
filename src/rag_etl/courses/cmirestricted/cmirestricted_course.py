@@ -22,7 +22,7 @@ import rag_etl.utils.mime_types as mt
 from rag_etl.config import CONFIG
 
 
-class CMIRestrictedCourse(BaseCourse):
+class CMIRESTRICTEDCourse(BaseCourse):
     """
     Course-specific pipeline for CMI (restricted).
     """

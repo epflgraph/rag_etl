@@ -23,6 +23,8 @@ from rag_etl.courses.swissunidemo import SWISSUNIDEMOCourse
 from rag_etl.courses.fin405 import FIN405Course
 from rag_etl.courses.math535 import MATH535Course
 from rag_etl.courses.plasma import PLASMACourse
+from rag_etl.courses.cmi import CMICourse
+from rag_etl.courses.cmirestricted import CMIRestrictedCourse
 
 __all__ = [
     "BaseCourse",
@@ -50,4 +52,6 @@ __all__ = [
     "FIN405Course",
     "MATH535Course",
     "PLASMACourse",
+    "CMICourse",
+    "CMIRestrictedCourse",
 ]

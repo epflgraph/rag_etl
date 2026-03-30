@@ -70,6 +70,23 @@ class UNIL134Course(BaseCourse):
             "split_exercises": True,
             "is_solution": True,
         },
+        "EXAM": {
+            "type": "exam",
+            "subtype": "previous_year_exam",
+            "one_chunk_per_page": False,
+            "one_chunk_per_doc": True,
+            "pdf_to_markdown": True,
+            "split_exercises": True,
+        },
+        "EXAM_SOLUTION": {
+            "type": "exam",
+            "subtype": "previous_year_exam",
+            "one_chunk_per_page": False,
+            "one_chunk_per_doc": True,
+            "pdf_to_markdown": True,
+            "split_exercises": True,
+            "is_solution": True,
+        },
     }
 
     semester_start_date = date(year=2026, month=2, day=16)

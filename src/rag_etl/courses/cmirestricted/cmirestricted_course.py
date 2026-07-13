@@ -30,23 +30,15 @@ class CMIRESTRICTEDCourse(BaseCourse):
     course_info = {
         "course_title": "Centre of MicroNanoTechnology (restricted)",
         "course_id": "CMIRESTRICTED",
-        "academic_course": "2025-2026",
-        "semester": 2,
+        "academic_course": "2026-2027",
+        "semester": 1,
         "admin_info_link": "https://www.epfl.ch/research/facilities/cmi/",
         "coursebook_link": ""
     }
 
     tags = [
-        "EBEAMLITHOGRAPHY",
-        "ETCHING",
-        "GENERAL",
-        "IPHYS",
-        "METROLOGY",
-        "PACKAGING",
-        "PHOTOLITHOGRAPHY",
-        "PROCESS",
+        "WEBSITE",
         "PRIVATE",
-        "THINFILMS",
     ]
     tag_metadata = {
         tag: {
@@ -60,8 +52,8 @@ class CMIRESTRICTEDCourse(BaseCourse):
         for tag in tags
     }
 
-    semester_start_date = date(year=2026, month=2, day=16)
-    semester_end_date = date(year=2026, month=6, day=22)
+    semester_start_date = date(year=2026, month=7, day=1)
+    semester_end_date = date(year=2027, month=7, day=1)
 
     course_path = f"{CONFIG['BASE_PATH']}/{course_info['course_id']}"
     output_path = f"{course_path}/output"

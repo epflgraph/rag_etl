@@ -139,7 +139,7 @@ def convert_page_pdf_to_md(pil_page):
     # Prepare messages
     user_message_content = [
         {"type": "text", "text": user_prompt},
-        {"type": "image_url", "image_url": {"url": data_uri}}
+        {"type": "image_url", "image_url": {"url": data_uri}},
     ]
 
     messages = [
@@ -148,8 +148,8 @@ def convert_page_pdf_to_md(pil_page):
     ]
 
     # Send LLM requests and store results
-    rcp_model = CONFIG['RCP_VISION_MODEL']
-    md_page = send_llm_request(rcp_model, messages).strip()
+    rcp_model = CONFIG["RCP_VISION_MODEL"]
+    md_page = send_llm_request(rcp_model, messages, name="pdf-page-to-markdown").strip()
 
     return md_page
 
@@ -173,7 +173,7 @@ def stitch_md_pages(md_pages):
     Output **only** the final Markdown (no explanations, metadata, or commentary).
     """
 
-    md_text = '\n\n'.join(['```\n' + md_page + '\n```' for md_page in md_pages])
+    md_text = "\n\n".join(["```\n" + md_page + "\n```" for md_page in md_pages])
 
     user_prompt = f"""
     Stitch the following page-level Markdown snippets into one cohesive GitHub-Flavored Markdown document.
@@ -190,8 +190,10 @@ def stitch_md_pages(md_pages):
         {"role": "user", "content": user_prompt},
     ]
 
-    rcp_model = CONFIG['RCP_BASE_MODEL']
-    md_text = send_llm_request(rcp_model, messages).strip()
+    rcp_model = CONFIG["RCP_BASE_MODEL"]
+    md_text = send_llm_request(
+        rcp_model, messages, name="stitch-markdown-pages"
+    ).strip()
 
     return md_text
 
@@ -234,7 +236,7 @@ def batch_stitch_md_pages(md_pages):
 
     md_text = ""
     for i in range(0, len(md_pages), batch_n_pages - overlap):
-        chunk_md_text = stitch_md_pages(md_pages[i:i + batch_n_pages])
+        chunk_md_text = stitch_md_pages(md_pages[i: i + batch_n_pages])
         md_text = best_overlap_concat(md_text, chunk_md_text)
 
     return md_text
@@ -257,7 +259,10 @@ def convert_pdf_to_md(pdf_path, md_path):
 
     # Parse PDF pages to Markdown individually
     async def run_all(pil_pages):
-        tasks = [asyncio.to_thread(convert_page_pdf_to_md, pil_page) for pil_page in pil_pages]
+        tasks = [
+            asyncio.to_thread(convert_page_pdf_to_md, pil_page)
+            for pil_page in pil_pages
+        ]
         return await asyncio.gather(*tasks)
 
     md_pages = asyncio.run(run_all(pil_pages))
@@ -469,5 +474,3 @@ def convert_pdf_to_md(pdf_path, md_path):
 #
 #     print('-' * 64)
 #     print(md_text)
-
-

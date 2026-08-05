@@ -1,13 +1,13 @@
 import base64
 
-from openai import OpenAI
+from langfuse.openai import OpenAI
 
 import rag_etl.utils.mime_types as mt
 
 from rag_etl.config import CONFIG
 
 
-def send_llm_request(model, messages, response_format=None):
+def send_llm_request(model, messages, response_format=None, name: str = "llm-request"):
     if response_format:
         response_format_schema = {
             "type": "json_schema",
@@ -20,9 +20,14 @@ def send_llm_request(model, messages, response_format=None):
     else:
         response_format_schema = None
 
-    # Send request
-    rcp_client = OpenAI(base_url=CONFIG['RCP_BASE_URL'], api_key=CONFIG['RCP_API_KEY'])
-    response = rcp_client.chat.completions.create(model=model, messages=messages, response_format=response_format_schema)
+    # Send request (Langfuse native integration auto-traces the call)
+    rcp_client = OpenAI(base_url=CONFIG["RCP_BASE_URL"], api_key=CONFIG["RCP_API_KEY"])
+    response = rcp_client.chat.completions.create(
+        name=name,
+        model=model,
+        messages=messages,
+        response_format=response_format_schema,
+    )
     content = response.choices[0].message.content.strip()
 
     # Strip thinking tokens
@@ -52,12 +57,20 @@ def generate_alt_text(path: str) -> str:
     # Build data URL
     data_url = f"data:{mime_type};base64,{b64}"
 
-    messages = [{'role': 'user', 'content': [
-        {"type": "text", "text": "Generate the ALT text for this image. If prominent text exists, include it briefly."},
-        {"type": "image_url", "image_url": {"url": data_url}}
-    ]}]
+    messages = [
+        {
+            "role": "user",
+            "content": [
+                {
+                    "type": "text",
+                    "text": "Generate the ALT text for this image. If prominent text exists, include it briefly.",
+                },
+                {"type": "image_url", "image_url": {"url": data_url}},
+            ],
+        }
+    ]
 
-    rcp_model = CONFIG['RCP_VISION_MODEL']
-    message = send_llm_request(rcp_model, messages)
+    rcp_model = CONFIG["RCP_VISION_MODEL"]
+    message = send_llm_request(rcp_model, messages, name="generate-alt-text")
 
     return message

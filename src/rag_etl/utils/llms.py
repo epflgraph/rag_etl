@@ -1,6 +1,7 @@
 import base64
 
-from langfuse.openai import OpenAI
+from langfuse import get_client
+from openai import OpenAI
 
 import rag_etl.utils.mime_types as mt
 
@@ -20,15 +21,44 @@ def send_llm_request(model, messages, response_format=None, name: str = "llm-req
     else:
         response_format_schema = None
 
-    # Send request (Langfuse native integration auto-traces the call)
+    # Send request and trace it as a single generation
     rcp_client = OpenAI(base_url=CONFIG["RCP_BASE_URL"], api_key=CONFIG["RCP_API_KEY"])
-    response = rcp_client.chat.completions.create(
+    langfuse = get_client()
+    with langfuse.start_as_current_observation(
+        as_type="generation",
         name=name,
         model=model,
-        messages=messages,
-        response_format=response_format_schema,
-    )
-    content = response.choices[0].message.content.strip()
+        input=messages,
+    ) as generation:
+        response = rcp_client.chat.completions.create(
+            model=model,
+            messages=messages,
+            response_format=response_format_schema,
+            temperature=1.0,
+            top_p=0.95,
+            presence_penalty=1.5,
+            extra_body={
+                "top_k": 20,
+                "min_p": 0.0,
+                "repetition_penalty": 1.0,
+                "chat_template_kwargs": {"enable_thinking": True},
+                "thinking_token_budget": 32000,  # Value from benchmark "Reasoning Budgets vs. Structured CoT Controlling LLM Thinking Tokens" (https://kaitchup.substack.com/p/reasoning-budgets-vs-structured-cot)
+            },
+        )
+        message = response.choices[0].message
+        content = message.content.strip()
+
+        # Capture reasoning / thinking tokens if present (modern vLLM uses `reasoning`, current RCP uses `reasoning_content`)
+        reasoning = getattr(message, "reasoning", None) or getattr(message, "reasoning_content", None)
+        update_kwargs: dict = {"output": content}
+        if reasoning:
+            update_kwargs["metadata"] = {"reasoning": reasoning}
+        if response.usage:
+            update_kwargs["usage_details"] = {
+                "input": response.usage.prompt_tokens,
+                "output": response.usage.completion_tokens,
+            }
+        generation.update(**update_kwargs)
 
     # Strip thinking tokens
     thinking_tag = '</think>'

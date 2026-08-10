@@ -12,7 +12,7 @@ from rag_etl.config import CONFIG
 
 
 def split_by_most_common_heading(md_text: str):
-    heading_pattern = re.compile(r'^(#{1,6})\s+(.+)', re.MULTILINE)
+    heading_pattern = re.compile(r"^(#{1,6})\s+(.+)", re.MULTILINE)
     matches = heading_pattern.findall(md_text)
 
     if not matches:
@@ -29,10 +29,7 @@ def split_by_most_common_heading(md_text: str):
     most_common_level = max(counts, key=counts.get)
 
     # Split on that level (keep headings using lookahead)
-    split_pattern = re.compile(
-        rf'(?=^#{{{most_common_level}}}\s+)',
-        re.MULTILINE
-    )
+    split_pattern = re.compile(rf"(?=^#{{{most_common_level}}}\s+)", re.MULTILINE)
 
     sections = split_pattern.split(md_text)
 
@@ -47,7 +44,7 @@ def merge_up_to_max_lines(sections, max_lines):
     second = sections[1]
 
     if len(first.splitlines()) + len(second.splitlines()) <= max_lines:
-        new_first = '\n'.join([first, second])
+        new_first = "\n".join([first, second])
         new_sections = [new_first] + sections[2:]
         return merge_up_to_max_lines(new_sections, max_lines)
 
@@ -463,7 +460,7 @@ you should output
         exercises: List[Exercise]
 
     # Read Markdown file to be split
-    md_text = md_path.read_text(encoding='utf-8')
+    md_text = md_path.read_text(encoding="utf-8")
 
     # Split by most common heading then try to merge as much as possible not exceeding the max lines
     max_lines = 2000
@@ -481,8 +478,7 @@ you should output
 
         # Annotate Markdown with line numbers (ensuring empty line at the end)
         annotated_md_text = "\n".join(
-            [f"[L{i}] {line}" for i, line in enumerate(md_lines, start=1)]
-            + [""]
+            [f"[L{i}] {line}" for i, line in enumerate(md_lines, start=1)] + [""]
         )
 
         # Prepare messages
@@ -492,7 +488,12 @@ you should output
         ]
 
         # Call LLM to split into exercises
-        exercise_list = send_llm_request(CONFIG['RCP_BASE_MODEL'], messages, response_format=ExerciseList)
+        exercise_list = send_llm_request(
+            CONFIG["RCP_BASE_MODEL"],
+            messages,
+            response_format=ExerciseList,
+            name="split-exercises",
+        )
 
         # Skip if no exercises
         if not exercise_list.exercises:
@@ -502,7 +503,9 @@ you should output
         snippets = {}
         for exercise in exercise_list.exercises:
             # Skip if lines make no sense
-            lines_make_sense = 1 <= exercise.start_line <= exercise.end_line <= len(md_lines)
+            lines_make_sense = (
+                1 <= exercise.start_line <= exercise.end_line <= len(md_lines)
+            )
             if not lines_make_sense:
                 logging.warning(f"While splitting {md_path} got exercise lines out of bounds: start {exercise.start_line}, end {exercise.end_line}, total {len(md_lines)}. Skipping...")
                 continue

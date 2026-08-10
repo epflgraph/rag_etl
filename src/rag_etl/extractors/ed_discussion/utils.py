@@ -173,7 +173,7 @@ def classify_thread_with_llm(
         ]
 
         model = CONFIG["RCP_VISION_MODEL"]
-        content = send_llm_request(model, messages)
+        content = send_llm_request(model, messages, name="classify-thread")
 
         return json.loads(content)
 

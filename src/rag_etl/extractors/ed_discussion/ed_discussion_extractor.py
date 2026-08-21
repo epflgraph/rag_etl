@@ -97,9 +97,7 @@ class EdDiscussionExtractor(BaseExtractor):
 
         # Intermediate JSON files are useful to detect errors in the message classification
         # The errors can be manually fixed in the JSON files without having to make extra LLM calls
-        intermediate_jsons = self.get_or_create_intermediate_jsons(
-            ed_dir, processed_dir, images_dir
-        )
+        intermediate_jsons = self.get_or_create_intermediate_jsons(ed_dir, processed_dir, images_dir)
 
         # Markdown (final) files are created from the JSON files
         resources = self.create_resources_from_jsons(intermediate_jsons, markdown_dir)
@@ -152,9 +150,7 @@ class EdDiscussionExtractor(BaseExtractor):
             thread_record = self.process_single_thread(json_path, images_dir)
             if thread_record is None:
                 # Append failed threads to the list
-                failed_threads.append(
-                    {"filename": json_path.name, "reason": "processing_failed"}
-                )
+                failed_threads.append({"filename": json_path.name, "reason": "processing_failed"})
                 continue
 
             thread_type = thread_record.get("type")
@@ -181,9 +177,7 @@ class EdDiscussionExtractor(BaseExtractor):
             failed_path = processed_dir / "failed_threads.json"
             with open(failed_path, "w", encoding="utf-8") as f:
                 json.dump(failed_threads, f, ensure_ascii=False, indent=2)
-            logger.warning(
-                f"Wrote {len(failed_threads)} failed threads to {failed_path}"
-            )
+            logger.warning(f"Wrote {len(failed_threads)} failed threads to {failed_path}")
 
     def process_single_thread(
         self,
@@ -271,9 +265,7 @@ class EdDiscussionExtractor(BaseExtractor):
                 continue
 
             for thread in threads:
-                resource = self.create_resource_from_thread(
-                    thread, category, json_path, markdown_dir
-                )
+                resource = self.create_resource_from_thread(thread, category, json_path, markdown_dir)
                 if resource is not None:
                     resources.append(resource)
 

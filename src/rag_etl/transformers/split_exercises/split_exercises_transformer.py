@@ -46,7 +46,7 @@ class SplitExercisesTransformer(BaseTransformer):
 
             # Build paths of md file and exercises folder
             md_path = Path(resource.path)
-            exercises_path = md_path.with_suffix('')
+            exercises_path = md_path.with_suffix("")
             exercises_path.mkdir(parents=True, exist_ok=True)
 
             # Only split if not cached

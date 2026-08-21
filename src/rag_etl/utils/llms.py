@@ -61,7 +61,7 @@ def send_llm_request(model, messages, response_format=None, name: str = "llm-req
         generation.update(**update_kwargs)
 
     # Strip thinking tokens
-    thinking_tag = '</think>'
+    thinking_tag = "</think>"
     if thinking_tag in response:
         content = content.split(thinking_tag)[-1].strip()
 

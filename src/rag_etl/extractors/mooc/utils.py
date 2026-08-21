@@ -92,9 +92,7 @@ def cmp_key(s: str) -> str:
     return s
 
 
-def get_filename_via_assets(
-    course_path: str, href: str, assets_map: dict[str, str]
-) -> Path:
+def get_filename_via_assets(course_path: str, href: str, assets_map: dict[str, str]) -> Path:
     """
     Find actual file path using previously loaded assets.json into assets_map
     """

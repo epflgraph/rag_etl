@@ -33,7 +33,7 @@ class MATH115aCourse(BaseCourse):
         "academic_course": "2025-2026",
         "semester": 2,
         "admin_info_link": "https://moodle.epfl.ch/course/view.php?id=14157",
-        "coursebook_link": "https://edu.epfl.ch/coursebook/fr/algebre-lineaire-avancee-ii-diagonalisation-MATH-115-A"
+        "coursebook_link": "https://edu.epfl.ch/coursebook/fr/algebre-lineaire-avancee-ii-diagonalisation-MATH-115-A",
     }
 
     tag_metadata = {
@@ -106,17 +106,17 @@ class MATH115aCourse(BaseCourse):
     @property
     def pdf_to_markdown_type_subtypes(self) -> List[Tuple[str, str]]:
         return [
-            (self.tag_metadata[tag].get('type'), self.tag_metadata[tag].get('subtype'))
+            (self.tag_metadata[tag].get("type"), self.tag_metadata[tag].get("subtype"))
             for tag in self.tag_metadata
-            if self.tag_metadata[tag].get('pdf_to_markdown')
+            if self.tag_metadata[tag].get("pdf_to_markdown")
         ]
 
     @property
     def split_exercises_type_subtypes(self) -> List[Tuple[str, str]]:
         return [
-            (self.tag_metadata[tag].get('type'), self.tag_metadata[tag].get('subtype'))
+            (self.tag_metadata[tag].get("type"), self.tag_metadata[tag].get("subtype"))
             for tag in self.tag_metadata
-            if self.tag_metadata[tag].get('split_exercises')
+            if self.tag_metadata[tag].get("split_exercises")
         ]
 
     @property
@@ -144,21 +144,17 @@ class MATH115aCourse(BaseCourse):
     @property
     def loaders(self) -> List[BaseLoader]:
         """No loaders defined for this course."""
-        return [
-            ContentMetadataLoader(
-                course_path=self.course_path,
-                course_info=self.course_info
-            )
-        ]
+        return [ContentMetadataLoader(course_path=self.course_path, course_info=self.course_info)]
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     import sys
+
     logging.basicConfig(
         level=logging.INFO,
-        format='[%(asctime)s] [%(levelname)s] [%(filename)s:%(lineno)d] %(message)s',
-        handlers=[logging.StreamHandler(sys.stdout)]
+        format="[%(asctime)s] [%(levelname)s] [%(filename)s:%(lineno)d] %(message)s",
+        handlers=[logging.StreamHandler(sys.stdout)],
     )
 
-    course = BaseCourse.from_code('MATH115a')
+    course = BaseCourse.from_code("MATH115a")
     course.run()

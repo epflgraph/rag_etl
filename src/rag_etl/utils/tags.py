@@ -28,7 +28,7 @@ def split_tag_number_text(text):
         return (None, None, text)
 
     # Try to extract number from tag
-    match = re.search(r'_(\d+)(?:_|$)', tag)
+    match = re.search(r"_(\d+)(?:_|$)", tag)
 
     # If no number, return only tag
     if not match:
@@ -36,7 +36,7 @@ def split_tag_number_text(text):
 
     # If number, remove it from tag and return both separately
     number = match.group(1)
-    tag = re.sub(rf'_{number}', '', tag, count=1)
+    tag = re.sub(rf"_{number}", "", tag, count=1)
 
     # Try to cast to int and then to string ("05" -> "5" but "5A" -> "5A")
     try:

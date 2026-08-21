@@ -69,7 +69,9 @@ class VideoToJSONTransformer(BaseTransformer):
 
                 if json_data is None:
                     # TODO retry on failure or at least print the content or plausible reason why it failed
-                    logger.debug(f"Failed to convert {resource.path} into {json_path}. Skipping to prevent a failure later on...")
+                    logger.debug(
+                        f"Failed to convert {resource.path} into {json_path}. Skipping to prevent a failure later on..."
+                    )
                     continue
 
                 json_path.write_text(

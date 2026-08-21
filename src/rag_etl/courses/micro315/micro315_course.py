@@ -33,58 +33,58 @@ class MICRO315Course(BaseCourse):
         "academic_course": "2025-2026",
         "semester": 2,
         "admin_info_link": "https://moodle.epfl.ch/course/view.php?id=467",
-        "coursebook_link": "https://edu.epfl.ch/coursebook/fr/systemes-embarques-et-robotique-MICRO-315"
+        "coursebook_link": "https://edu.epfl.ch/coursebook/fr/systemes-embarques-et-robotique-MICRO-315",
     }
 
     tag_metadata = {
-        'SLIDES': {
-            'type': 'theory',
-            'subtype': 'lecture_slides',
-            'one_chunk_per_page': True,
-            'one_chunk_per_doc': False,
-            'pdf_to_markdown': False,
-            'split_exercises': False,
+        "SLIDES": {
+            "type": "theory",
+            "subtype": "lecture_slides",
+            "one_chunk_per_page": True,
+            "one_chunk_per_doc": False,
+            "pdf_to_markdown": False,
+            "split_exercises": False,
         },
-        'REF': {
-            'type': 'theory',
-            'subtype': 'recommended_reading',
-            'one_chunk_per_page': False,
-            'one_chunk_per_doc': False,
-            'pdf_to_markdown': False,
-            'split_exercises': False,
+        "REF": {
+            "type": "theory",
+            "subtype": "recommended_reading",
+            "one_chunk_per_page": False,
+            "one_chunk_per_doc": False,
+            "pdf_to_markdown": False,
+            "split_exercises": False,
         },
-        'TP': {
-            'type': 'practice',
-            'subtype': 'lab',
-            'one_chunk_per_page': False,
-            'one_chunk_per_doc': False,
-            'pdf_to_markdown': False,
-            'split_exercises': False,
+        "TP": {
+            "type": "practice",
+            "subtype": "lab",
+            "one_chunk_per_page": False,
+            "one_chunk_per_doc": False,
+            "pdf_to_markdown": False,
+            "split_exercises": False,
         },
-        'TP_SOLUTION': {
-            'type': 'practice',
-            'subtype': 'lab',
-            'is_solution': True,
-            'one_chunk_per_page': False,
-            'one_chunk_per_doc': False,
-            'pdf_to_markdown': False,
-            'split_exercises': False,
+        "TP_SOLUTION": {
+            "type": "practice",
+            "subtype": "lab",
+            "is_solution": True,
+            "one_chunk_per_page": False,
+            "one_chunk_per_doc": False,
+            "pdf_to_markdown": False,
+            "split_exercises": False,
         },
-        'LIB': {
-            'type': 'practice',
-            'subtype': 'lab_lib',
-            'one_chunk_per_page': False,
-            'one_chunk_per_doc': False,
-            'pdf_to_markdown': False,
-            'split_exercises': False,
+        "LIB": {
+            "type": "practice",
+            "subtype": "lab_lib",
+            "one_chunk_per_page": False,
+            "one_chunk_per_doc": False,
+            "pdf_to_markdown": False,
+            "split_exercises": False,
         },
-        'WIKI': {
-            'type': 'practice',
-            'subtype': 'lab_wiki',
-            'one_chunk_per_page': False,
-            'one_chunk_per_doc': False,
-            'pdf_to_markdown': False,
-            'split_exercises': False,
+        "WIKI": {
+            "type": "practice",
+            "subtype": "lab_wiki",
+            "one_chunk_per_page": False,
+            "one_chunk_per_doc": False,
+            "pdf_to_markdown": False,
+            "split_exercises": False,
         },
     }
 
@@ -111,17 +111,17 @@ class MICRO315Course(BaseCourse):
     @property
     def pdf_to_markdown_type_subtypes(self) -> List[Tuple[str, str]]:
         return [
-            (self.tag_metadata[tag].get('type'), self.tag_metadata[tag].get('subtype'))
+            (self.tag_metadata[tag].get("type"), self.tag_metadata[tag].get("subtype"))
             for tag in self.tag_metadata
-            if self.tag_metadata[tag].get('pdf_to_markdown')
+            if self.tag_metadata[tag].get("pdf_to_markdown")
         ]
 
     @property
     def split_exercises_type_subtypes(self) -> List[Tuple[str, str]]:
         return [
-            (self.tag_metadata[tag].get('type'), self.tag_metadata[tag].get('subtype'))
+            (self.tag_metadata[tag].get("type"), self.tag_metadata[tag].get("subtype"))
             for tag in self.tag_metadata
-            if self.tag_metadata[tag].get('split_exercises')
+            if self.tag_metadata[tag].get("split_exercises")
         ]
 
     @property
@@ -137,7 +137,7 @@ class MICRO315Course(BaseCourse):
                 moodle_base_path=self.moodle_base_path,
                 tag_metadata=self.tag_metadata,
                 mime_types=self.mime_types,
-            )
+            ),
         ]
 
     @property
@@ -151,21 +151,17 @@ class MICRO315Course(BaseCourse):
 
     @property
     def loaders(self) -> List[BaseLoader]:
-        return [
-            ContentMetadataLoader(
-                course_path=self.course_path,
-                course_info=self.course_info
-            )
-        ]
+        return [ContentMetadataLoader(course_path=self.course_path, course_info=self.course_info)]
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     import sys
+
     logging.basicConfig(
         level=logging.INFO,
-        format='[%(asctime)s] [%(levelname)s] [%(filename)s:%(lineno)d] %(message)s',
-        handlers=[logging.StreamHandler(sys.stdout)]
+        format="[%(asctime)s] [%(levelname)s] [%(filename)s:%(lineno)d] %(message)s",
+        handlers=[logging.StreamHandler(sys.stdout)],
     )
 
-    course = BaseCourse.from_code('MICRO315')
+    course = BaseCourse.from_code("MICRO315")
     course.run()

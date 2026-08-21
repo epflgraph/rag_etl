@@ -54,9 +54,7 @@ class VideoParser:
             if elem.tag == "source":
                 switch_video_url = elem.get("src")
 
-        video_platform = self.get_video_platform_id(
-            video_url=switch_video_url, youtube_id=youtube_id
-        )
+        video_platform = self.get_video_platform_id(video_url=switch_video_url, youtube_id=youtube_id)
 
         video_url = ""
         if video_platform == "mediaspace":

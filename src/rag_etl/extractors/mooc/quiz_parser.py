@@ -76,9 +76,7 @@ class QuizParser:
             # Unsupported quiz type
             return []
 
-        resource_title = f"{vertical_display_name} - {quiz_data.display_name}".strip(
-            " -"
-        )
+        resource_title = f"{vertical_display_name} - {quiz_data.display_name}".strip(" -")
 
         out_dir = Path(course_path) / "quiz"
         out_dir.mkdir(parents=True, exist_ok=True)
@@ -176,9 +174,7 @@ class QuizParser:
         logger.info("QuizParser: unsupported quiz (no recognized response node)")
         return None
 
-    def extract_single_choice(
-        self, display_name: str, mcr: _Element
-    ) -> QuizData | None:
+    def extract_single_choice(self, display_name: str, mcr: _Element) -> QuizData | None:
         """
         Extract single choice
         """
@@ -206,9 +202,7 @@ class QuizParser:
             general_feedback_md=general_feedback_md,
         )
 
-    def extract_checkbox_choice(
-        self, display_name: str, cr: _Element
-    ) -> QuizData | None:
+    def extract_checkbox_choice(self, display_name: str, cr: _Element) -> QuizData | None:
         """
         Extract Multiple choice
         """
@@ -295,9 +289,7 @@ class QuizParser:
             return None
 
         # <solution><div class="detailed-solution"><p>...</p>...</div></solution>
-        container = (
-            sol.find("./div[@class='detailed-solution']") or sol.find("./div") or sol
-        )
+        container = sol.find("./div[@class='detailed-solution']") or sol.find("./div") or sol
 
         chunks: list[str] = []
 
@@ -348,11 +340,7 @@ class QuizParser:
                 for r in rest:
                     lines.append(f"  {r}")
 
-        if (
-            include_solutions
-            and quiz.general_feedback_md
-            and quiz.general_feedback_md.strip()
-        ):
+        if include_solutions and quiz.general_feedback_md and quiz.general_feedback_md.strip():
             lines.append("")
             lines.append("## Explanation")
             lines.append("")

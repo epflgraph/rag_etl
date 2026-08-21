@@ -270,9 +270,7 @@ def process_comment(
     endorsed = comment.get("is_endorsed", False)
 
     if role in STAFF_ROLES:
-        subtype = (
-            "answer_from_staff_followup" if parent_is_answer else "answer_from_staff"
-        )
+        subtype = "answer_from_staff_followup" if parent_is_answer else "answer_from_staff"
         message = create_message(
             msg_type=comment.get("type", "comment"),
             subtype=subtype,

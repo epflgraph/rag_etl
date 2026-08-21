@@ -135,21 +135,13 @@ class UNIL134Course(BaseCourse):
         return [
             ExtractZipTransformer(cache=self.course_code),
             JupyterToMarkdownTransformer(cache=self.course_code),
-            PDFToMarkdownTransformer(
-                type_subtypes=self.pdf_to_markdown_type_subtypes, cache=self.course_code
-            ),
-            SplitExercisesTransformer(
-                type_subtypes=self.split_exercises_type_subtypes, cache=self.course_code
-            ),
+            PDFToMarkdownTransformer(type_subtypes=self.pdf_to_markdown_type_subtypes, cache=self.course_code),
+            SplitExercisesTransformer(type_subtypes=self.split_exercises_type_subtypes, cache=self.course_code),
         ]
 
     @property
     def loaders(self) -> List[BaseLoader]:
-        return [
-            ContentMetadataLoader(
-                course_path=self.course_path, course_info=self.course_info
-            )
-        ]
+        return [ContentMetadataLoader(course_path=self.course_path, course_info=self.course_info)]
 
 
 if __name__ == "__main__":

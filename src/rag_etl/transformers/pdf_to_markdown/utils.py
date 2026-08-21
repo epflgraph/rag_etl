@@ -191,9 +191,7 @@ def stitch_md_pages(md_pages):
     ]
 
     rcp_model = CONFIG["RCP_BASE_MODEL"]
-    md_text = send_llm_request(
-        rcp_model, messages, name="stitch-markdown-pages"
-    ).strip()
+    md_text = send_llm_request(rcp_model, messages, name="stitch-markdown-pages").strip()
 
     return md_text
 
@@ -223,7 +221,7 @@ def best_overlap_concat(a: str, b: str, min_ratio: float = 0.8):
             best = {"overlap": k, "ratio": r}
 
     if best["ratio"] >= min_ratio:
-        merged = a_lines + b_lines[best["overlap"]:]
+        merged = a_lines + b_lines[best["overlap"] :]
     else:
         merged = a_lines + b_lines
 
@@ -236,7 +234,7 @@ def batch_stitch_md_pages(md_pages):
 
     md_text = ""
     for i in range(0, len(md_pages), batch_n_pages - overlap):
-        chunk_md_text = stitch_md_pages(md_pages[i: i + batch_n_pages])
+        chunk_md_text = stitch_md_pages(md_pages[i : i + batch_n_pages])
         md_text = best_overlap_concat(md_text, chunk_md_text)
 
     return md_text
@@ -259,10 +257,7 @@ def convert_pdf_to_md(pdf_path, md_path):
 
     # Parse PDF pages to Markdown individually
     async def run_all(pil_pages):
-        tasks = [
-            asyncio.to_thread(convert_page_pdf_to_md, pil_page)
-            for pil_page in pil_pages
-        ]
+        tasks = [asyncio.to_thread(convert_page_pdf_to_md, pil_page) for pil_page in pil_pages]
         return await asyncio.gather(*tasks)
 
     md_pages = asyncio.run(run_all(pil_pages))

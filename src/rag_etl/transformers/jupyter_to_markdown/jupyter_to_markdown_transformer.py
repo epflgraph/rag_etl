@@ -37,7 +37,7 @@ class JupyterToMarkdownTransformer(BaseTransformer):
 
             # Build paths of ipynb file and md file
             ipynb_path = Path(resource.path)
-            md_path = ipynb_path.with_suffix('.md')
+            md_path = ipynb_path.with_suffix(".md")
 
             # Only convert if not cached
             cached = self.get_from_cache(ipynb_path, md_path)

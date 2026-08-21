@@ -18,7 +18,7 @@ class BaseExtractor(ABC):
     """
 
     @abstractmethod
-    def extract(self) -> List[BaseResource]:
+    def extract(self) -> list[BaseResource]:
         """
         Perform extraction and return a list of Resource objects.
 

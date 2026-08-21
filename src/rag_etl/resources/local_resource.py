@@ -9,6 +9,6 @@ from rag_etl.resources.base_resource import BaseResource
 
 @dataclass
 class LocalResource(BaseResource):
-    source = 'local'
+    source = "local"
 
     tag: Optional[str] = None

@@ -70,7 +70,7 @@ def convert_ipynb_to_md(ipynb_path, md_path):
 
         return f"![{alt}]({src})"
 
-    md_image_re = re.compile(r'!\[(.*?)\]\((.*?)\)')
+    md_image_re = re.compile(r"!\[(.*?)\]\((.*?)\)")
     text = md_image_re.sub(md_image_replace, text)
 
     # Replace HTML images (<img...)

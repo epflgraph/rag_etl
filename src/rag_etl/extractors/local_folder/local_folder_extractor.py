@@ -21,7 +21,7 @@ class LocalFolderExtractor(BaseExtractor):
     Extractor for retrieving course materials from a local folder.
     """
 
-    METADATA_FILES = ['from', 'until', 'url']
+    METADATA_FILES = ["from", "until", "url"]
 
     def __init__(
         self,
@@ -105,7 +105,9 @@ class LocalFolderExtractor(BaseExtractor):
                 # Skip if unexpected mime type
                 mime_type = mt.guess_mime_type(str(file_path))
                 if mime_type not in self.mime_types:
-                    logging.info(f"Skipping file {str(file_path)} because its mime type ({mime_type}) is not expected ({self.mime_types}).")
+                    logging.info(
+                        f"Skipping file {str(file_path)} because its mime type ({mime_type}) is not expected ({self.mime_types})."
+                    )
                     continue
 
                 # Extract tag from filename
@@ -120,47 +122,51 @@ class LocalFolderExtractor(BaseExtractor):
 
                 # Skip if unrecognised tag
                 if tag not in self.tag_metadata:
-                    logging.info(f"Skipping file {str(file_path)} because its tag ({tag}) is unexpected ({self.tag_metadata.keys()})")
+                    logging.info(
+                        f"Skipping file {str(file_path)} because its tag ({tag}) is unexpected ({self.tag_metadata.keys()})"
+                    )
                     continue
 
                 # Extract tag metadata
-                type_ = self.tag_metadata.get(tag, {}).get('type')
-                subtype = self.tag_metadata.get(tag, {}).get('subtype')
-                is_solution = self.tag_metadata.get(tag, {}).get('is_solution', False)
-                one_chunk_per_page = self.tag_metadata.get(tag, {}).get('one_chunk_per_page', False)
-                one_chunk_per_doc = self.tag_metadata.get(tag, {}).get('one_chunk_per_doc', False)
+                type_ = self.tag_metadata.get(tag, {}).get("type")
+                subtype = self.tag_metadata.get(tag, {}).get("subtype")
+                is_solution = self.tag_metadata.get(tag, {}).get("is_solution", False)
+                one_chunk_per_page = self.tag_metadata.get(tag, {}).get("one_chunk_per_page", False)
+                one_chunk_per_doc = self.tag_metadata.get(tag, {}).get("one_chunk_per_doc", False)
 
                 # Extract metadata from files
-                from_ = self.extract_closest_metadata(file_path.parent, 'from')
-                until = self.extract_closest_metadata(file_path.parent, 'until')
-                url = self.extract_closest_metadata(file_path.parent, 'url')
+                from_ = self.extract_closest_metadata(file_path.parent, "from")
+                until = self.extract_closest_metadata(file_path.parent, "until")
+                url = self.extract_closest_metadata(file_path.parent, "url")
 
                 # Processing method and model
                 if mime_type == mt.PDF:
-                    processing_method = 'rcp'
-                    model = CONFIG['RCP_VISION_MODEL']
+                    processing_method = "rcp"
+                    model = CONFIG["RCP_VISION_MODEL"]
                 else:
                     processing_method = None
                     model = None
 
                 # Append resource
-                resources.append(LocalResource(
-                    tag=tag,
-                    title=title,
-                    url=url,
-                    path=str(file_path),
-                    source='local',
-                    mime_type=mime_type,
-                    type=type_,
-                    subtype=subtype,
-                    number=number,
-                    is_solution=is_solution,
-                    processing_method=processing_method,
-                    model=model,
-                    one_chunk_per_page=one_chunk_per_page,
-                    one_chunk_per_doc=one_chunk_per_doc,
-                    from_=from_,
-                    until=until,
-                ))
+                resources.append(
+                    LocalResource(
+                        tag=tag,
+                        title=title,
+                        url=url,
+                        path=str(file_path),
+                        source="local",
+                        mime_type=mime_type,
+                        type=type_,
+                        subtype=subtype,
+                        number=number,
+                        is_solution=is_solution,
+                        processing_method=processing_method,
+                        model=model,
+                        one_chunk_per_page=one_chunk_per_page,
+                        one_chunk_per_doc=one_chunk_per_doc,
+                        from_=from_,
+                        until=until,
+                    )
+                )
 
         return resources

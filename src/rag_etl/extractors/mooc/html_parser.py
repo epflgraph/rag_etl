@@ -154,18 +154,14 @@ class HtmlParser:
         for child in node.children:
             self.walk(child, out)
 
-    def generate_title_for_found_resource(
-        self, html_title: str, found_resource_path: str
-    ) -> str:
+    def generate_title_for_found_resource(self, html_title: str, found_resource_path: str) -> str:
         """Generate resource title making use of its parent title."""
 
         normalized_path = unicodedata.normalize("NFC", found_resource_path)
         resource_title = html_title + " " + Path(normalized_path).name
         return resource_title
 
-    def find_document_links_local_regex(
-        self, html_text: str, extension: str
-    ) -> list[str]:
+    def find_document_links_local_regex(self, html_text: str, extension: str) -> list[str]:
         """Find documents links in a local HTML file using regex"""
 
         # Ensure the extension starts with a dot
@@ -213,9 +209,7 @@ class HtmlParser:
         # Extract tag
         module_number = None
 
-        module_tag, module_number, mooc_resource_title = split_tag_number_text(
-            mooc_resource_title
-        )
+        module_tag, module_number, mooc_resource_title = split_tag_number_text(mooc_resource_title)
         logger.debug(f"title module_tag={module_tag}")
         logger.debug(f"title module_number={module_number}")
         logger.debug(f"title mooc_resource_title={mooc_resource_title}")
@@ -292,9 +286,7 @@ class HtmlParser:
 
         # For all supported linked files
         for ext in ("pdf", "txt", "zip", "md"):
-            links = self.find_document_links_local_regex(
-                html_text=html_text, extension=ext
-            )
+            links = self.find_document_links_local_regex(html_text=html_text, extension=ext)
             for linked in links:
                 # If it's an URL skip it
                 if "http" in linked:
@@ -323,14 +315,10 @@ class HtmlParser:
                     repr(resource_path),
                 )
                 if not resource_path_exists:
-                    resource_path = get_filename_via_assets(
-                        course_path, linked, assets_map
-                    )
+                    resource_path = get_filename_via_assets(course_path, linked, assets_map)
                     resource_path_exists = resource_path.exists()
                     if not resource_path_exists:
-                        logger.warning(
-                            "Missing asset: href=%r resolved=%s", linked, resource_path
-                        )
+                        logger.warning("Missing asset: href=%r resolved=%s", linked, resource_path)
 
                     logger.debug(
                         "resource_path resolved exists? %s (%s)",

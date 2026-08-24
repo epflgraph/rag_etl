@@ -44,10 +44,26 @@ def infer_date(resource: BaseResource, start_date: date, end_date: date) -> str:
     # Normalise month to three letters, then to int
     month = month.strip().lower()[:3]  # normalise (Oct → oct, October → oct, octover → oct)
     month_map = {
-        "jan": 1, "feb": 2, "fev": 2, "fév": 2, "mar": 3,
-        "apr": 4, "avr": 4, "may": 5, "mai": 5, "jun": 6, "jui": 6,
-        "jul": 7, "aug": 8, "aou": 8, "aoû": 8,
-        "sep": 9, "oct": 10, "nov": 11, "dec": 12, "déc": 12,
+        "jan": 1,
+        "feb": 2,
+        "fev": 2,
+        "fév": 2,
+        "mar": 3,
+        "apr": 4,
+        "avr": 4,
+        "may": 5,
+        "mai": 5,
+        "jun": 6,
+        "jui": 6,
+        "jul": 7,
+        "aug": 8,
+        "aou": 8,
+        "aoû": 8,
+        "sep": 9,
+        "oct": 10,
+        "nov": 11,
+        "dec": 12,
+        "déc": 12,
     }
     month = month_map[month]
 
@@ -73,10 +89,10 @@ def infer_week(resource: BaseResource, weeks: dict) -> Optional[int]:
 def infer_year(resource: BaseResource) -> Optional[str]:
     text = resource.title.lower()
 
-    years = re.findall(r'\b(1[0-9]{3}|2[0-9]{3})\b', text)
+    years = re.findall(r"\b(1[0-9]{3}|2[0-9]{3})\b", text)
 
     if years:
-        return '-'.join(years)
+        return "-".join(years)
 
     return None
 
@@ -88,64 +104,64 @@ def get_type_subtype(resource: BaseResource) -> Tuple[str, str]:
         text = resource.title.lower()
 
     # 'exam' match
-    keyword = 'exam'
-    match = bool(re.search(rf'\b{keyword}\b', text, re.IGNORECASE))
+    keyword = "exam"
+    match = bool(re.search(rf"\b{keyword}\b", text, re.IGNORECASE))
     if match:
-        return 'exam', 'previous_year_exam'
+        return "exam", "previous_year_exam"
 
     # 'exams' match
-    keyword = 'exams'
-    match = bool(re.search(rf'\b{keyword}\b', text, re.IGNORECASE))
+    keyword = "exams"
+    match = bool(re.search(rf"\b{keyword}\b", text, re.IGNORECASE))
     if match:
-        return 'exam', 'previous_year_exam'
+        return "exam", "previous_year_exam"
 
     # 'solution' match
-    keyword = 'solution'
-    match = bool(re.search(rf'\b{keyword}\b', text, re.IGNORECASE))
+    keyword = "solution"
+    match = bool(re.search(rf"\b{keyword}\b", text, re.IGNORECASE))
     if match and resource.week:
-        return 'practice', 'homework'
+        return "practice", "homework"
 
     # 'solutions' match
-    keyword = 'solutions'
-    match = bool(re.search(rf'\b{keyword}\b', text, re.IGNORECASE))
+    keyword = "solutions"
+    match = bool(re.search(rf"\b{keyword}\b", text, re.IGNORECASE))
     if match and resource.week:
-        return 'practice', 'homework'
+        return "practice", "homework"
 
     # 'homework' match
-    keyword = 'homework'
-    match = bool(re.search(rf'\b{keyword}\b', text, re.IGNORECASE))
+    keyword = "homework"
+    match = bool(re.search(rf"\b{keyword}\b", text, re.IGNORECASE))
     if match:
-        return 'practice', 'homework'
+        return "practice", "homework"
 
     # 'problem' match
-    keyword = 'problem'
-    match = bool(re.search(rf'\b{keyword}\b', text, re.IGNORECASE))
+    keyword = "problem"
+    match = bool(re.search(rf"\b{keyword}\b", text, re.IGNORECASE))
     if match and resource.week:
-        return 'practice', 'homework'
+        return "practice", "homework"
 
     # 'problems' match
-    keyword = 'problems'
-    match = bool(re.search(rf'\b{keyword}\b', text, re.IGNORECASE))
+    keyword = "problems"
+    match = bool(re.search(rf"\b{keyword}\b", text, re.IGNORECASE))
     if match and resource.week:
-        return 'practice', 'homework'
+        return "practice", "homework"
 
     # 'project' match
-    keyword = 'project'
-    match = bool(re.search(rf'\b{keyword}\b', text, re.IGNORECASE))
+    keyword = "project"
+    match = bool(re.search(rf"\b{keyword}\b", text, re.IGNORECASE))
     if match:
-        return 'practice', 'project'
+        return "practice", "project"
 
     # 'projects' match
-    keyword = 'projects'
-    match = bool(re.search(rf'\b{keyword}\b', text, re.IGNORECASE))
+    keyword = "projects"
+    match = bool(re.search(rf"\b{keyword}\b", text, re.IGNORECASE))
     if match:
-        return 'practice', 'project'
+        return "practice", "project"
 
     # 'lecture notes'
-    if 'lecture notes' in text:
-        return 'theory', 'lecture_notes'
+    if "lecture notes" in text:
+        return "theory", "lecture_notes"
 
-    return 'theory', 'lecture_slides'
+    return "theory", "lecture_slides"
 
 
 def get_is_solution(resource: BaseResource) -> bool:
@@ -154,7 +170,7 @@ def get_is_solution(resource: BaseResource) -> bool:
     else:
         text = resource.title.lower()
 
-    if 'solution' in text:
+    if "solution" in text:
         return True
 
     return False
@@ -164,38 +180,38 @@ def get_processing_method_model(resource: BaseResource) -> Tuple[Optional[str], 
     if resource.mime_type != mt.PDF:
         return None, None
 
-    return 'rcp', CONFIG['RCP_VISION_MODEL']
+    return "rcp", CONFIG["RCP_VISION_MODEL"]
 
 
 def get_one_chunk_per_page(resource: BaseResource) -> bool:
-    if (resource.type, resource.subtype) == ('theory', 'lecture_slides'):
+    if (resource.type, resource.subtype) == ("theory", "lecture_slides"):
         return True
 
     return False
 
 
 def get_one_chunk_per_doc(resource: BaseResource) -> bool:
-    if resource.type == 'practice':
+    if resource.type == "practice":
         return True
 
     return False
 
 
 def get_number(resource: BaseResource) -> Optional[str]:
-    if resource.type == 'theory':
+    if resource.type == "theory":
         return None
 
-    if resource.type == 'exam':
+    if resource.type == "exam":
         return str(resource.year)
 
-    if resource.type == 'practice':
-        if resource.subtype == 'exercise':
+    if resource.type == "practice":
+        if resource.subtype == "exercise":
             return None
 
-        if resource.subtype == 'series':
+        if resource.subtype == "series":
             return str(resource.week)
 
-        if resource.subtype == 'slt':
+        if resource.subtype == "slt":
             return None
 
     return None
@@ -222,7 +238,7 @@ def get_shifted_date(resource: BaseResource, weeks: dict) -> Optional[str]:
 
 
 def get_from(resource: BaseResource) -> Optional[str]:
-    if resource.date and (resource.type, resource.subtype) == ('practice', 'homework'):
+    if resource.date and (resource.type, resource.subtype) == ("practice", "homework"):
         return f"{resource.date}T00:00:00.000000"
     else:
         return None

@@ -133,19 +133,13 @@ class MGT645Course(BaseCourse):
         """Single transformer that converts PDFs into Markdown text."""
         return [
             VideoToJSONTransformer(cache=self.course_code),
-            PDFToMarkdownTransformer(
-                type_subtypes=self.pdf_to_markdown_type_subtypes, cache=self.course_code
-            ),
+            PDFToMarkdownTransformer(type_subtypes=self.pdf_to_markdown_type_subtypes, cache=self.course_code),
         ]
 
     @property
     def loaders(self) -> list[BaseLoader]:
         """No loaders defined for this course."""
-        return [
-            ContentMetadataLoader(
-                course_path=self.course_path, course_info=self.course_info
-            )
-        ]
+        return [ContentMetadataLoader(course_path=self.course_path, course_info=self.course_info)]
 
 
 if __name__ == "__main__":
@@ -153,7 +147,7 @@ if __name__ == "__main__":
 
     logging.basicConfig(
         level=logging.INFO,
-        format='[%(asctime)s] [%(levelname)s] [%(filename)s:%(lineno)d] %(message)s',
+        format="[%(asctime)s] [%(levelname)s] [%(filename)s:%(lineno)d] %(message)s",
         handlers=[logging.StreamHandler(sys.stdout)],
     )
 

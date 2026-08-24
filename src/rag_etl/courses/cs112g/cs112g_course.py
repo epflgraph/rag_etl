@@ -261,12 +261,8 @@ class CS112gCourse(BaseCourse):
         return [
             VideoToJSONTransformer(cache=self.course_code),
             ExtractZipTransformer(cache=self.course_code),
-            PDFToMarkdownTransformer(
-                type_subtypes=self.pdf_to_markdown_type_subtypes, cache=self.course_code
-            ),
-            SplitExercisesTransformer(
-                type_subtypes=self.split_exercises_type_subtypes, cache=self.course_code
-            ),
+            PDFToMarkdownTransformer(type_subtypes=self.pdf_to_markdown_type_subtypes, cache=self.course_code),
+            SplitExercisesTransformer(type_subtypes=self.split_exercises_type_subtypes, cache=self.course_code),
         ]
 
     @property

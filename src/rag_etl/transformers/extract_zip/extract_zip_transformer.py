@@ -26,10 +26,10 @@ def unzip_file(zip_path):
 
     zip_path = Path(zip_path)
 
-    extract_dir = zip_path.with_suffix('')
+    extract_dir = zip_path.with_suffix("")
     extract_dir.mkdir(parents=True, exist_ok=True)
 
-    with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+    with zipfile.ZipFile(zip_path, "r") as zip_ref:
         zip_ref.extractall(extract_dir)
 
     return extract_dir
@@ -44,7 +44,7 @@ def iter_files(root):
         if path.is_file():
             # Skip macOS metadata
             parts = set(path.parts)
-            if "__MACOSX" in parts or '.ipynb_checkpoints' in parts or path.name == ".DS_Store":
+            if "__MACOSX" in parts or ".ipynb_checkpoints" in parts or path.name == ".DS_Store":
                 continue
             yield path
 

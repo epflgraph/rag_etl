@@ -29,9 +29,9 @@ class ContentMetadataLoader(BaseLoader):
         logging.debug(f"Populating content and metadata folders at {self.course_path}")
 
         # Create paths and folders if needed
-        output_path = Path(self.course_path) / 'output'
-        content_path = output_path / 'content'
-        metadata_path = output_path / 'metadata'
+        output_path = Path(self.course_path) / "output"
+        content_path = output_path / "content"
+        metadata_path = output_path / "metadata"
 
         # Empty output_path if it exists
         if output_path.exists():
@@ -55,7 +55,9 @@ class ContentMetadataLoader(BaseLoader):
             shutil.copy(resource.path, resource_output_path.parent)
 
             # Make path relative to base path
-            resource.path = str(content_path.relative_to(output_path) / Path(resource.path).relative_to(self.course_path))
+            resource.path = str(
+                content_path.relative_to(output_path) / Path(resource.path).relative_to(self.course_path)
+            )
 
             # Give unique id to resource incrementally
             resource.id = 1 + len(metadata[resource.source])
@@ -65,13 +67,10 @@ class ContentMetadataLoader(BaseLoader):
 
         for source, source_metadata in metadata.items():
             # Build path for the metadata file for this source
-            source_metadata_path = (metadata_path / source).with_suffix('.json')
+            source_metadata_path = (metadata_path / source).with_suffix(".json")
 
             # Build full metadata in final format
-            full_source_metadata = {
-                "course_info": self.course_info,
-                "documents": source_metadata
-            }
+            full_source_metadata = {"course_info": self.course_info, "documents": source_metadata}
 
             # Write full metadata into metadata file
             source_metadata_path.write_text(json.dumps(full_source_metadata, ensure_ascii=False, indent=2))

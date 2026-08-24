@@ -25,9 +25,7 @@ class CourseParser:
         m: dict[str, str] = {}
         for asset_key, value in data.items():
             # Get import_path if present
-            file_path = (
-                value.get("import_path") or value.get("displayname") or asset_key
-            )
+            file_path = value.get("import_path") or value.get("displayname") or asset_key
 
             # Normalize key and store file_path in dictionary
             m[cmp_key(asset_key)] = file_path

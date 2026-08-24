@@ -6,7 +6,7 @@ from pathlib import Path
 from rag_etl.config import CONFIG
 
 
-cache_path = Path(CONFIG['CACHE_DIR'])
+cache_path = Path(CONFIG["CACHE_DIR"])
 
 if not cache_path.exists():
     raise ValueError(f"Cache path {cache_path} does not exist.")

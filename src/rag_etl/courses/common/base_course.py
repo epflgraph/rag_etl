@@ -51,7 +51,7 @@ class BaseCourse(ABC):
     @property
     def course_code(self) -> str:
         """Defaults to the class name (e.g., 'MATH101') without 'Course'."""
-        return self.__class__.__name__.removesuffix('Course')
+        return self.__class__.__name__.removesuffix("Course")
 
     @property
     @abstractmethod

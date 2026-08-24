@@ -10,10 +10,10 @@ class BaseResource:
     """Represents a single resource flowing through the ETL pipeline."""
 
     title: str
-    source: str                 # e.g., "moodle", "mooc", etc.
-    url: str                    # public url we can link to, where the resource is available
-    path: str                   # path where the resource file is located in the file system
-    mime_type: str              # e.g., "application/pdf", "text/markdown", "video/mp4"
+    source: str  # e.g., "moodle", "mooc", etc.
+    url: str  # public url we can link to, where the resource is available
+    path: str  # path where the resource file is located in the file system
+    mime_type: str  # e.g., "application/pdf", "text/markdown", "video/mp4"
 
     id: Optional[int] = None
 

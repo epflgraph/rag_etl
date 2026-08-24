@@ -9,7 +9,7 @@ from rag_etl.resources.base_resource import BaseResource
 
 @dataclass
 class MoodleResource(BaseResource):
-    source = 'moodle'
+    source = "moodle"
 
     section_title: Optional[str] = None
     section_text: Optional[str] = None

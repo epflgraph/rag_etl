@@ -451,10 +451,20 @@ you should output
 
     # Prepare response format
     class Exercise(BaseModel):
-        start_line: int = Field(..., description="The first line of the Markdown chunk. Its contents are included in the chunk.")
-        end_line: int = Field(..., description="The last line of the Markdown chunk. Its contents are included in the chunk.")
-        number: str = Field(..., description="The exercise number, as referenced in the Markdown chunk. Typically one or more integers, as in `3` or `2.7`.")
-        is_solution: bool = Field(..., description="Whether the Markdown chunk contains the solution of the exercise, as opposed to only the question.")
+        start_line: int = Field(
+            ..., description="The first line of the Markdown chunk. Its contents are included in the chunk."
+        )
+        end_line: int = Field(
+            ..., description="The last line of the Markdown chunk. Its contents are included in the chunk."
+        )
+        number: str = Field(
+            ...,
+            description="The exercise number, as referenced in the Markdown chunk. Typically one or more integers, as in `3` or `2.7`.",
+        )
+        is_solution: bool = Field(
+            ...,
+            description="Whether the Markdown chunk contains the solution of the exercise, as opposed to only the question.",
+        )
 
     class ExerciseList(BaseModel):
         exercises: List[Exercise]
@@ -477,9 +487,7 @@ you should output
         md_lines = md_text.splitlines()
 
         # Annotate Markdown with line numbers (ensuring empty line at the end)
-        annotated_md_text = "\n".join(
-            [f"[L{i}] {line}" for i, line in enumerate(md_lines, start=1)] + [""]
-        )
+        annotated_md_text = "\n".join([f"[L{i}] {line}" for i, line in enumerate(md_lines, start=1)] + [""])
 
         # Prepare messages
         messages = [
@@ -503,15 +511,15 @@ you should output
         snippets = {}
         for exercise in exercise_list.exercises:
             # Skip if lines make no sense
-            lines_make_sense = (
-                1 <= exercise.start_line <= exercise.end_line <= len(md_lines)
-            )
+            lines_make_sense = 1 <= exercise.start_line <= exercise.end_line <= len(md_lines)
             if not lines_make_sense:
-                logging.warning(f"While splitting {md_path} got exercise lines out of bounds: start {exercise.start_line}, end {exercise.end_line}, total {len(md_lines)}. Skipping...")
+                logging.warning(
+                    f"While splitting {md_path} got exercise lines out of bounds: start {exercise.start_line}, end {exercise.end_line}, total {len(md_lines)}. Skipping..."
+                )
                 continue
 
             # Fetch snippet from original document
-            snippet = "\n".join(md_lines[exercise.start_line - 1: exercise.end_line])
+            snippet = "\n".join(md_lines[exercise.start_line - 1 : exercise.end_line])
 
             # Store snippet in object
             if (exercise.number, exercise.is_solution) in snippets:
@@ -531,6 +539,6 @@ you should output
 
     # Store exercises as individual Markdown files
     exercises_path.mkdir(parents=True, exist_ok=True)
-    for (number, is_solution) in all_snippets:
+    for number, is_solution in all_snippets:
         exercise_path = exercises_path / f"{number}.md"
         exercise_path.write_text(all_snippets[(number, is_solution)], encoding="utf-8")

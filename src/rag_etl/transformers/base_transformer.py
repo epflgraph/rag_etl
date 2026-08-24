@@ -17,9 +17,9 @@ class BaseTransformer(ABC):
     and return a new list of transformed `Resource` objects.
     """
 
-    def __init__(self, cache: str = 'default'):
+    def __init__(self, cache: str = "default"):
         self.cache = cache
-        self.cache_scope = f'{cache}/{self.__class__.__name__}'
+        self.cache_scope = f"{cache}/{self.__class__.__name__}"
 
     def get_from_cache(self, resource_path, destination_path):
         return get_from_cache(self.cache_scope, resource_path, destination_path)

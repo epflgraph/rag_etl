@@ -194,7 +194,7 @@ class COM202Course(BaseCourse):
     moodle_base_path = f"{course_path}/moodle"
 
     @property
-    def pdf_to_markdown_type_subtypes(self) -> List[Tuple[str, str]]:
+    def pdf_to_markdown_type_subtypes(self) -> list[tuple[str, str]]:
         return [
             (self.tag_metadata[tag].get("type"), self.tag_metadata[tag].get("subtype"))
             for tag in self.tag_metadata
@@ -202,7 +202,7 @@ class COM202Course(BaseCourse):
         ]
 
     @property
-    def split_exercises_type_subtypes(self) -> List[Tuple[str, str]]:
+    def split_exercises_type_subtypes(self) -> list[tuple[str, str]]:
         return [
             (self.tag_metadata[tag].get("type"), self.tag_metadata[tag].get("subtype"))
             for tag in self.tag_metadata
@@ -210,7 +210,7 @@ class COM202Course(BaseCourse):
         ]
 
     @property
-    def extractors(self) -> List[BaseExtractor]:
+    def extractors(self) -> list[BaseExtractor]:
         """Single Moodle extractor."""
         return [
             MOOCExtractor(
@@ -227,28 +227,20 @@ class COM202Course(BaseCourse):
         ]
 
     @property
-    def transformers(self) -> List[BaseTransformer]:
+    def transformers(self) -> list[BaseTransformer]:
         """Single transformer that converts PDFs into Markdown text."""
         return [
             VideoToJSONTransformer(cache=self.course_code),
             ExtractZipTransformer(cache=self.course_code),
             JupyterToMarkdownTransformer(cache=self.course_code),
-            PDFToMarkdownTransformer(
-                type_subtypes=self.pdf_to_markdown_type_subtypes, cache=self.course_code
-            ),
-            SplitExercisesTransformer(
-                type_subtypes=self.split_exercises_type_subtypes, cache=self.course_code
-            ),
+            PDFToMarkdownTransformer(type_subtypes=self.pdf_to_markdown_type_subtypes, cache=self.course_code),
+            SplitExercisesTransformer(type_subtypes=self.split_exercises_type_subtypes, cache=self.course_code),
         ]
 
     @property
-    def loaders(self) -> List[BaseLoader]:
+    def loaders(self) -> list[BaseLoader]:
         """No loaders defined for this course."""
-        return [
-            ContentMetadataLoader(
-                course_path=self.course_path, course_info=self.course_info
-            )
-        ]
+        return [ContentMetadataLoader(course_path=self.course_path, course_info=self.course_info)]
 
 
 if __name__ == "__main__":

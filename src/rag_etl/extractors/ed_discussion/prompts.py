@@ -1,6 +1,4 @@
-CLASSIFY_THREAD_SYSTEM_PROMPT = (
-    "You are an expert teaching assistant experienced in classifying student questions."
-)
+CLASSIFY_THREAD_SYSTEM_PROMPT = "You are an expert teaching assistant experienced in classifying student questions."
 
 CLASSIFY_THREAD_USER_PROMPT = """
 Classify this thread from an educational forum.

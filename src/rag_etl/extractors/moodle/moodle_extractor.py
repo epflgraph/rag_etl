@@ -55,28 +55,16 @@ def extract_from_and_until(module):
     until = None
 
     # Keep only date restrictions
-    restrictions = [
-        restriction
-        for restriction in availability.get("c", [])
-        if restriction.get("type") == "date"
-    ]
+    restrictions = [restriction for restriction in availability.get("c", []) if restriction.get("type") == "date"]
 
     # From field
-    gt_restrictions = [
-        restriction
-        for restriction in restrictions
-        if restriction.get("d") in (">=", ">")
-    ]
+    gt_restrictions = [restriction for restriction in restrictions if restriction.get("d") in (">=", ">")]
     if gt_restrictions:
         gt_epochs = [restriction.get("t") for restriction in gt_restrictions]
         from_ = datetime.fromtimestamp(max(gt_epochs)).strftime("%Y-%m-%dT%H:%M:%S.%f")
 
     # Until field
-    lt_restrictions = [
-        restriction
-        for restriction in restrictions
-        if restriction.get("d") in ("<=", "<")
-    ]
+    lt_restrictions = [restriction for restriction in restrictions if restriction.get("d") in ("<=", "<")]
     if lt_restrictions:
         lt_epochs = [restriction.get("t") for restriction in lt_restrictions]
         until = datetime.fromtimestamp(min(lt_epochs)).strftime("%Y-%m-%dT%H:%M:%S.%f")
@@ -93,8 +81,8 @@ class MoodleExtractor(BaseExtractor):
         self,
         moodle_course_id: int,
         moodle_base_path: str,
-        tag_metadata: Optional[dict] = None,
-        mime_types: Optional[list[str]] = None,
+        tag_metadata: dict | None = None,
+        mime_types: list[str] | None = None,
     ) -> None:
         self.moodle_course_id = moodle_course_id
         self.moodle_base_path = Path(moodle_base_path)
@@ -109,7 +97,7 @@ class MoodleExtractor(BaseExtractor):
         else:
             self.mime_types = mime_types
 
-    def extract(self) -> List[MoodleResource]:
+    def extract(self) -> list[MoodleResource]:
         """
         Extract resources for this course from Moodle.
 
@@ -170,11 +158,11 @@ class MoodleExtractor(BaseExtractor):
                         continue
 
                     # Extract metadata from tag
-                    type_ = self.tag_metadata.get(tag, {}).get('type')
-                    subtype = self.tag_metadata.get(tag, {}).get('subtype')
-                    is_solution = self.tag_metadata.get(tag, {}).get('is_solution', False)
-                    one_chunk_per_page = self.tag_metadata.get(tag, {}).get('one_chunk_per_page', False)
-                    one_chunk_per_doc = self.tag_metadata.get(tag, {}).get('one_chunk_per_doc', False)
+                    type_ = self.tag_metadata.get(tag, {}).get("type")
+                    subtype = self.tag_metadata.get(tag, {}).get("subtype")
+                    is_solution = self.tag_metadata.get(tag, {}).get("is_solution", False)
+                    one_chunk_per_page = self.tag_metadata.get(tag, {}).get("one_chunk_per_page", False)
+                    one_chunk_per_doc = self.tag_metadata.get(tag, {}).get("one_chunk_per_doc", False)
 
                     # Download file from url
                     url = f"{module_contents['fileurl']}&token={CONFIG['MOODLE_TOKEN']}"
@@ -184,7 +172,9 @@ class MoodleExtractor(BaseExtractor):
                     try:
                         response.raise_for_status()  # Raises an error if download fails
                     except requests.HTTPError:
-                        logging.debug(f"Download failed for file {module['name']} > {module_contents['filename']}. Ignoring...")
+                        logging.debug(
+                            f"Download failed for file {module['name']} > {module_contents['filename']}. Ignoring..."
+                        )
                         continue
 
                     # Build download path for file

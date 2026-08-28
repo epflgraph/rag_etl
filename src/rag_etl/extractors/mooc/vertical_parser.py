@@ -23,6 +23,7 @@ class VerticalParser:
         elem_vertical: _Element,
         assets_map: dict[str, str],
         tag_metadata: dict | None = None,
+        language: str | None = None,
     ) -> list[MOOCResource]:
         """Parse a MOOC vertical"""
 
@@ -75,6 +76,7 @@ class VerticalParser:
                     elem_vertical=child,
                     vertical_display_name=vertical_display_name,
                     tag_metadata=tag_metadata,
+                    language=language,
                 )
                 # Append the returned resource
                 if video_resource is not None:

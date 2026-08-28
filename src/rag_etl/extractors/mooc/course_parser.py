@@ -36,6 +36,7 @@ class CourseParser:
         self,
         course_path: str,
         tag_metadata: dict | None = None,
+        language: str | None = None,
     ) -> list[MOOCResource]:
         """Parse a MOOC course"""
 
@@ -55,6 +56,7 @@ class CourseParser:
                     chapter_filename=chapter_filename,
                     assets_map=assets_map,
                     tag_metadata=tag_metadata,
+                    language=language,
                 )
             )
 

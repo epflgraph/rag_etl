@@ -7,7 +7,6 @@ import logging
 from rag_etl.resources.mooc_resource import MOOCResource
 from rag_etl.extractors.mooc.utils import load_root_elem_from_mooc_xml
 from rag_etl.utils.kaltura import extract_entry_id_from_url
-from rag_etl.utils.languages import language_code
 import rag_etl.utils.mime_types as mt
 
 logger = logging.getLogger(__name__)
@@ -47,11 +46,10 @@ class VideoParser:
         if not transcripts:
             return None
 
-        code = language_code(language)
-        file_name = transcripts.get(code)
+        file_name = transcripts.get(language)
 
         if not file_name:
-            logger.debug(f"No {code} transcript among {sorted(transcripts)}, skipping subtitles for this video")
+            logger.debug(f"No {language} transcript among {sorted(transcripts)}, skipping subtitles for this video")
             return None
 
         transcript_path = Path(course_path) / "static" / file_name

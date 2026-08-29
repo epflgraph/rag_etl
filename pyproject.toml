@@ -29,6 +29,8 @@ dependencies = [
     "Pillow",
     "pathvalidate",     # sanitise user-input strings to use as filenames
     "langfuse",
+    "KalturaApiClient",
+    "imageio-ffmpeg",     # bundles a static ffmpeg binary for frame extraction
 ]
 
 [tool.setuptools]

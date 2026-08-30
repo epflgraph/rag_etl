@@ -6,10 +6,6 @@ import imageio_ffmpeg
 
 logger = logging.getLogger(__name__)
 
-# Width the extracted frames are scaled to. Enough for the vision model to
-# read a projected slide, small enough to keep the base64 payload small
-FRAME_WIDTH = 1280
-
 FFMPEG_TIMEOUT = 60
 
 
@@ -69,9 +65,8 @@ def extract_frame(video_url: str, seconds: int, output_path: Path) -> bool:
         # Write a single frame and stop
         "-frames:v",
         "1",
-        # Scale the width, -1 keeps the original aspect ratio
-        "-vf",
-        f"scale={FRAME_WIDTH}:-1",
+        # The frame keeps the resolution of the source: scaling down loses the
+        # small print on a slide, and scaling up only inflates the payload
         # JPEG quality, 2 being the best and 31 the worst
         "-q:v",
         "3",

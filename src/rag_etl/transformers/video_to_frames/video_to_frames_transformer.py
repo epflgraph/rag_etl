@@ -104,8 +104,6 @@ class VideoToFramesTransformer(BaseTransformer):
                     path=str(frame_path),
                     mime_type=mt.JPEG,
                     url=url_to_link,
-                    number=str(start_seconds),
-                    sub_number=str(start_seconds),
                     processing_method="rcp",
                     model=CONFIG["RCP_VISION_MODEL"],
                     is_gemini_processed_video=False,

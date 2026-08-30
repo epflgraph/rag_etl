@@ -5,7 +5,7 @@ import json
 import logging
 
 from rag_etl.resources.mooc_resource import MOOCResource
-from rag_etl.extractors.mooc.utils import load_root_elem_from_mooc_xml
+from rag_etl.extractors.mooc.utils import extract_number, extract_week, load_root_elem_from_mooc_xml
 from rag_etl.utils.kaltura import extract_entry_id_from_url
 import rag_etl.utils.mime_types as mt
 
@@ -108,7 +108,17 @@ class VideoParser:
         tag_name = "MOOC_VIDEO"
         tag_dict = tag_metadata.get(tag_name)
 
+        # Unlike quizzes, videos are never optional: a course running the video
+        # chain without this tag would silently produce nothing, so it is told
+        # what is missing instead
+        if tag_dict is None:
+            raise ValueError(f"The course declares no {tag_name} tag, so its MOOC videos cannot be classified")
+
         mooc_resource_title = vertical_display_name + " - " + video_title
+
+        # The week is inherited by every slide cut from this video, while the
+        # numbering itself is not: a slide is identified by its timestamp
+        week = extract_week(extract_number(mooc_resource_title))
         return MOOCResource(
             source="mooc",
             title=mooc_resource_title,
@@ -118,6 +128,7 @@ class VideoParser:
             is_video=True,
             is_gemini_processed_video=tag_dict.get("is_gemini_processed_video", False),
             srt_path=srt_path,
+            week=week,
             entry_id=entry_id,
             tag=tag_name,
             type=tag_dict.get("type"),

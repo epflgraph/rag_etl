@@ -9,6 +9,8 @@ from lxml.etree import _Element
 import rag_etl.utils.mime_types as mt
 from rag_etl.resources.mooc_resource import MOOCResource
 from rag_etl.extractors.mooc.utils import (
+    extract_number,
+    extract_week,
     load_root_elem_from_mooc_xml,
     clean_text,
     normalize_markdown,
@@ -61,6 +63,15 @@ class QuizParser:
     ) -> list[MOOCResource]:
         mooc_resources: list[MOOCResource] = []
 
+        tag_name = "MOOC_QUIZ"
+        tag_dict = tag_metadata.get(tag_name)
+
+        # A course that does not declare the tag is not asking for its quizzes,
+        # so they are skipped rather than produced without any metadata
+        if tag_dict is None:
+            logger.debug(f"Skipping quiz because the course declares no {tag_name} tag")
+            return []
+
         url_name = elem_vertical.get("url_name", "")
         if not url_name:
             logger.warning("QuizParser: missing url_name in elem_vertical")
@@ -92,10 +103,8 @@ class QuizParser:
 
         # We split the quiz between quiz and quiz with solutions for keeping the structure of
         # assignment vs solution used by Tutor Bot
-        number_str = self.extract_quiz_number(resource_title=resource_title)
-
-        tag_name = "MOOC_QUIZ"
-        tag_dict = tag_metadata.get(tag_name)
+        number_str = extract_number(resource_title)
+        week = extract_week(number_str)
 
         # Quiz
         quiz_res: MOOCResource = MOOCResource(
@@ -112,6 +121,7 @@ class QuizParser:
             type=tag_dict.get("type"),
             subtype=tag_dict.get("subtype"),
             number=number_str,
+            week=week,
             one_chunk_per_page=tag_dict.get("one_chunk_per_page"),
             one_chunk_per_doc=tag_dict.get("one_chunk_per_doc"),
             processing_method=tag_dict.get("processing_method"),
@@ -133,6 +143,7 @@ class QuizParser:
             type=tag_dict.get("type"),
             subtype=tag_dict.get("subtype"),
             number=number_str,
+            week=week,
             one_chunk_per_page=tag_dict.get("one_chunk_per_page"),
             one_chunk_per_doc=tag_dict.get("one_chunk_per_doc"),
             processing_method=tag_dict.get("processing_method"),
@@ -140,16 +151,6 @@ class QuizParser:
         mooc_resources.append(quiz_sol_res)
 
         return mooc_resources
-
-    def extract_quiz_number(self, resource_title: str) -> str | None:
-        """
-        Extract quiz number by taking everything from the first digit to the end of the string.
-        """
-
-        for idx, ch in enumerate(resource_title):
-            if ch.isdigit():
-                return resource_title[idx:].strip()
-        return None
 
     def extract_quiz_data(self, root: _Element) -> QuizData | None:
         """

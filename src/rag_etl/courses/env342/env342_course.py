@@ -37,7 +37,7 @@ class ENV342Course(BaseCourse):
         "semester": 2,
         "admin_info_link": "",
         "coursebook_link": "https://edu.epfl.ch/coursebook/en/geographic-information-system-gis-ENV-342",
-        "course_language": "French",  # ask Aitor to add this
+        "course_language": "fr",  # ask Aitor to add this
     }
 
     # [SLIDES]

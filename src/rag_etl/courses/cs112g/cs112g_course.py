@@ -39,7 +39,7 @@ class CS112gCourse(BaseCourse):
         "semester": 2,
         "admin_info_link": "https://moodle.epfl.ch/course/view.php?id=5571",
         "coursebook_link": "https://edu.epfl.ch/coursebook/fr/programmation-orientee-objet-CS-112-G",
-        "course_language": "French",
+        "course_language": "fr",
     }
 
     tag_metadata = {

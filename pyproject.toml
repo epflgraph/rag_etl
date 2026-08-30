@@ -55,4 +55,8 @@ testpaths = ["tests"]
 line-length = 120
 
 [tool.ruff.lint]
-ignore = ["I001"] # avoids import reordering 
+ignore = [
+    "I001",   # avoids import reordering
+    "RUF012", # avoids linting in course_info and tag_metadata 
+    "RUF022", # avoids expecting alphabetical order
+] 

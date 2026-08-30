@@ -9,7 +9,19 @@ import rag_etl.utils.mime_types as mt
 
 logger = logging.getLogger(__name__)
 
-TRANSCRIPT_HEADING = "## Transcript"
+# The transcript is quoted rather than put under a heading
+TRANSCRIPT_PREFIX = "> "
+
+
+def slide_start_seconds(resource: BaseResource) -> int:
+    """
+    Return the second the slide's interval starts at.
+
+    VideoToFramesTransformer names each frame after that moment, and the name
+    survives the conversion to Markdown, so the file name carries it.
+    """
+
+    return int(Path(resource.path).stem)
 
 
 class MergeSlideTranscriptTransformer(BaseTransformer):
@@ -74,7 +86,12 @@ class MergeSlideTranscriptTransformer(BaseTransformer):
         if resource.mime_type != mt.MARKDOWN:
             return False
 
-        return bool(resource.is_video and resource.srt_path and resource.sub_number)
+        if not resource.is_video or not resource.srt_path:
+            return False
+
+        # A slide is named after the second it starts at, so anything else is
+        # Markdown that reached here by another route
+        return Path(resource.path).stem.isdigit()
 
     def transform(self, resources: Sequence[BaseResource]) -> list[BaseResource]:
         """Append the spoken words of its interval to every slide resource."""
@@ -102,15 +119,15 @@ class MergeSlideTranscriptTransformer(BaseTransformer):
                 continue
 
             # Chronological order is what lets each slide be bounded by the next
-            ordered = sorted(video_slides, key=lambda item: int(item.sub_number))
+            ordered = sorted(video_slides, key=slide_start_seconds)
 
             for position, resource in enumerate(ordered):
                 # A slide runs from its own start to the start of the next one
                 # The last slide has no successor, so it runs to the end of the
                 # recording, which text_between reads as an open interval
-                start = int(resource.sub_number)
+                start = slide_start_seconds(resource)
                 if position + 1 < len(ordered):
-                    end = int(ordered[position + 1].sub_number)
+                    end = slide_start_seconds(ordered[position + 1])
                 else:
                     end = None
 
@@ -131,12 +148,18 @@ class MergeSlideTranscriptTransformer(BaseTransformer):
 
                 # The Markdown is rewritten in place, so a second run over an
                 # already-merged file must not append the transcript twice
-                if TRANSCRIPT_HEADING not in slide_markdown:
+                starts_quoted = slide_markdown.startswith(TRANSCRIPT_PREFIX)
+                contains_quote = f"\n{TRANSCRIPT_PREFIX}" in slide_markdown
+
+                if not starts_quoted and not contains_quote:
                     md_path.write_text(
-                        f"{slide_markdown}\n\n{TRANSCRIPT_HEADING}\n\n{spoken}\n",
+                        f"{slide_markdown}\n\n{TRANSCRIPT_PREFIX}{spoken}\n",
                         encoding="utf-8",
                     )
 
-                transformed_resources.append(resource)
+                # The subtitles are now part of the chunk, and the file they
+                # came from is never copied into the output, so keeping a path
+                # to it would only leave a reference that resolves nowhere
+                transformed_resources.append(resource.copy_with(srt_path=None))
 
         return transformed_resources

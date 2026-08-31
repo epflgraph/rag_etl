@@ -27,7 +27,6 @@ from rag_etl.courses.cmi import CMICourse
 from rag_etl.courses.cmirestricted import CMIRESTRICTEDCourse
 from rag_etl.courses.unil134 import UNIL134Course
 from rag_etl.courses.math310 import MATH310Course
-from rag_etl.courses.bio695 import BIO695Course
 from rag_etl.courses.cs119d import CS119dCourse
 from rag_etl.courses.cs550 import CS550Course
 from rag_etl.courses.math111a import MATH111aCourse
@@ -64,7 +63,6 @@ __all__ = [
     "CMIRESTRICTEDCourse",
     "UNIL134Course",
     "MATH310Course",
-    "BIO695Course",
     "CS119dCourse",
     "CS550Course",
     "MATH111aCourse",

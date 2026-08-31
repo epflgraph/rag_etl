@@ -5,6 +5,7 @@ from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 
 import requests
 from KalturaClient import KalturaClient, KalturaConfiguration
+from KalturaClient.exceptions import KalturaException
 from KalturaClient.Plugins.Caption import KalturaCaptionAssetFilter, KalturaCaptionAssetStatus, KalturaCaptionType
 
 from rag_etl.config import CONFIG
@@ -462,17 +463,14 @@ def original_flavor(client: KalturaClient, entry_id: str):
 
 def bits_per_pixel(asset) -> float:
     """
-    Bitrate normalised by frame area, used to tell a slide capture from a
-    camera shot within one recording.
+    Bitrate normalised by frame area, used to differentiate a slide from a
+    camera auditorium shot within one recording
 
-    A slide capture is almost static, so inter-frame compression collapses
-    it; a camera pointed at a lecture hall has motion in every frame and
-    needs several times the bitrate for the same resolution. Normalising by
-    pixel count keeps the comparison valid when the two streams differ in
-    resolution.
+    A slide capture is almost static, so bitrate is lower for the screen recording
+    stream than for the camera auditorium stream
 
     The value is only meaningful relative to the other stream of the same
-    recording: a screencast can sit as high as a camera in absolute terms.
+    recording: a slide can sit as high as a camera in absolute terms
     """
 
     width = getattr(asset, "width", 0) or 0
@@ -551,4 +549,11 @@ def get_video_download_url(client: KalturaClient, entry_id: str) -> str | None:
         logger.error(f"Entry {entry_id} has no ready video flavor")
         return None
 
-    return client.flavorAsset.getUrl(asset.id)
+    # getUrl raises instead of returning nothing when the flavor has no file
+    try:
+        download_url = client.flavorAsset.getUrl(asset.id)
+    except KalturaException as error:
+        logger.error(f"Entry {entry_id} has no file for flavor {asset.id}: {error}")
+        return None
+
+    return download_url

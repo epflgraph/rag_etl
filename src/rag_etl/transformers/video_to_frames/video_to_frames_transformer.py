@@ -26,7 +26,10 @@ class VideoToFramesTransformer(BaseTransformer):
     downloaded. Each frame carries the public watch URL of its own moment, so
     the Markdown produced from it later links straight into that moment of the lecture.
 
-    The video resource is replaced by its frames.
+    The video resource is replaced by its frames. A video resource points at a
+    video descriptor (JSON file).
+
+    Resources that are not videos always pass through untouched.
     """
 
     def __init__(
@@ -135,8 +138,7 @@ class VideoToFramesTransformer(BaseTransformer):
 
             entry_id = getattr(resource, "entry_id", None)
             if not entry_id:
-                logger.warning(f"Video {resource.title} has no Kaltura entry id, leaving it unchanged")
-                transformed_resources.append(resource)
+                logger.warning(f"Dropping {resource.title}: no Kaltura entry id to reach the video with")
                 continue
 
             # Frames live in a folder named after the resource that produced them
@@ -157,8 +159,7 @@ class VideoToFramesTransformer(BaseTransformer):
                 video_url = get_video_download_url(client, slides_entry_id)
 
                 if not video_url:
-                    logger.warning(f"No video file for entry {slides_entry_id}, leaving {resource.title} unchanged")
-                    transformed_resources.append(resource)
+                    logger.warning(f"Dropping {resource.title}: no video file for entry {slides_entry_id}")
                     continue
 
                 logger.info(f"Detecting slides in {resource.title} (entry {slides_entry_id})")
@@ -173,8 +174,7 @@ class VideoToFramesTransformer(BaseTransformer):
             frame_resources = self.build_frame_resources(resource, frames_path)
 
             if not frame_resources:
-                logger.warning(f"No frames extracted from {resource.title}, leaving it unchanged")
-                transformed_resources.append(resource)
+                logger.warning(f"Dropping {resource.title}: no frames were extracted from it")
                 continue
 
             logger.info(f"{resource.title}: {len(frame_resources)} slides")

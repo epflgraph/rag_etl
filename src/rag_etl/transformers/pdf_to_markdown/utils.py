@@ -4,7 +4,6 @@ import base64
 
 from difflib import SequenceMatcher
 
-from typing import Optional, List
 
 import pymupdf
 from PIL import Image
@@ -14,7 +13,7 @@ from rag_etl.utils.llms import send_llm_request
 from rag_etl.config import CONFIG
 
 
-def render_pdf_pages(pdf_path: str, dpi: Optional[int] = None) -> List[Image.Image]:
+def render_pdf_pages(pdf_path: str, dpi: int | None = None) -> list[Image.Image]:
     """
     Render each PDF page to a PIL Image using PyMuPDF (fitz).
     If dpi is provided, scale accordingly; otherwise use default (~72 DPI).
@@ -149,7 +148,7 @@ def convert_page_pdf_to_md(pil_page):
 
     # Send LLM requests and store results
     rcp_model = CONFIG["RCP_VISION_MODEL"]
-    md_page = send_llm_request(rcp_model, messages, name="pdf-page-to-markdown").strip()
+    md_page = send_llm_request(rcp_model, messages, name="pdf-page-to-markdown", enable_thinking=False).strip()
 
     return md_page
 

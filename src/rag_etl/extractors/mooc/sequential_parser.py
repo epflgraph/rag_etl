@@ -19,6 +19,7 @@ class SequentialParser:
         elem_sequential: _Element,
         assets_map: dict[str, str],
         tag_metadata: dict | None = None,
+        language: str | None = None,
     ) -> list[MOOCResource]:
         """Parse a MOOC sequential"""
 
@@ -45,6 +46,7 @@ class SequentialParser:
                     elem_vertical=elem_vertical,
                     assets_map=assets_map,
                     tag_metadata=tag_metadata,
+                    language=language,
                 )
             )
 

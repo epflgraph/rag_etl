@@ -1,21 +1,16 @@
-from __future__ import annotations
-
 from datetime import date
 
 import logging
 from rag_etl.courses import BaseCourse
-from rag_etl.extractors import (
-    BaseExtractor,
-    MOOCExtractor,
-    MoodleExtractor,
-    EdDiscussionExtractor,
-)
+from rag_etl.extractors import BaseExtractor, MOOCExtractor, MoodleExtractor, MediaspaceExtractor
 from rag_etl.transformers import (
     BaseTransformer,
     PDFToMarkdownTransformer,
-    VideoToJSONTransformer,
     ExtractZipTransformer,
     SplitExercisesTransformer,
+    ImageToMarkdownTransformer,
+    MergeSlideTranscriptTransformer,
+    VideoToFramesTransformer,
 )
 
 from rag_etl.loaders import BaseLoader, ContentMetadataLoader
@@ -24,40 +19,80 @@ import rag_etl.utils.mime_types as mt
 
 from rag_etl.config import CONFIG
 
-from typing import Tuple, List
 
-
-class CS112gCourse(BaseCourse):
+class CS119dCourse(BaseCourse):
     """
-    Course-specific pipeline for CS-112(g).
+    Course-specific pipeline for CS-119d
     """
 
     course_info = {
-        "course_title": "Programmation orientée objet",
-        "course_id": "CS112g",
-        "academic_course": "2025-2026",
-        "semester": 2,
-        "admin_info_link": "https://moodle.epfl.ch/course/view.php?id=5571",
-        "coursebook_link": "https://edu.epfl.ch/coursebook/fr/programmation-orientee-objet-CS-112-G",
+        "course_title": "Information, Calcul, Communication",
+        "course_id": "CS119d",
+        "academic_course": "2026-2027",
+        "semester": 1,
+        "admin_info_link": "https://moodle.epfl.ch/course/view.php?id=14023",
+        "coursebook_link": "https://edu.epfl.ch/coursebook/fr/information-calcul-communication-CS-119-D",
         "course_language": "fr",
     }
 
+    # [SERIE_x]
+    # [SERIE_x_SOLUTION]
+    # [MIDTERM_EXAM_xxxx]
+    # [MIDTERM_EXAM_xxxx_SOLUTION]
+    # [EXAM_xxxx]
+    # [EXAM_xxxx_SOLUTION]
+    # [CASE_STUDY_x_SOLUTION]
+
     tag_metadata = {
-        "SLIDES": {
+        "THEORY": {  # just in case
             "type": "theory",
-            "subtype": "lecture_slides",
+            "subtype": "theory",
+            "one_chunk_per_page": False,
+            "one_chunk_per_doc": False,
+            "pdf_to_markdown": False,
+            "split_exercises": False,
+        },
+        "THEORY_SLIDES": {  # just in case
+            "type": "theory",
+            "subtype": "theory_slides",
             "one_chunk_per_page": True,
             "one_chunk_per_doc": False,
             "pdf_to_markdown": False,
             "split_exercises": False,
         },
-        "PROJECT": {
+        "SERIE": {
             "type": "practice",
-            "subtype": "project",
+            "subtype": "serie",
             "one_chunk_per_page": False,
             "one_chunk_per_doc": True,
             "pdf_to_markdown": True,
             "split_exercises": True,
+        },
+        "SERIE_SOLUTION": {
+            "type": "practice",
+            "subtype": "serie",
+            "one_chunk_per_page": False,
+            "one_chunk_per_doc": True,
+            "pdf_to_markdown": True,
+            "split_exercises": True,
+            "is_solution": True,
+        },
+        "CASE_STUDY": {  # just in case
+            "type": "practice",
+            "subtype": "case_study",
+            "one_chunk_per_page": False,
+            "one_chunk_per_doc": True,
+            "pdf_to_markdown": True,
+            "split_exercises": True,
+        },
+        "CASE_STUDY_SOLUTION": {
+            "type": "practice",
+            "subtype": "case_study",
+            "one_chunk_per_page": False,
+            "one_chunk_per_doc": True,
+            "pdf_to_markdown": True,
+            "split_exercises": True,
+            "is_solution": True,
         },
         "MIDTERM_EXAM": {
             "type": "exam",
@@ -181,15 +216,25 @@ class CS112gCourse(BaseCourse):
         },
         "MOOC_VIDEO": {
             "type": "theory",
-            "subtype": "video_lecture",
+            "subtype": "mooc_video",
+            "one_chunk_per_page": False,
+            "one_chunk_per_doc": True,
+            "pdf_to_markdown": False,
+            "split_exercises": False,
+            "is_video": True,
+            "is_gemini_processed_video": False,
+            "processing_method": None,
+            "model": None,
+        },
+        "MEDIASPACE_VIDEO": {
+            "type": "theory",
+            "subtype": "mediaspace_video",
             "one_chunk_per_page": False,
             "one_chunk_per_doc": False,
             "pdf_to_markdown": False,
             "split_exercises": False,
             "is_video": True,
-            "is_gemini_processed_video": True,
-            "processing_method": "gemini",
-            "model": "gemini-2.5-pro",
+            "is_gemini_processed_video": False,
         },
     }
 
@@ -203,7 +248,16 @@ class CS112gCourse(BaseCourse):
 
     mime_types = mt.DEFAULT_MIME_TYPES
 
-    moodle_course_id = 5571
+    mediaspace_language = course_info["course_language"]
+
+    mediaspace_playlist_or_channel_url = "https://mediaspace.epfl.ch/channel/CS-119%2528d%2529%2BInformation_%2Bcalcul_%2Bcommunication%2B%2528SMA%2B%2526%2BSPH%2529/30888"
+
+    # Only keep recordings of this course edition
+    mediaspace_created_after = semester_start_date
+
+    mediaspace_base_path = f"{course_path}/mediaspace"
+
+    moodle_course_id = 14023
 
     moodle_base_path = f"{course_path}/moodle"
 
@@ -216,7 +270,7 @@ class CS112gCourse(BaseCourse):
         ]
 
     @property
-    def split_exercises_type_subtypes(self) -> List[Tuple[str, str]]:
+    def split_exercises_type_subtypes(self) -> list[tuple[str, str]]:
         return [
             (self.tag_metadata[tag].get("type"), self.tag_metadata[tag].get("subtype"))
             for tag in self.tag_metadata
@@ -231,6 +285,7 @@ class CS112gCourse(BaseCourse):
                 mooc_base_path=self.mooc_base_path,
                 tag_metadata=self.tag_metadata,
                 mime_types=(self.mime_types + [mt.MP4, mt.JSON]),
+                language=self.course_info["course_language"],
             ),
             MoodleExtractor(
                 moodle_course_id=self.moodle_course_id,
@@ -238,12 +293,19 @@ class CS112gCourse(BaseCourse):
                 tag_metadata=self.tag_metadata,
                 mime_types=self.mime_types,
             ),
+            MediaspaceExtractor(
+                playlist_or_channel_url=self.mediaspace_playlist_or_channel_url,
+                mediaspace_base_path=self.mediaspace_base_path,
+                tag_metadata=self.tag_metadata,
+                language=self.mediaspace_language,
+                created_after=self.mediaspace_created_after,
+            ),
             # EdDiscussionExtractor(
             #     ed_discussion_base_path=self.course_path,
             #     tags=self.tag_metadata.keys(),
             #     tag_metadata=self.tag_metadata,
-            #     mime_types=(mt.DEFAULT_MIME_TYPES),
-            #     academic_year="2024-2025",
+            #     mime_types=self.mime_types,
+            #     academic_year="2025-2026",
             #     categories=[
             #         "theory",
             #         "practice",
@@ -257,12 +319,17 @@ class CS112gCourse(BaseCourse):
 
     @property
     def transformers(self) -> list[BaseTransformer]:
-        """Single transformer that converts PDFs into Markdown text."""
+        """Documents into Markdown, then videos into timestamped slides."""
         return [
-            VideoToJSONTransformer(cache=self.course_code),
             ExtractZipTransformer(cache=self.course_code),
             PDFToMarkdownTransformer(type_subtypes=self.pdf_to_markdown_type_subtypes, cache=self.course_code),
             SplitExercisesTransformer(type_subtypes=self.split_exercises_type_subtypes, cache=self.course_code),
+            VideoToFramesTransformer(
+                cache=self.course_code,
+                language=self.course_info["course_language"],
+            ),
+            ImageToMarkdownTransformer(cache=self.course_code),
+            MergeSlideTranscriptTransformer(cache=self.course_code),
         ]
 
     @property
@@ -285,5 +352,5 @@ if __name__ == "__main__":
         handlers=[logging.StreamHandler(sys.stdout)],
     )
 
-    course = BaseCourse.from_code("CS112g")
+    course = BaseCourse.from_code("CS119d")
     course.run()

@@ -340,6 +340,12 @@ class HtmlParser:
                 logger.debug(f"module_tag={module_tag}")
                 tag_dict = tag_metadata.get(module_tag)
 
+                # A tag the course does not declare carries no metadata, so the
+                # file is skipped rather than indexed unclassified
+                if tag_dict is None:
+                    logger.info(f"Skipping {linked} because its tag ({module_tag}) is unexpected")
+                    continue
+
                 if module_number is not None:
                     module_number = str(module_number)
 

@@ -26,6 +26,13 @@ from rag_etl.courses.plasma import PLASMACourse
 from rag_etl.courses.cmi import CMICourse
 from rag_etl.courses.cmirestricted import CMIRESTRICTEDCourse
 from rag_etl.courses.unil134 import UNIL134Course
+from rag_etl.courses.math310 import MATH310Course
+from rag_etl.courses.cs119d import CS119dCourse
+from rag_etl.courses.cs550 import CS550Course
+from rag_etl.courses.math111a import MATH111aCourse
+from rag_etl.courses.micro303 import MICRO303Course
+from rag_etl.courses.phys201a import PHYS201aCourse
+from rag_etl.courses.me326 import ME326Course
 
 __all__ = [
     "BaseCourse",
@@ -33,7 +40,6 @@ __all__ = [
     "PHYS108Course",
     "MICRO315Course",
     "CS112gCourse",
-    "CS470Course",
     "MGT645Course",
     "MATH115aCourse",
     "MATH106eCourse",
@@ -56,4 +62,11 @@ __all__ = [
     "CMICourse",
     "CMIRESTRICTEDCourse",
     "UNIL134Course",
+    "MATH310Course",
+    "CS119dCourse",
+    "CS550Course",
+    "MATH111aCourse",
+    "MICRO303Course",
+    "PHYS201aCourse",
+    "ME326Course",
 ]

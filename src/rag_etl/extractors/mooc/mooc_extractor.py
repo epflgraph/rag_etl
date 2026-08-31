@@ -17,9 +17,13 @@ class MOOCExtractor(BaseExtractor):
         mooc_base_path: str,
         tag_metadata: dict | None = None,
         mime_types: list[str] | None = None,
+        language: str | None = None,
     ) -> None:
         self.mooc_base_path = mooc_base_path
         self.tag_metadata = tag_metadata
+        # Selects which of the subtitle tracks shipped with the export is kept
+        # for each video. Accepts a name ("French") or a code ("fr").
+        self.language = language
         if mime_types is None:
             self.mime_types = mt.DEFAULT_MIME_TYPES
         else:
@@ -34,4 +38,5 @@ class MOOCExtractor(BaseExtractor):
         return course_parser.parse(
             course_path=self.mooc_base_path,
             tag_metadata=self.tag_metadata,
+            language=self.language,
         )

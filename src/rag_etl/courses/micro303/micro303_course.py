@@ -3,19 +3,18 @@ from __future__ import annotations
 from datetime import date
 
 import logging
+
 from rag_etl.courses import BaseCourse
-from rag_etl.extractors import (
-    BaseExtractor,
-    MOOCExtractor,
-    MoodleExtractor,
-    EdDiscussionExtractor,
-)
+from rag_etl.extractors import BaseExtractor, MoodleExtractor
 from rag_etl.transformers import (
     BaseTransformer,
-    PDFToMarkdownTransformer,
-    VideoToJSONTransformer,
     ExtractZipTransformer,
+    JupyterToMarkdownTransformer,
+    PDFToMarkdownTransformer,
     SplitExercisesTransformer,
+    ImageToMarkdownTransformer,
+    MergeSlideTranscriptTransformer,
+    VideoToFramesTransformer,
 )
 
 from rag_etl.loaders import BaseLoader, ContentMetadataLoader
@@ -24,74 +23,50 @@ import rag_etl.utils.mime_types as mt
 
 from rag_etl.config import CONFIG
 
-from typing import Tuple, List
 
-
-class CS112gCourse(BaseCourse):
+# ToDo: Add MOOC
+class MICRO303Course(BaseCourse):
     """
-    Course-specific pipeline for CS-112(g).
+    Course-specific pipeline for MICRO303
     """
 
     course_info = {
-        "course_title": "Programmation orientée objet",
-        "course_id": "CS112g",
-        "academic_course": "2025-2026",
-        "semester": 2,
-        "admin_info_link": "https://moodle.epfl.ch/course/view.php?id=5571",
-        "coursebook_link": "https://edu.epfl.ch/coursebook/fr/programmation-orientee-objet-CS-112-G",
-        "course_language": "fr",
+        "course_title": "Microfabrication I",
+        "course_id": "MICRO303",
+        "academic_course": "2026-2027",
+        "semester": 1,
+        "admin_info_link": "https://moodle.epfl.ch/course/view.php?id=19283",
+        "coursebook_link": "https://edu.epfl.ch/coursebook/fr/microfabrication-i-MICRO-303",
+        "course_language": "en",
     }
 
+    # [THEORY]
+    # [THEORY_SLIDES]
+    # [LAB_x] -> we use this tag for SLT
     tag_metadata = {
-        "SLIDES": {
+        "THEORY": {
             "type": "theory",
-            "subtype": "lecture_slides",
+            "subtype": "theory",
+            "one_chunk_per_page": False,
+            "one_chunk_per_doc": False,
+            "pdf_to_markdown": False,
+            "split_exercises": False,
+        },
+        "THEORY_SLIDES": {
+            "type": "theory",
+            "subtype": "theory_slides",
             "one_chunk_per_page": True,
             "one_chunk_per_doc": False,
             "pdf_to_markdown": False,
             "split_exercises": False,
         },
-        "PROJECT": {
+        "LAB": {
             "type": "practice",
-            "subtype": "project",
+            "subtype": "lab",
             "one_chunk_per_page": False,
             "one_chunk_per_doc": True,
             "pdf_to_markdown": True,
             "split_exercises": True,
-        },
-        "MIDTERM_EXAM": {
-            "type": "exam",
-            "subtype": "midterm_exam",
-            "one_chunk_per_page": False,
-            "one_chunk_per_doc": True,
-            "pdf_to_markdown": True,
-            "split_exercises": True,
-        },
-        "MIDTERM_EXAM_SOLUTION": {
-            "type": "exam",
-            "subtype": "midterm_exam",
-            "one_chunk_per_page": False,
-            "one_chunk_per_doc": True,
-            "pdf_to_markdown": True,
-            "split_exercises": True,
-            "is_solution": True,
-        },
-        "EXAM": {
-            "type": "exam",
-            "subtype": "previous_year_exam",
-            "one_chunk_per_page": False,
-            "one_chunk_per_doc": True,
-            "pdf_to_markdown": True,
-            "split_exercises": True,
-        },
-        "EXAM_SOLUTION": {
-            "type": "exam",
-            "subtype": "previous_year_exam",
-            "one_chunk_per_page": False,
-            "one_chunk_per_doc": True,
-            "pdf_to_markdown": True,
-            "split_exercises": True,
-            "is_solution": True,
         },
         "MOOC_ASSIGNMENT": {
             "type": "practice",
@@ -183,29 +158,33 @@ class CS112gCourse(BaseCourse):
             "type": "theory",
             "subtype": "video_lecture",
             "one_chunk_per_page": False,
-            "one_chunk_per_doc": False,
+            "one_chunk_per_doc": True,
             "pdf_to_markdown": False,
             "split_exercises": False,
             "is_video": True,
-            "is_gemini_processed_video": True,
-            "processing_method": "gemini",
-            "model": "gemini-2.5-pro",
+            "is_gemini_processed_video": False,
+            "processing_method": None,
+            "model": None,
         },
     }
 
-    semester_start_date = date(year=2026, month=2, day=16)
-    semester_end_date = date(year=2026, month=6, day=22)
+    semester_start_date = date(year=2026, month=9, day=7)
+    semester_end_date = date(year=2027, month=1, day=30)
 
     course_path = f"{CONFIG['BASE_PATH']}/{course_info['course_id']}"
     output_path = f"{course_path}/output"
+
+    ################################################################
 
     mooc_base_path = f"{course_path}/mooc"
 
     mime_types = mt.DEFAULT_MIME_TYPES
 
-    moodle_course_id = 5571
+    moodle_course_id = 19283
 
     moodle_base_path = f"{course_path}/moodle"
+
+    ################################################################
 
     @property
     def pdf_to_markdown_type_subtypes(self) -> list[tuple[str, str]]:
@@ -216,7 +195,7 @@ class CS112gCourse(BaseCourse):
         ]
 
     @property
-    def split_exercises_type_subtypes(self) -> List[Tuple[str, str]]:
+    def split_exercises_type_subtypes(self) -> list[tuple[str, str]]:
         return [
             (self.tag_metadata[tag].get("type"), self.tag_metadata[tag].get("subtype"))
             for tag in self.tag_metadata
@@ -225,25 +204,19 @@ class CS112gCourse(BaseCourse):
 
     @property
     def extractors(self) -> list[BaseExtractor]:
-        """Single MOOC extractor."""
         return [
-            MOOCExtractor(
-                mooc_base_path=self.mooc_base_path,
-                tag_metadata=self.tag_metadata,
-                mime_types=(self.mime_types + [mt.MP4, mt.JSON]),
-            ),
             MoodleExtractor(
                 moodle_course_id=self.moodle_course_id,
                 moodle_base_path=self.moodle_base_path,
                 tag_metadata=self.tag_metadata,
-                mime_types=self.mime_types,
+                mime_types=(mt.DEFAULT_MIME_TYPES),
             ),
             # EdDiscussionExtractor(
             #     ed_discussion_base_path=self.course_path,
             #     tags=self.tag_metadata.keys(),
             #     tag_metadata=self.tag_metadata,
-            #     mime_types=(mt.DEFAULT_MIME_TYPES),
-            #     academic_year="2024-2025",
+            #     mime_types=self.mime_types,
+            #     academic_year="2025-2026",
             #     categories=[
             #         "theory",
             #         "practice",
@@ -257,23 +230,22 @@ class CS112gCourse(BaseCourse):
 
     @property
     def transformers(self) -> list[BaseTransformer]:
-        """Single transformer that converts PDFs into Markdown text."""
         return [
-            VideoToJSONTransformer(cache=self.course_code),
             ExtractZipTransformer(cache=self.course_code),
+            JupyterToMarkdownTransformer(cache=self.course_code),
             PDFToMarkdownTransformer(type_subtypes=self.pdf_to_markdown_type_subtypes, cache=self.course_code),
             SplitExercisesTransformer(type_subtypes=self.split_exercises_type_subtypes, cache=self.course_code),
+            VideoToFramesTransformer(
+                cache=self.course_code,
+                language=self.course_info["course_language"],
+            ),
+            ImageToMarkdownTransformer(cache=self.course_code),
+            MergeSlideTranscriptTransformer(cache=self.course_code),
         ]
 
     @property
     def loaders(self) -> list[BaseLoader]:
-        """No loaders defined for this course."""
-        return [
-            ContentMetadataLoader(
-                course_path=self.course_path,
-                course_info=self.course_info,
-            )
-        ]
+        return [ContentMetadataLoader(course_path=self.course_path, course_info=self.course_info)]
 
 
 if __name__ == "__main__":
@@ -285,5 +257,5 @@ if __name__ == "__main__":
         handlers=[logging.StreamHandler(sys.stdout)],
     )
 
-    course = BaseCourse.from_code("CS112g")
+    course = BaseCourse.from_code("MICRO303")
     course.run()

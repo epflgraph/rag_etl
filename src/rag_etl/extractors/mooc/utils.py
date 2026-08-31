@@ -116,3 +116,50 @@ def get_filename_via_assets(course_path: str, href: str, assets_map: dict[str, s
     real_name = sanitize_for_filename(real_name)
 
     return Path(course_path) / "static" / real_name
+
+
+def extract_number(resource_title: str) -> str | None:
+    """
+    Extract the numbering from a MOOC resource title.
+
+    The number is the first run of digits and dots, wherever it sits in the
+    title: some MOOCs open with it ("1.3.3. Digital Images - ...")
+
+    Returns None for a title carrying no digits at all.
+    """
+
+    number = ""
+    for character in resource_title:
+        if character.isdigit() or character == "." and number:
+            number += character
+        elif number:
+            break
+
+    resource_number = number.strip(".")
+
+    if not resource_number:
+        return None
+
+    return resource_number
+
+
+def extract_week(resource_number: str | None) -> int | None:
+    """
+    Infer the week a resource belongs to from its numbering.
+
+    MOOC numbering opens with the week, so "1.3.3" is material of week 1.
+
+    Returns None when the number carries no leading week.
+    """
+
+    if not resource_number:
+        return None
+
+    components = resource_number.split(".")
+
+    if len(components) < 2 or not components[0].isdigit():
+        return None
+
+    week = int(components[0])
+
+    return week

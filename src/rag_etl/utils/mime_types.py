@@ -4,6 +4,9 @@ MARKDOWN = "text/markdown"
 TXT = "text/plain"
 SRT = "application/x-subrip"
 
+JPEG = "image/jpeg"
+PNG = "image/png"
+
 PDF = "application/pdf"
 
 ZIP = "application/zip"

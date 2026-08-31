@@ -3,17 +3,14 @@ from __future__ import annotations
 from datetime import date
 
 import logging
+
 from rag_etl.courses import BaseCourse
-from rag_etl.extractors import (
-    BaseExtractor,
-    MOOCExtractor,
-    MoodleExtractor,
-)
+from rag_etl.extractors import BaseExtractor, MoodleExtractor, LocalFolderExtractor
 from rag_etl.transformers import (
     BaseTransformer,
-    PDFToMarkdownTransformer,
-    VideoToJSONTransformer,
     ExtractZipTransformer,
+    JupyterToMarkdownTransformer,
+    PDFToMarkdownTransformer,
     SplitExercisesTransformer,
 )
 
@@ -22,76 +19,50 @@ from rag_etl.loaders import BaseLoader, ContentMetadataLoader
 import rag_etl.utils.mime_types as mt
 
 from rag_etl.config import CONFIG
-from typing import List, Tuple
 
 
-class ENV342Course(BaseCourse):
+class PHYS201aCourse(BaseCourse):
     """
-    Course-specific pipeline for ENV-342.
+    Course-specific pipeline for PHYS201a
     """
 
     course_info = {
-        "course_title": "Geographic Information System",
-        "course_id": "ENV342",
-        "academic_course": "2025-2026",
-        "semester": 2,
-        "admin_info_link": "",
-        "coursebook_link": "https://edu.epfl.ch/coursebook/en/geographic-information-system-gis-ENV-342",
-        "course_language": "fr",  # ask Aitor to add this
+        "course_title": "Physique générale : électromagnétisme",
+        "course_id": "PHYS201a",
+        "academic_course": "2026-2027",
+        "semester": 1,
+        "admin_info_link": "https://moodle.epfl.ch/course/view.php?id=14288",
+        "coursebook_link": "https://edu.epfl.ch/coursebook/fr/physique-generale-electromagnetisme-PHYS-201-A",
     }
 
-    # [SLIDES]
-    # [POLYCOPIE]
-    # [EXERCISE_SIG_x]
-    # [EXERCISE_GEO_x]
-    # [PROJET_x]
-    # [EXAMEN_x]
+    # [QUIZ_x] <- weekly slides with a quiz and its solutions
+    # [SERIE_x] <- a weekly series of exercises
+    # [SERIE_x_SOLUTION] <- the solutions to these weekly series
+    # [EXAM_xxxx] <- past exams
+    # [EXAM_xxxx_SOLUTION] <- the solutions to these past exams
+    # [MIDTERM_EXAM_xxxx] <- past midterm exams (including, later, this year's midterm)
+    # [MIDTERM_EXAM_xxxx_SOLUTION] <- past midterm exams (including, later, this year's midterm)
 
     tag_metadata = {
-        "SLIDES": {
+        "THEORY": {  # THEORY added just in case
             "type": "theory",
-            "subtype": "lecture_slides",
-            "one_chunk_per_page": True,
-            "one_chunk_per_doc": False,
-            "pdf_to_markdown": False,
-            "split_exercises": False,
-        },
-        "POLYCOPIE": {
-            "type": "theory",
-            "subtype": "polycopie",
+            "subtype": "theory",
             "one_chunk_per_page": False,
             "one_chunk_per_doc": False,
             "pdf_to_markdown": False,
             "split_exercises": False,
         },
-        "EXERCICE_SIG": {
+        "SERIE": {
             "type": "practice",
-            "subtype": "exercice_sig",
+            "subtype": "serie",
             "one_chunk_per_page": False,
             "one_chunk_per_doc": True,
             "pdf_to_markdown": True,
             "split_exercises": True,
         },
-        "EXERCICE_SIG_SOLUTION": {
+        "SERIE_SOLUTION": {
             "type": "practice",
-            "subtype": "exercice_sig",
-            "one_chunk_per_page": False,
-            "one_chunk_per_doc": True,
-            "pdf_to_markdown": True,
-            "split_exercises": True,
-            "is_solution": True,
-        },
-        "EXERCICE_GEO": {
-            "type": "practice",
-            "subtype": "exercice_geo",
-            "one_chunk_per_page": False,
-            "one_chunk_per_doc": True,
-            "pdf_to_markdown": True,
-            "split_exercises": True,
-        },
-        "EXERCICE_GEO_SOLUTION": {
-            "type": "practice",
-            "subtype": "exercice_geo",
+            "subtype": "serie",
             "one_chunk_per_page": False,
             "one_chunk_per_doc": True,
             "pdf_to_markdown": True,
@@ -115,55 +86,51 @@ class ENV342Course(BaseCourse):
             "split_exercises": True,
             "is_solution": True,
         },
-        "PROJET": {
-            "type": "practice",
-            "subtype": "projet",
+        "MIDTERM_EXAM": {
+            "type": "exam",
+            "subtype": "midterm_exam",
             "one_chunk_per_page": False,
             "one_chunk_per_doc": True,
             "pdf_to_markdown": True,
             "split_exercises": True,
         },
-        "MOOC_VIDEO": {
-            "type": "theory",
-            "subtype": "video_lecture",
+        "MIDTERM_EXAM_SOLUTION": {
+            "type": "exam",
+            "subtype": "midterm_exam",
             "one_chunk_per_page": False,
-            "one_chunk_per_doc": False,
-            "pdf_to_markdown": False,
-            "split_exercises": False,
-            "is_video": True,
-            "is_gemini_processed_video": True,
-            "processing_method": "gemini",
-            "model": "gemini-2.5-pro",
+            "one_chunk_per_doc": True,
+            "pdf_to_markdown": True,
+            "split_exercises": True,
+            "is_solution": True,
         },
-        "MOOC_QUIZ": {
+        "QUIZ": {
             "type": "practice",
             "subtype": "quiz",
             "one_chunk_per_page": False,
             "one_chunk_per_doc": True,
-            "pdf_to_markdown": False,
+            "pdf_to_markdown": True,
             "split_exercises": False,
-            "is_video": False,
-            "is_gemini_processed_video": False,
-            "processing_method": None,
-            "model": None,
+            "is_solution": True,
         },
     }
 
-    semester_start_date = date(year=2026, month=2, day=16)
-    semester_end_date = date(year=2026, month=6, day=22)
+    semester_start_date = date(year=2026, month=9, day=7)
+    semester_end_date = date(year=2027, month=1, day=30)
 
-    # now course_path
     course_path = f"{CONFIG['BASE_PATH']}/{course_info['course_id']}"
     output_path = f"{course_path}/output"
 
-    mooc_base_path_gis_1 = f"{course_path}/mooc_gis_1"
-    mooc_base_path_gis_2 = f"{course_path}/mooc_gis_2"
+    ################################################################
 
-    moodle_course_id = 4081
-
-    mime_types = mt.DEFAULT_MIME_TYPES + [mt.MATLAB_SOURCE]
+    moodle_course_id = 14288
 
     moodle_base_path = f"{course_path}/moodle"
+
+    mime_types = mt.DEFAULT_MIME_TYPES
+
+    local_folder_base_path = f"{course_path}/local"
+
+    ################################################################
 
     @property
     def pdf_to_markdown_type_subtypes(self) -> list[tuple[str, str]]:
@@ -174,7 +141,7 @@ class ENV342Course(BaseCourse):
         ]
 
     @property
-    def split_exercises_type_subtypes(self) -> List[Tuple[str, str]]:
+    def split_exercises_type_subtypes(self) -> list[tuple[str, str]]:
         return [
             (self.tag_metadata[tag].get("type"), self.tag_metadata[tag].get("subtype"))
             for tag in self.tag_metadata
@@ -183,45 +150,47 @@ class ENV342Course(BaseCourse):
 
     @property
     def extractors(self) -> list[BaseExtractor]:
-        """Single MOOC extractor."""
         return [
-            MOOCExtractor(
-                mooc_base_path=self.mooc_base_path_gis_1,
-                tag_metadata=self.tag_metadata,
-                mime_types=(mt.DEFAULT_MIME_TYPES + [mt.MP4, mt.JSON]),
-            ),
-            MOOCExtractor(
-                mooc_base_path=self.mooc_base_path_gis_2,
-                tag_metadata=self.tag_metadata,
-                mime_types=(mt.DEFAULT_MIME_TYPES + [mt.MP4, mt.JSON]),
-            ),
             MoodleExtractor(
                 moodle_course_id=self.moodle_course_id,
                 moodle_base_path=self.moodle_base_path,
                 tag_metadata=self.tag_metadata,
                 mime_types=self.mime_types,
             ),
+            LocalFolderExtractor(
+                folder_base_path=self.local_folder_base_path,
+                tag_metadata=self.tag_metadata,
+                mime_types=self.mime_types,
+            ),
+            # EdDiscussionExtractor(
+            #     ed_discussion_base_path=self.course_path,
+            #     tags=self.tag_metadata.keys(),
+            #     tag_metadata=self.tag_metadata,
+            #     mime_types=self.mime_types,
+            #     academic_year="2025-2026",
+            #     categories=[
+            #         "theory",
+            #         "practice",
+            #         "exam",
+            #     ],
+            #     language=self.course_info["course_language"],
+            #     semester=self.course_info["semester"],
+            #     include_student_endorsed=True,
+            # ),
         ]
 
     @property
     def transformers(self) -> list[BaseTransformer]:
-        """Single transformer that converts PDFs into Markdown text."""
         return [
-            VideoToJSONTransformer(cache=self.course_code),
             ExtractZipTransformer(cache=self.course_code),
+            JupyterToMarkdownTransformer(cache=self.course_code),
             PDFToMarkdownTransformer(type_subtypes=self.pdf_to_markdown_type_subtypes, cache=self.course_code),
             SplitExercisesTransformer(type_subtypes=self.split_exercises_type_subtypes, cache=self.course_code),
         ]
 
     @property
     def loaders(self) -> list[BaseLoader]:
-        """No loaders defined for this course."""
-        return [
-            ContentMetadataLoader(
-                course_path=self.course_path,
-                course_info=self.course_info,
-            )
-        ]
+        return [ContentMetadataLoader(course_path=self.course_path, course_info=self.course_info)]
 
 
 if __name__ == "__main__":
@@ -233,5 +202,5 @@ if __name__ == "__main__":
         handlers=[logging.StreamHandler(sys.stdout)],
     )
 
-    course = BaseCourse.from_code("ENV342")
+    course = BaseCourse.from_code("PHYS201a")
     course.run()

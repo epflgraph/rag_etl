@@ -13,3 +13,7 @@ class MOOCResource(BaseResource):
     sequential: str | None = None
     vertical: str | None = None
     tag: str | None = None
+
+    # Kaltura entry backing a MOOC video, parsed from its <source src="...">.
+    # Lets video resources from MOOC and Mediaspace present the same handle.
+    entry_id: str | None = None

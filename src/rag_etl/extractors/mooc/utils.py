@@ -123,18 +123,14 @@ def extract_number(resource_title: str) -> str | None:
     Extract the numbering from a MOOC resource title.
 
     The number is the first run of digits and dots, wherever it sits in the
-    title: some MOOCs open with it ("1.3.3. Digital Images - ...") and others
-    close with it ("... - Question 3.1.1"). Trailing dots are dropped, so both
-    forms yield a bare "1.3.3".
+    title: some MOOCs open with it ("1.3.3. Digital Images - ...")
 
     Returns None for a title carrying no digits at all.
     """
 
     number = ""
     for character in resource_title:
-        if character.isdigit():
-            number += character
-        elif character == "." and number:
+        if character.isdigit() or character == "." and number:
             number += character
         elif number:
             break
@@ -152,12 +148,6 @@ def extract_week(resource_number: str | None) -> int | None:
     Infer the week a resource belongs to from its numbering.
 
     MOOC numbering opens with the week, so "1.3.3" is material of week 1.
-    Checked against the BIO695 titles that also state their week in words,
-    where the first component matched in every case.
-
-    Only a dotted number counts. A bare "1" is far more often a part number,
-    as in CS-119(d)'s "Branchements conditionnels (partie 1)", where reading
-    it as a week would scatter one lesson across three of them.
 
     Returns None when the number carries no leading week.
     """

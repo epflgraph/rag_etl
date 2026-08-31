@@ -1,3 +1,4 @@
+import json
 import logging
 import shutil
 from datetime import date, datetime
@@ -33,12 +34,20 @@ TAG = "MEDIASPACE_VIDEO"
 
 class MediaspaceExtractor(BaseExtractor):
     """
-    Extractor for retrieving video subtitles from an EPFL Mediaspace
-    (Kaltura) playlist or channel.
+    Extractor for retrieving videos from an EPFL Mediaspace (Kaltura)
+    playlist or channel.
 
-    One resource is produced per video entry, pointing at the subtitle
-    file downloaded for it. The video itself is never downloaded: the
-    subtitles already carry the text the RAG pipeline indexes.
+    One resource is produced per video entry, pointing at a small descriptor
+    naming the entry. The video itself is never downloaded.
+    VideoToFramesTransformer reads it over HTTP
+
+    Subtitles are downloaded (when available), and reached through srt_path.
+    We process a video published without subtitles. This matches how the MOOC
+    extractor already describes a video, which points at the export's video XML
+    and carries srt_path beside it.
+
+    Note that mime_types filters caption assets. The resources themselves are
+    videos and carry mt.MP4
     """
 
     def __init__(
@@ -116,8 +125,7 @@ class MediaspaceExtractor(BaseExtractor):
         if len(matching_captions) == 1:
             return matching_captions[0]
 
-        # Several assets can share entry and language. Mediaspace shows the
-        # default one, so it is the one a student would have seen.
+        # More than one caption, we keep the one marked asisDefault
         selected = matching_captions[0]
         for caption in matching_captions:
             if caption.get("is_default"):
@@ -158,9 +166,37 @@ class MediaspaceExtractor(BaseExtractor):
 
         return caption_path
 
+    def build_descriptor_path(self, entry_id: str, entry_name: str) -> Path:
+        """Build the path of the file standing for an entry's video."""
+
+        # Same shape as build_caption_path, minus the language, so an entry's
+        # descriptor and its subtitle sit next to each other under one name
+        name_parts = [entry_id]
+        if entry_name:
+            name_parts.append(safe_filename(entry_name))
+
+        file_stem = "_".join(name_parts)
+        descriptor_path = self.mediaspace_base_path / f"{file_stem}.json"
+
+        return descriptor_path
+
+    def write_descriptor(self, entry_id: str, entry_name: str) -> Path:
+        """
+        Write the file an entry's resource points at, and return its path.
+
+        It holds the entry id and nothing else on purpose. Transformers key
+        their cache on the bytes of the file a resource points at.
+        """
+
+        descriptor_path = self.build_descriptor_path(entry_id, entry_name)
+        descriptor_path.parent.mkdir(parents=True, exist_ok=True)
+        descriptor_path.write_text(json.dumps({"entry_id": entry_id}), encoding="utf-8")
+
+        return descriptor_path
+
     def extract(self) -> list[MediaspaceResource]:
         """
-        Extract subtitle resources for this course from Mediaspace.
+        Extract video resources for this course from Mediaspace.
 
         Returns:
             list[MediaspaceResource]: List of raw Resources.
@@ -196,30 +232,44 @@ class MediaspaceExtractor(BaseExtractor):
                 logger.debug(f"Skipping entry {entry_id} because it was not created after {self.created_after}.")
                 continue
 
-            # An entry without usable subtitles is ignored
+            # An entry the recording system created but never filled has no
+            # file behind it, so there is nothing to cut frames from
+            duration = getattr(entry, "duration", 0) or 0
+            if duration <= 0:
+                logger.warning(f"Skipping entry {entry_id} because it has no duration")
+                continue
+
+            # Subtitles are optional: a video published without them, or
+            # without them in this course's language, still uses its extracted slide frames
             caption = self.select_caption(get_subtitle_urls(client, entry_id), entry_id)
-            if caption is None:
-                continue
 
-            # A failed download skips
-            caption_path = self.build_caption_path(caption, entry_id, entry_name)
-            if not download_caption(client, caption, caption_path):
-                continue
+            srt_path = None
+            caption_asset_id = None
 
-            logger.info(f"Entry {entry_id}: wrote {caption_path}")
+            if caption is not None:
+                caption_path = self.build_caption_path(caption, entry_id, entry_name)
+
+                # A failed download leaves the video without a transcript
+                # rather than dropping it
+                if download_caption(client, caption, caption_path):
+                    logger.info(f"Entry {entry_id}: wrote {caption_path}")
+                    srt_path = str(caption_path)
+                    caption_asset_id = caption.get("caption_asset_id")
+
+            descriptor_path = self.write_descriptor(entry_id, entry_name)
 
             resources.append(
                 MediaspaceResource(
                     title=entry_name,
                     source="mediaspace",
                     url=build_entry_url(entry_id, self.playlist_or_channel_url),
-                    path=str(caption_path),
-                    mime_type=caption_mime_type(caption) or mt.SRT,
-                    srt_path=str(caption_path),
+                    path=str(descriptor_path),
+                    mime_type=mt.MP4,
+                    srt_path=srt_path,
                     is_video=True,
                     is_gemini_processed_video=False,
                     entry_id=entry_id,
-                    caption_asset_id=caption.get("caption_asset_id"),
+                    caption_asset_id=caption_asset_id,
                     tag=TAG,
                     type=tag_dict.get("type"),
                     subtype=tag_dict.get("subtype"),
@@ -230,6 +280,6 @@ class MediaspaceExtractor(BaseExtractor):
             )
 
         if not resources:
-            logger.warning(f"No subtitles extracted from {self.playlist_or_channel_url}")
+            logger.warning(f"No videos extracted from {self.playlist_or_channel_url}")
 
         return resources

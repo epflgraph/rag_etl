@@ -10,7 +10,7 @@ this order:
 
 ```
   video resource
-  (Mediaspace subtitles, or a MOOC video descriptor)
+  (a descriptor naming the video, with its subtitles beside it in srt_path)
         |
         v
   VideoToFramesTransformer
@@ -35,7 +35,9 @@ before the next change, so anything the lecturer wrote on the slide meanwhile
 is visible. The video is read straight from its URL and never downloaded.
 
 Each frame becomes its own resource, with a link that opens the recording at
-that moment. The video resource is replaced by its frames.
+that moment. The video resource is replaced by its frames, and dropped with a
+warning when it yields none, since it points at a descriptor rather than at
+anything worth indexing on its own.
 
 ## ImageToMarkdownTransformer
 
@@ -48,5 +50,9 @@ It sends each image to the RCP vision model, which transcribes the text and figu
 Adds to each slide what the lecturer said while it was on screen. 
 
 A slide lasts from its own moment until the next slide starts, so this reads
-the subtitles for that time laps and appends them as a quote. 
+the subtitles for that time laps and appends them as a quote.
+
+A video published without subtitles, or without them in the course's language,
+has no srt_path, so its slides pass through here untouched and keep just what
+the vision model read off them. 
 

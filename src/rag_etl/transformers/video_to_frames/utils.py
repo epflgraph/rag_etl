@@ -2,8 +2,6 @@ import logging
 import subprocess
 from pathlib import Path
 
-import imageio_ffmpeg
-
 logger = logging.getLogger(__name__)
 
 FFMPEG_TIMEOUT = 60
@@ -48,8 +46,10 @@ def extract_frame(video_url: str, seconds: int, output_path: Path) -> bool:
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     command = [
-        # imageio-ffmpeg includes an ffmpeg binary, so no system install is needed
-        imageio_ffmpeg.get_ffmpeg_exe(),
+        # The system ffmpeg, found on PATH. The static binary imageio-ffmpeg
+        # used to bundle segfaults on a host whose glibc is much newer than the
+        # one it was linked against, which a distribution package cannot do
+        "ffmpeg",
         # Never read stdin: without this ffmpeg can block waiting for an answer
         "-nostdin",
         # Report errors only, so a successful extraction stays silent

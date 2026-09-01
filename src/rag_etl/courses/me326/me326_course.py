@@ -125,14 +125,13 @@ class ME326Course(BaseCourse):
 
     ################################################################
 
-    mediaspace_playlist_or_channel_url = (
-        "https://mediaspace.epfl.ch/channel/ME-326+Automatique+et+commande+num%C3%A9rique/55706?"
-    )
+    mediaspace_playlist_or_channel_url = "https://mediaspace.epfl.ch/playlist/dedicated/55706/0_4a2i8lhf/0_dzalmgoo"
 
     mediaspace_language = course_info["course_language"]
 
-    # Only keep recordings of this course edition
-    mediaspace_created_after = semester_start_date
+    # The professor won't be uploading new videos this upcoming semester
+    # We were told to use the 2025 playlist
+    mediaspace_created_after = date(year=2025, month=9, day=1)
 
     mediaspace_base_path = f"{course_path}/mediaspace"
 

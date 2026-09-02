@@ -24,7 +24,6 @@ import rag_etl.utils.mime_types as mt
 from rag_etl.config import CONFIG
 
 
-# ToDo: Add MOOC when Christian shares it
 class ME326Course(BaseCourse):
     """
     Course-specific pipeline for ME326
@@ -49,7 +48,7 @@ class ME326Course(BaseCourse):
             "subtype": "theory",
             "one_chunk_per_page": False,
             "one_chunk_per_doc": False,
-            "pdf_to_markdown": False,
+            "pdf_to_markdown": True,
             "split_exercises": False,
         },
         "THEORY_SLIDES": {
@@ -57,7 +56,7 @@ class ME326Course(BaseCourse):
             "subtype": "theory_slides",
             "one_chunk_per_page": True,
             "one_chunk_per_doc": False,
-            "pdf_to_markdown": False,
+            "pdf_to_markdown": True,
             "split_exercises": False,
         },
         "SERIE": {

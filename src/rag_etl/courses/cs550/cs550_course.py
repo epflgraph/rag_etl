@@ -47,7 +47,7 @@ class CS550Course(BaseCourse):
             "subtype": "theory",
             "one_chunk_per_page": False,
             "one_chunk_per_doc": False,
-            "pdf_to_markdown": False,
+            "pdf_to_markdown": True,
             "split_exercises": False,
         },
         "THEORY_SLIDES": {
@@ -55,7 +55,7 @@ class CS550Course(BaseCourse):
             "subtype": "theory_slides",
             "one_chunk_per_page": True,
             "one_chunk_per_doc": False,
-            "pdf_to_markdown": False,
+            "pdf_to_markdown": True,
             "split_exercises": False,
         },
         "SERIE": {

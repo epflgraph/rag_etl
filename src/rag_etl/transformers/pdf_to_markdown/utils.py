@@ -62,7 +62,7 @@ def to_data_uri(img: Image.Image) -> str:
     return f"data:image/png;base64,{b64}"
 
 
-def convert_page_pdf_to_md(pil_page):
+async def convert_page_pdf_to_md(pil_page, semaphore: asyncio.Semaphore):
     # Prompts
     system_prompt = """
     You are an expert PDF→Markdown converter. Convert the visual content of a *single PDF page* into **clean, semantically-accurate GitHub-Flavored Markdown**.
@@ -148,9 +148,23 @@ def convert_page_pdf_to_md(pil_page):
 
     # Send LLM requests and store results
     rcp_model = CONFIG["RCP_VISION_MODEL"]
-    md_page = send_llm_request(rcp_model, messages, name="pdf-page-to-markdown", enable_thinking=False).strip()
+    max_retries = 2
 
-    return md_page
+    async with semaphore:
+        for attempt in range(max_retries + 1):
+            try:
+                md_page = await asyncio.to_thread(
+                    send_llm_request,
+                    rcp_model,
+                    messages,
+                    name="pdf-page-to-markdown",
+                    enable_thinking=False,
+                )
+                return md_page.strip()
+            except TimeoutError:
+                if attempt == max_retries:
+                    raise
+                await asyncio.sleep(2 ** attempt)
 
 
 def stitch_md_pages(md_pages):
@@ -251,12 +265,15 @@ def convert_pdf_to_md(pdf_path, md_path):
     pil_pages = [downscale_if_needed(pil_page) for pil_page in pil_pages]
 
     ################################################################
-    # Page images to page Markdown (in parallel threads)           #
+    # Page images to page Markdown (bounded concurrency)           #
     ################################################################
+
+    max_concurrent_pages = 20
 
     # Parse PDF pages to Markdown individually
     async def run_all(pil_pages):
-        tasks = [asyncio.to_thread(convert_page_pdf_to_md, pil_page) for pil_page in pil_pages]
+        semaphore = asyncio.Semaphore(max_concurrent_pages)
+        tasks = [convert_page_pdf_to_md(pil_page, semaphore) for pil_page in pil_pages]
         return await asyncio.gather(*tasks)
 
     md_pages = asyncio.run(run_all(pil_pages))

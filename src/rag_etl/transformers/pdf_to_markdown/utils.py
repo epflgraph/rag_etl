@@ -148,11 +148,12 @@ async def convert_page_pdf_to_md(pil_page, semaphore: asyncio.Semaphore):
 
     # Send LLM requests and store results
     rcp_model = CONFIG["RCP_VISION_MODEL"]
-    max_retries = 2
+    max_retries = 5
 
     async with semaphore:
         for attempt in range(max_retries + 1):
             try:
+                print(f"attempting page attempt={attempt}")
                 md_page = await asyncio.to_thread(
                     send_llm_request,
                     rcp_model,
@@ -164,7 +165,7 @@ async def convert_page_pdf_to_md(pil_page, semaphore: asyncio.Semaphore):
             except TimeoutError:
                 if attempt == max_retries:
                     raise
-                await asyncio.sleep(2 ** attempt)
+                await asyncio.sleep(2**attempt)
 
 
 def stitch_md_pages(md_pages):
@@ -268,7 +269,7 @@ def convert_pdf_to_md(pdf_path, md_path):
     # Page images to page Markdown (bounded concurrency)           #
     ################################################################
 
-    max_concurrent_pages = 20
+    max_concurrent_pages = 5
 
     # Parse PDF pages to Markdown individually
     async def run_all(pil_pages):

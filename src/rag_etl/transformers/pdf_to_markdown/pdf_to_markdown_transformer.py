@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import List, Sequence
+from collections.abc import Sequence
 from pathlib import Path
 
 import logging
@@ -25,14 +25,14 @@ class PDFToMarkdownTransformer(BaseTransformer):
 
         self.type_subtypes = type_subtypes
 
-    def transform(self, resources: Sequence[BaseResource]) -> List[BaseResource]:
+    def transform(self, resources: Sequence[BaseResource]) -> list[BaseResource]:
         """
         Convert PDF resources into Markdown text.
 
         Non-PDF resources as well as resources not matching the specified type_subtypes are left unchanged.
         """
 
-        transformed_resources: List[BaseResource] = []
+        transformed_resources: list[BaseResource] = []
 
         for resource in resources:
             # Skip if resource is not in the specified list of types and subtypes

@@ -149,10 +149,10 @@ async def convert_page_pdf_to_md(pil_page, semaphore: asyncio.Semaphore, page_nu
 
     # Send LLM requests and store results
     rcp_model = CONFIG["RCP_VISION_MODEL"]
-    max_retries = 5
+    max_retries = 3
 
     async with semaphore:
-        for attempt in range(max_retries + 1):
+        for attempt in range(1, max_retries + 1):
             try:
                 print(f"attempting page={page_number} attempt={attempt}")
                 md_page = await asyncio.to_thread(
@@ -161,6 +161,7 @@ async def convert_page_pdf_to_md(pil_page, semaphore: asyncio.Semaphore, page_nu
                     messages,
                     name="pdf-page-to-markdown",
                     enable_thinking=False,
+                    timeout=180,  # 3 min for OCR without thinking, 10 min by default
                 )
                 print(f"finished page={page_number} attempt={attempt}")
                 return md_page.strip()
@@ -174,6 +175,7 @@ async def convert_page_pdf_to_md(pil_page, semaphore: asyncio.Semaphore, page_nu
 
 
 def stitch_md_pages(md_pages):
+    print("batch_stitch_md_pages")
     # Make LLM call to fix possible Markdown issues due to processing page by page
     system_prompt = """
     You will receive multiple Markdown snippets, one per PDF page, enclosed in triple backticks, in strict page order.
@@ -210,8 +212,11 @@ def stitch_md_pages(md_pages):
     ]
 
     rcp_model = CONFIG["RCP_BASE_MODEL"]
-    md_text = send_llm_request(rcp_model, messages, name="stitch-markdown-pages").strip()
+    md_text = send_llm_request(rcp_model, messages, name="stitch-markdown-pages", enable_thinking=False)
+    if md_text is not None:
+        md_text = md_text.strip()
 
+    print("batch_stitch_md_pages finishes")
     return md_text
 
 
@@ -248,13 +253,15 @@ def best_overlap_concat(a: str, b: str, min_ratio: float = 0.8):
 
 
 def batch_stitch_md_pages(md_pages):
+    print("batch_stitch_md_pages")
     batch_n_pages = 5
     overlap = 2
 
     md_text = ""
     for i in range(0, len(md_pages), batch_n_pages - overlap):
         chunk_md_text = stitch_md_pages(md_pages[i : i + batch_n_pages])
-        md_text = best_overlap_concat(md_text, chunk_md_text)
+        if chunk_md_text is not None:
+            md_text = best_overlap_concat(md_text, chunk_md_text)
 
     return md_text
 
@@ -274,7 +281,7 @@ def convert_pdf_to_md(pdf_path, md_path):
     # Page images to page Markdown (bounded concurrency)           #
     ################################################################
 
-    max_concurrent_pages = 3
+    max_concurrent_pages = 5
 
     # Parse PDF pages to Markdown individually
     async def run_all(pil_pages):
@@ -291,8 +298,9 @@ def convert_pdf_to_md(pdf_path, md_path):
     # Stitch page Markdown into one coherent Markdown              #
     ################################################################
 
+    print("before batch_stitch_md_pages")
     md_text = batch_stitch_md_pages(md_pages)
-
+    print("after batch_stitch_md_pages")
     ################################################################
     # Store result in file                                         #
     ################################################################

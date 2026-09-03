@@ -162,6 +162,7 @@ async def convert_page_pdf_to_md(pil_page, semaphore: asyncio.Semaphore, page_nu
                     name="pdf-page-to-markdown",
                     enable_thinking=False,
                 )
+                print(f"finished page={page_number} attempt={attempt}")
                 return md_page.strip()
             # The client raises its own timeout, which is an APIConnectionError
             # rather than the builtin TimeoutError, so catching the builtin

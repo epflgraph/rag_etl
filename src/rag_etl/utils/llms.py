@@ -42,11 +42,7 @@ LLM_PARAMS = {
 
 
 def send_llm_request(
-    model,
-    messages,
-    response_format=None,
-    name: str = "llm-request",
-    enable_thinking: bool = True,
+    model, messages, response_format=None, name: str = "llm-request", enable_thinking: bool = True, timeout: int = 600
 ):
     if response_format:
         response_format_schema = {
@@ -61,7 +57,7 @@ def send_llm_request(
         response_format_schema = None
 
     # Send request and trace it as a single generation
-    rcp_client = OpenAI(base_url=CONFIG["RCP_BASE_URL"], api_key=CONFIG["RCP_API_KEY"])
+    rcp_client = OpenAI(base_url=CONFIG["RCP_BASE_URL"], api_key=CONFIG["RCP_API_KEY"], timeout=timeout)
     langfuse = get_client()
     with langfuse.start_as_current_observation(
         as_type="generation",

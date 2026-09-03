@@ -88,7 +88,8 @@ def retrieve_video(video_url: str, token: str) -> str:
 
     video_token = result.get("token")
     if not video_token:
-        raise RuntimeError(f"GraphAI could not retrieve {video_url}: {payload}")
+        logger.warning(f"GraphAI could not retrieve {video_url}: {payload}")
+        # raise RuntimeError(f"GraphAI could not retrieve {video_url}: {payload}")
 
     return video_token
 

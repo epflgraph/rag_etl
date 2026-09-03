@@ -109,8 +109,15 @@ async def convert_page_pdf_to_md(pil_page, semaphore: asyncio.Semaphore, page_nu
       - Inline math: `$ ... $`
       - Block math: `$$ ... $$`
       - When multiple aligned equations are detected, render them as a single block math region within `$$ ... $$` instead.
+    
+    5. - **Code**:
+    - Use 'triple backticks' Markdown notation, indicating the programming language to separate code from the rest of the content on the page. e.g.
+    ```cpp 
+    # Here is some C++ code on the slide 
+    using namespace std;
+    ```         
 
-    5. **Fidelity and Consistency**
+    6. **Fidelity and Consistency**
     - Keep content in the exact reading order.
     - Do not paraphrase, summarize, or add commentary.
     - Include all visible textual elements (titles, captions, labels) except for page numbers.

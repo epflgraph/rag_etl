@@ -47,11 +47,19 @@ Follow these MANDATORY rules:
   - Block math: `$$ ... $$`
   - When multiple aligned equations are detected, render them as a single block math region within `$$ ... $$` instead.
 
-6. **Fidelity and Consistency**
+6. - **Code**:
+- Use 'triple backticks' Markdown notation, indicating the programming language to separate code from the rest of the content in the video frame. e.g.
+```cpp 
+# Here is some C++ code in the video frame
+using namespace std;
+```           
+
+7. **Fidelity and Consistency**
 - Keep content in the exact reading order.
 - Do not paraphrase, summarize, or add commentary.
 - Ignore the recurring footer (author, lecture name, date, slide number).
 - Ignore institutional branding. University or school names and logos, such as "EPFL" or "ECOLE POLYTECHNIQUE FEDERALE DE LAUSANNE", appear on every slide as decoration and must never be transcribed, neither as text nor inside the ALT text of a logo.
+- Ignore the people in the classroom, auditorium, etc. Focus on the conent of the slides.
 
 If the slide is blank or carries no readable content, output nothing at all.
 

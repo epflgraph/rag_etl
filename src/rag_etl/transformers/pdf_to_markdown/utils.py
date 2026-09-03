@@ -183,7 +183,6 @@ async def convert_page_pdf_to_md(pil_page, semaphore: asyncio.Semaphore, page_nu
 
 
 def stitch_md_pages(md_pages):
-    print("batch_stitch_md_pages")
     # Make LLM call to fix possible Markdown issues due to processing page by page
     system_prompt = """
     You will receive multiple Markdown snippets, one per PDF page, enclosed in triple backticks, in strict page order.
@@ -224,7 +223,6 @@ def stitch_md_pages(md_pages):
     if md_text is not None:
         md_text = md_text.strip()
 
-    print("batch_stitch_md_pages finishes")
     return md_text
 
 
@@ -262,15 +260,16 @@ def best_overlap_concat(a: str, b: str, min_ratio: float = 0.8):
 
 def batch_stitch_md_pages(md_pages):
     print("batch_stitch_md_pages")
-    batch_n_pages = 5
+    batch_n_pages = 10
     overlap = 2
 
     md_text = ""
     for i in range(0, len(md_pages), batch_n_pages - overlap):
+        print(f"stitch_md_pages start from page {i} to {(i + batch_n_pages)}")
         chunk_md_text = stitch_md_pages(md_pages[i : i + batch_n_pages])
         if chunk_md_text is not None:
             md_text = best_overlap_concat(md_text, chunk_md_text)
-
+        print(f"stitch_md_pages end from page {i} to {(i + batch_n_pages)}")
     return md_text
 
 

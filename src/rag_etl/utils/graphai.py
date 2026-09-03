@@ -89,6 +89,7 @@ def retrieve_video(video_url: str, token: str) -> str:
     video_token = result.get("token")
     if not video_token:
         logger.warning(f"GraphAI could not retrieve {video_url}: {payload}")
+        return None
         # raise RuntimeError(f"GraphAI could not retrieve {video_url}: {payload}")
 
     return video_token
@@ -116,7 +117,9 @@ def detect_slides(video_token: str, token: str, language: str | None = None) -> 
     result = payload.get("task_result") or {}
 
     if not result.get("successful"):
-        raise RuntimeError(f"Slide detection failed for {video_token}: {payload}")
+        logger.warning(f"Slide detection failed for {video_token}: {payload}")
+        return None
+        # raise RuntimeError(f"Slide detection failed for {video_token}: {payload}")
 
     timestamps = []
     for slide in (result.get("slide_tokens") or {}).values():

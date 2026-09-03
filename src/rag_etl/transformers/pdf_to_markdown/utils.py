@@ -243,8 +243,8 @@ def best_overlap_concat(a: str, b: str, min_ratio: float = 0.8):
 
 
 def batch_stitch_md_pages(md_pages):
-    batch_n_pages = 10
-    overlap = 3
+    batch_n_pages = 5
+    overlap = 2
 
     md_text = ""
     for i in range(0, len(md_pages), batch_n_pages - overlap):

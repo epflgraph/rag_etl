@@ -149,7 +149,7 @@ async def convert_page_pdf_to_md(pil_page, semaphore: asyncio.Semaphore, page_nu
 
     # Send LLM requests and store results
     rcp_model = CONFIG["RCP_VISION_MODEL"]
-    max_retries = 3
+    max_retries = 1
 
     async with semaphore:
         for attempt in range(1, max_retries + 1):
@@ -161,16 +161,24 @@ async def convert_page_pdf_to_md(pil_page, semaphore: asyncio.Semaphore, page_nu
                     messages,
                     name="pdf-page-to-markdown",
                     enable_thinking=False,
-                    timeout=180,  # 3 min for OCR without thinking, 10 min by default
+                    timeout=120,  # 2 min for OCR without thinking, 10 min by default
                 )
-                print(f"finished page={page_number} attempt={attempt}")
-                return md_page.strip()
+                if md_page is not None:
+                    md_page = md_page.strip()
+                    print(f"finished page={page_number} attempt={attempt}")
+                else:
+                    md_page = ""
+                    print(f"finished EMPTY page={page_number} attempt={attempt}")
+
+                return md_page
+
             # The client raises its own timeout, which is an APIConnectionError
             # rather than the builtin TimeoutError, so catching the builtin
             # here would let every real timeout escape unretried
             except openai.APITimeoutError:
                 if attempt == max_retries:
-                    raise
+                    # raise
+                    pass
                 await asyncio.sleep(2**attempt)
 
 
@@ -281,7 +289,7 @@ def convert_pdf_to_md(pdf_path, md_path):
     # Page images to page Markdown (bounded concurrency)           #
     ################################################################
 
-    max_concurrent_pages = 5
+    max_concurrent_pages = 10
 
     # Parse PDF pages to Markdown individually
     async def run_all(pil_pages):

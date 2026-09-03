@@ -6,6 +6,9 @@ from openai import OpenAI
 import rag_etl.utils.mime_types as mt
 
 from rag_etl.config import CONFIG
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 # Recommended params for each model and mode
@@ -72,12 +75,17 @@ def send_llm_request(
 
         params = LLM_PARAMS[(model, mode)]
 
-        response = rcp_client.chat.completions.create(
-            model=model,
-            messages=messages,
-            response_format=response_format_schema,
-            **params,
-        )
+        try:
+            response = rcp_client.chat.completions.create(
+                model=model,
+                messages=messages,
+                response_format=response_format_schema,
+                **params,
+            )
+        except Exception as e:
+            logger.warning(f"Failed to : {e}")
+            return None
+
         message = response.choices[0].message
         content = message.content.strip()
 

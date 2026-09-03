@@ -5,6 +5,7 @@ import base64
 from difflib import SequenceMatcher
 
 
+import openai
 import pymupdf
 from PIL import Image
 
@@ -62,7 +63,7 @@ def to_data_uri(img: Image.Image) -> str:
     return f"data:image/png;base64,{b64}"
 
 
-async def convert_page_pdf_to_md(pil_page, semaphore: asyncio.Semaphore):
+async def convert_page_pdf_to_md(pil_page, semaphore: asyncio.Semaphore, page_number: int):
     # Prompts
     system_prompt = """
     You are an expert PDF→Markdown converter. Convert the visual content of a *single PDF page* into **clean, semantically-accurate GitHub-Flavored Markdown**.
@@ -153,7 +154,7 @@ async def convert_page_pdf_to_md(pil_page, semaphore: asyncio.Semaphore):
     async with semaphore:
         for attempt in range(max_retries + 1):
             try:
-                print(f"attempting page attempt={attempt}")
+                print(f"attempting page={page_number} attempt={attempt}")
                 md_page = await asyncio.to_thread(
                     send_llm_request,
                     rcp_model,
@@ -162,7 +163,10 @@ async def convert_page_pdf_to_md(pil_page, semaphore: asyncio.Semaphore):
                     enable_thinking=False,
                 )
                 return md_page.strip()
-            except TimeoutError:
+            # The client raises its own timeout, which is an APIConnectionError
+            # rather than the builtin TimeoutError, so catching the builtin
+            # here would let every real timeout escape unretried
+            except openai.APITimeoutError:
                 if attempt == max_retries:
                     raise
                 await asyncio.sleep(2**attempt)
@@ -269,12 +273,15 @@ def convert_pdf_to_md(pdf_path, md_path):
     # Page images to page Markdown (bounded concurrency)           #
     ################################################################
 
-    max_concurrent_pages = 5
+    max_concurrent_pages = 3
 
     # Parse PDF pages to Markdown individually
     async def run_all(pil_pages):
         semaphore = asyncio.Semaphore(max_concurrent_pages)
-        tasks = [convert_page_pdf_to_md(pil_page, semaphore) for pil_page in pil_pages]
+        tasks = []
+        for page_number, pil_page in enumerate(pil_pages, start=1):
+            tasks.append(convert_page_pdf_to_md(pil_page, semaphore, page_number))
+
         return await asyncio.gather(*tasks)
 
     md_pages = asyncio.run(run_all(pil_pages))

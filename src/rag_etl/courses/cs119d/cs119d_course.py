@@ -2,7 +2,7 @@ from datetime import date
 
 import logging
 from rag_etl.courses import BaseCourse
-from rag_etl.extractors import BaseExtractor, MOOCExtractor, MoodleExtractor, MediaspaceExtractor
+from rag_etl.extractors import BaseExtractor, MediaspaceExtractor
 from rag_etl.transformers import (
     BaseTransformer,
     PDFToMarkdownTransformer,
@@ -281,18 +281,18 @@ class CS119dCourse(BaseCourse):
     def extractors(self) -> list[BaseExtractor]:
         """Single MOOC extractor."""
         return [
-            MOOCExtractor(
-                mooc_base_path=self.mooc_base_path,
-                tag_metadata=self.tag_metadata,
-                mime_types=(self.mime_types + [mt.MP4, mt.JSON]),
-                language=self.course_info["course_language"],
-            ),
-            MoodleExtractor(
-                moodle_course_id=self.moodle_course_id,
-                moodle_base_path=self.moodle_base_path,
-                tag_metadata=self.tag_metadata,
-                mime_types=self.mime_types,
-            ),
+            # MOOCExtractor(
+            #     mooc_base_path=self.mooc_base_path,
+            #     tag_metadata=self.tag_metadata,
+            #     mime_types=(self.mime_types + [mt.MP4, mt.JSON]),
+            #     language=self.course_info["course_language"],
+            # ),
+            # MoodleExtractor(
+            #     moodle_course_id=self.moodle_course_id,
+            #     moodle_base_path=self.moodle_base_path,
+            #     tag_metadata=self.tag_metadata,
+            #     mime_types=self.mime_types,
+            # ),
             MediaspaceExtractor(
                 playlist_or_channel_url=self.mediaspace_playlist_or_channel_url,
                 mediaspace_base_path=self.mediaspace_base_path,

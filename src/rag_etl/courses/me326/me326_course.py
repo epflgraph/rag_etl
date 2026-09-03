@@ -78,7 +78,7 @@ class ME326Course(BaseCourse):
         },
         "MOOC_QUIZ": {
             "type": "practice",
-            "subtype": "quiz",
+            "subtype": "mooc_quiz",
             "one_chunk_per_page": False,
             "one_chunk_per_doc": True,
             "pdf_to_markdown": False,

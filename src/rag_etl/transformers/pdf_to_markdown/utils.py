@@ -5,6 +5,7 @@ import base64
 from difflib import SequenceMatcher
 
 
+import openai
 import pymupdf
 from PIL import Image
 
@@ -62,7 +63,7 @@ def to_data_uri(img: Image.Image) -> str:
     return f"data:image/png;base64,{b64}"
 
 
-def convert_page_pdf_to_md(pil_page):
+async def convert_page_pdf_to_md(pil_page, semaphore: asyncio.Semaphore, page_number: int):
     # Prompts
     system_prompt = """
     You are an expert PDF→Markdown converter. Convert the visual content of a *single PDF page* into **clean, semantically-accurate GitHub-Flavored Markdown**.
@@ -148,9 +149,37 @@ def convert_page_pdf_to_md(pil_page):
 
     # Send LLM requests and store results
     rcp_model = CONFIG["RCP_VISION_MODEL"]
-    md_page = send_llm_request(rcp_model, messages, name="pdf-page-to-markdown", enable_thinking=False).strip()
+    max_retries = 1
 
-    return md_page
+    async with semaphore:
+        for attempt in range(1, max_retries + 1):
+            try:
+                print(f"attempting page={page_number} attempt={attempt}")
+                md_page = await asyncio.to_thread(
+                    send_llm_request,
+                    rcp_model,
+                    messages,
+                    name="pdf-page-to-markdown",
+                    enable_thinking=False,
+                    timeout=120,  # 2 min for OCR without thinking, 10 min by default
+                )
+                if md_page is not None:
+                    md_page = md_page.strip()
+                    print(f"finished page={page_number} attempt={attempt}")
+                else:
+                    md_page = ""
+                    print(f"finished EMPTY page={page_number} attempt={attempt}")
+
+                return md_page
+
+            # The client raises its own timeout, which is an APIConnectionError
+            # rather than the builtin TimeoutError, so catching the builtin
+            # here would let every real timeout escape unretried
+            except openai.APITimeoutError:
+                if attempt == max_retries:
+                    # raise
+                    pass
+                await asyncio.sleep(2**attempt)
 
 
 def stitch_md_pages(md_pages):
@@ -190,7 +219,9 @@ def stitch_md_pages(md_pages):
     ]
 
     rcp_model = CONFIG["RCP_BASE_MODEL"]
-    md_text = send_llm_request(rcp_model, messages, name="stitch-markdown-pages").strip()
+    md_text = send_llm_request(rcp_model, messages, name="stitch-markdown-pages", enable_thinking=False)
+    if md_text is not None:
+        md_text = md_text.strip()
 
     return md_text
 
@@ -228,14 +259,17 @@ def best_overlap_concat(a: str, b: str, min_ratio: float = 0.8):
 
 
 def batch_stitch_md_pages(md_pages):
+    print("batch_stitch_md_pages")
     batch_n_pages = 10
-    overlap = 3
+    overlap = 2
 
     md_text = ""
     for i in range(0, len(md_pages), batch_n_pages - overlap):
+        print(f"stitch_md_pages start from page {i} to {(i + batch_n_pages)}")
         chunk_md_text = stitch_md_pages(md_pages[i : i + batch_n_pages])
-        md_text = best_overlap_concat(md_text, chunk_md_text)
-
+        if chunk_md_text is not None:
+            md_text = best_overlap_concat(md_text, chunk_md_text)
+        print(f"stitch_md_pages end from page {i} to {(i + batch_n_pages)}")
     return md_text
 
 
@@ -251,12 +285,18 @@ def convert_pdf_to_md(pdf_path, md_path):
     pil_pages = [downscale_if_needed(pil_page) for pil_page in pil_pages]
 
     ################################################################
-    # Page images to page Markdown (in parallel threads)           #
+    # Page images to page Markdown (bounded concurrency)           #
     ################################################################
+
+    max_concurrent_pages = 20
 
     # Parse PDF pages to Markdown individually
     async def run_all(pil_pages):
-        tasks = [asyncio.to_thread(convert_page_pdf_to_md, pil_page) for pil_page in pil_pages]
+        semaphore = asyncio.Semaphore(max_concurrent_pages)
+        tasks = []
+        for page_number, pil_page in enumerate(pil_pages, start=1):
+            tasks.append(convert_page_pdf_to_md(pil_page, semaphore, page_number))
+
         return await asyncio.gather(*tasks)
 
     md_pages = asyncio.run(run_all(pil_pages))
@@ -265,8 +305,9 @@ def convert_pdf_to_md(pdf_path, md_path):
     # Stitch page Markdown into one coherent Markdown              #
     ################################################################
 
+    print("before batch_stitch_md_pages")
     md_text = batch_stitch_md_pages(md_pages)
-
+    print("after batch_stitch_md_pages")
     ################################################################
     # Store result in file                                         #
     ################################################################

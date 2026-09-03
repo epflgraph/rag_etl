@@ -34,6 +34,7 @@ from rag_etl.courses.micro303 import MICRO303Course
 from rag_etl.courses.phys201a import PHYS201aCourse
 from rag_etl.courses.me326 import ME326Course
 from rag_etl.courses.math101e import MATH101eCourse
+from rag_etl.courses.bio695 import BIO695Course
 
 __all__ = [
     "BaseCourse",
@@ -71,4 +72,5 @@ __all__ = [
     "PHYS201aCourse",
     "ME326Course",
     "MATH101eCourse",
+    "BIO695Course",
 ]

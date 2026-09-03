@@ -6,6 +6,9 @@ from openai import OpenAI
 import rag_etl.utils.mime_types as mt
 
 from rag_etl.config import CONFIG
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 # Recommended params for each model and mode
@@ -42,11 +45,7 @@ LLM_PARAMS = {
 
 
 def send_llm_request(
-    model,
-    messages,
-    response_format=None,
-    name: str = "llm-request",
-    enable_thinking: bool = True,
+    model, messages, response_format=None, name: str = "llm-request", enable_thinking: bool = True, timeout: int = 600
 ):
     if response_format:
         response_format_schema = {
@@ -61,7 +60,7 @@ def send_llm_request(
         response_format_schema = None
 
     # Send request and trace it as a single generation
-    rcp_client = OpenAI(base_url=CONFIG["RCP_BASE_URL"], api_key=CONFIG["RCP_API_KEY"])
+    rcp_client = OpenAI(base_url=CONFIG["RCP_BASE_URL"], api_key=CONFIG["RCP_API_KEY"], timeout=timeout)
     langfuse = get_client()
     with langfuse.start_as_current_observation(
         as_type="generation",
@@ -76,12 +75,17 @@ def send_llm_request(
 
         params = LLM_PARAMS[(model, mode)]
 
-        response = rcp_client.chat.completions.create(
-            model=model,
-            messages=messages,
-            response_format=response_format_schema,
-            **params,
-        )
+        try:
+            response = rcp_client.chat.completions.create(
+                model=model,
+                messages=messages,
+                response_format=response_format_schema,
+                **params,
+            )
+        except Exception as e:
+            logger.warning(f"Failed to : {e}")
+            return None
+
         message = response.choices[0].message
         content = message.content.strip()
 

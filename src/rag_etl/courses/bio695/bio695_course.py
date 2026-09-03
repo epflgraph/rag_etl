@@ -5,16 +5,13 @@ from datetime import date
 import logging
 
 from rag_etl.courses import BaseCourse
-from rag_etl.extractors import BaseExtractor, MoodleExtractor
+from rag_etl.extractors import BaseExtractor, LocalFolderExtractor
 from rag_etl.transformers import (
     BaseTransformer,
     ExtractZipTransformer,
     JupyterToMarkdownTransformer,
     PDFToMarkdownTransformer,
     SplitExercisesTransformer,
-    ImageToMarkdownTransformer,
-    MergeSlideTranscriptTransformer,
-    VideoToFramesTransformer,
 )
 
 from rag_etl.loaders import BaseLoader, ContentMetadataLoader
@@ -24,25 +21,21 @@ import rag_etl.utils.mime_types as mt
 from rag_etl.config import CONFIG
 
 
-# ToDo: Add MOOC
-class MICRO303Course(BaseCourse):
+class BIO695Course(BaseCourse):
     """
-    Course-specific pipeline for MICRO303
+    Course-specific pipeline for BIO695
     """
 
     course_info = {
-        "course_title": "Microfabrication I",
-        "course_id": "MICRO303",
+        "course_title": "Image Processing for Life Science",
+        "course_id": "BIO695",
         "academic_course": "2026-2027",
         "semester": 1,
-        "admin_info_link": "https://moodle.epfl.ch/course/view.php?id=19283",
-        "coursebook_link": "https://edu.epfl.ch/coursebook/fr/microfabrication-i-MICRO-303",
-        "course_language": "en",
+        "admin_info_link": "",
+        "coursebook_link": "https://edu.epfl.ch/coursebook/en/image-processing-for-life-science-BIO-695",
     }
 
-    # [THEORY]
-    # [THEORY_SLIDES]
-    # [LAB_x] -> we use this tag for SLT
+    # [SERIE_x_SOLUTION] <- the solutions to these weekly series
     tag_metadata = {
         "THEORY": {
             "type": "theory",
@@ -60,37 +53,14 @@ class MICRO303Course(BaseCourse):
             "pdf_to_markdown": True,
             "split_exercises": False,
         },
-        "LAB": {
+        "SERIE_SOLUTION": {
             "type": "practice",
-            "subtype": "lab",
+            "subtype": "serie",
             "one_chunk_per_page": False,
             "one_chunk_per_doc": True,
             "pdf_to_markdown": True,
-            "split_exercises": True,
-        },
-        "MOOC_QUIZ": {
-            "type": "practice",
-            "subtype": "mooc_quiz",
-            "one_chunk_per_page": False,
-            "one_chunk_per_doc": True,
-            "pdf_to_markdown": False,
             "split_exercises": False,
-            "is_video": False,
-            "is_gemini_processed_video": False,
-            "processing_method": None,
-            "model": None,
-        },
-        "MOOC_VIDEO": {
-            "type": "theory",
-            "subtype": "mooc_video",
-            "one_chunk_per_page": False,
-            "one_chunk_per_doc": True,
-            "pdf_to_markdown": False,
-            "split_exercises": False,
-            "is_video": True,
-            "is_gemini_processed_video": False,
-            "processing_method": None,
-            "model": None,
+            "is_solution": True,
         },
     }
 
@@ -102,13 +72,13 @@ class MICRO303Course(BaseCourse):
 
     ################################################################
 
-    mooc_base_path = f"{course_path}/mooc"
+    moodle_course_id = 14288
+
+    moodle_base_path = f"{course_path}/moodle"
 
     mime_types = mt.DEFAULT_MIME_TYPES
 
-    moodle_course_id = 19283
-
-    moodle_base_path = f"{course_path}/moodle"
+    local_folder_base_path = f"{course_path}/local"
 
     ################################################################
 
@@ -131,27 +101,11 @@ class MICRO303Course(BaseCourse):
     @property
     def extractors(self) -> list[BaseExtractor]:
         return [
-            MoodleExtractor(
-                moodle_course_id=self.moodle_course_id,
-                moodle_base_path=self.moodle_base_path,
+            LocalFolderExtractor(
+                folder_base_path=self.local_folder_base_path,
                 tag_metadata=self.tag_metadata,
-                mime_types=(mt.DEFAULT_MIME_TYPES),
+                mime_types=self.mime_types,
             ),
-            # EdDiscussionExtractor(
-            #     ed_discussion_base_path=self.course_path,
-            #     tags=self.tag_metadata.keys(),
-            #     tag_metadata=self.tag_metadata,
-            #     mime_types=self.mime_types,
-            #     academic_year="2025-2026",
-            #     categories=[
-            #         "theory",
-            #         "practice",
-            #         "exam",
-            #     ],
-            #     language=self.course_info["course_language"],
-            #     semester=self.course_info["semester"],
-            #     include_student_endorsed=True,
-            # ),
         ]
 
     @property
@@ -161,12 +115,6 @@ class MICRO303Course(BaseCourse):
             JupyterToMarkdownTransformer(cache=self.course_code),
             PDFToMarkdownTransformer(type_subtypes=self.pdf_to_markdown_type_subtypes, cache=self.course_code),
             SplitExercisesTransformer(type_subtypes=self.split_exercises_type_subtypes, cache=self.course_code),
-            VideoToFramesTransformer(
-                cache=self.course_code,
-                language=self.course_info["course_language"],
-            ),
-            ImageToMarkdownTransformer(cache=self.course_code),
-            MergeSlideTranscriptTransformer(cache=self.course_code),
         ]
 
     @property
@@ -183,5 +131,5 @@ if __name__ == "__main__":
         handlers=[logging.StreamHandler(sys.stdout)],
     )
 
-    course = BaseCourse.from_code("MICRO303")
+    course = BaseCourse.from_code("BIO695")
     course.run()

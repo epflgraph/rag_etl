@@ -1,5 +1,5 @@
-from rag_etl.courses.phys201a.phys201a_course import PHYS201aCourse
+from rag_etl.courses.bio695.bio695_course import BIO695Course
 
 __all__ = [
-    "PHYS201aCourse",
+    "BIO695Course",
 ]

@@ -35,7 +35,7 @@ class VideoToFramesTransformer(BaseTransformer):
     def __init__(
         self,
         type_subtypes=None,
-        min_slide_seconds: int = 50,
+        min_slide_seconds: int = 40,
         frame_offset_seconds: int = 5,
         language: str | None = None,
         mediaspace_url: str | None = None,

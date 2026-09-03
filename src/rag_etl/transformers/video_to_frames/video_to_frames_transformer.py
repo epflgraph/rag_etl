@@ -10,7 +10,7 @@ from rag_etl.transformers.video_to_frames.utils import (
     filter_close_timestamps,
     frame_time,
 )
-from rag_etl.utils.graphai import detect_slides, get_access_token, retrieve_video
+from rag_etl.utils.graphai import GraphAIError, detect_slides, get_access_token, retrieve_video
 from rag_etl.utils.kaltura import build_entry_url, create_kaltura_session, find_slides_entry_id, get_video_download_url
 import rag_etl.utils.mime_types as mt
 
@@ -165,9 +165,13 @@ class VideoToFramesTransformer(BaseTransformer):
                     continue
 
                 logger.info(f"Detecting slides in {resource.title} (entry {slides_entry_id})")
-                timestamps = self.slide_detected_timestamps(video_url)
-                if timestamps is None:
-                    logger.warning(f"Entry {slides_entry_id}: Slide detection = None ")
+
+                # The service being unreachable, or failing on one video, costs
+                # that video rather than the whole course
+                try:
+                    timestamps = self.slide_detected_timestamps(video_url)
+                except GraphAIError as error:
+                    logger.warning(f"Dropping {resource.title}: {error}")
                     continue
 
                 logger.info(f"Entry {slides_entry_id}: {len(timestamps)} slide changes detected")

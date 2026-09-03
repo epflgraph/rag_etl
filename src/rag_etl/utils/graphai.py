@@ -15,10 +15,41 @@ MAX_WAIT_SECONDS = 3600
 REQUEST_TIMEOUT = 120
 
 
+class GraphAIError(Exception):
+    """
+    Raised when GraphAI cannot be reached, answers with an error, or cannot do
+    what was asked of it.
+
+    Callers get one thing to catch, and do not have to know that the service is
+    reached over HTTP.
+    """
+
+
+def request_json(method: str, url: str, headers: dict[str, str], **kwargs) -> dict:
+    """
+    Send one request to GraphAI and return its decoded body.
+
+    Every way the call can fail is reported as GraphAIError: the host being
+    unreachable, a timeout, an error status, or a body that is not JSON.
+    """
+
+    try:
+        response = requests.request(method, url, headers=headers, timeout=REQUEST_TIMEOUT, **kwargs)
+        response.raise_for_status()
+    except requests.RequestException as error:
+        raise GraphAIError(f"{method} {url} failed: {error}") from error
+
+    try:
+        return response.json()
+    except ValueError as error:
+        raise GraphAIError(f"{method} {url} answered with a body that is not JSON") from error
+
+
 def get_access_token() -> str:
     """Log in to GraphAI and return a bearer token."""
 
-    response = requests.post(
+    payload = request_json(
+        "POST",
         f"{CONFIG['GRAPH_AI_URL']}/token",
         headers={"accept": "application/json", "Content-Type": "application/x-www-form-urlencoded"},
         data={
@@ -29,11 +60,13 @@ def get_access_token() -> str:
             "client_id": "",
             "client_secret": "",
         },
-        timeout=REQUEST_TIMEOUT,
     )
-    response.raise_for_status()
 
-    return response.json()["access_token"]
+    access_token = payload.get("access_token")
+    if not access_token:
+        raise GraphAIError(f"GraphAI did not return an access token: {payload}")
+
+    return access_token
 
 
 def json_headers(token: str) -> dict[str, str]:
@@ -55,13 +88,7 @@ def poll_task(endpoint: str, task_id: str, token: str) -> dict:
     deadline = time.time() + MAX_WAIT_SECONDS
 
     while time.time() < deadline:
-        response = requests.get(
-            f"{CONFIG['GRAPH_AI_URL']}/{endpoint}/status/{task_id}",
-            headers=headers,
-            timeout=REQUEST_TIMEOUT,
-        )
-        response.raise_for_status()
-        payload = response.json()
+        payload = request_json("GET", f"{CONFIG['GRAPH_AI_URL']}/{endpoint}/status/{task_id}", headers=headers)
 
         if payload["task_status"] != "PENDING":
             return payload
@@ -69,28 +96,25 @@ def poll_task(endpoint: str, task_id: str, token: str) -> dict:
         logger.debug(f"{endpoint}: still working")
         time.sleep(POLL_SECONDS)
 
-    raise TimeoutError(f"{endpoint} did not finish within {MAX_WAIT_SECONDS}s")
+    raise GraphAIError(f"{endpoint} did not finish within {MAX_WAIT_SECONDS}s")
 
 
 def retrieve_video(video_url: str, token: str) -> str:
     """Ask GraphAI to fetch the video, and return the token identifying it."""
 
-    response = requests.post(
+    response = request_json(
+        "POST",
         f"{CONFIG['GRAPH_AI_URL']}/video/retrieve_url",
         headers=json_headers(token),
         json={"url": video_url, "force": False, "playlist": False},
-        timeout=REQUEST_TIMEOUT,
     )
-    response.raise_for_status()
 
-    payload = poll_task("video/retrieve_url", response.json()["task_id"], token)
+    payload = poll_task("video/retrieve_url", response["task_id"], token)
     result = payload.get("task_result") or {}
 
     video_token = result.get("token")
     if not video_token:
-        logger.warning(f"GraphAI could not retrieve {video_url}: {payload}")
-        return None
-        # raise RuntimeError(f"GraphAI could not retrieve {video_url}: {payload}")
+        raise GraphAIError(f"GraphAI could not retrieve {video_url}: {payload}")
 
     return video_token
 
@@ -105,21 +129,18 @@ def detect_slides(video_token: str, token: str, language: str | None = None) -> 
     treat the last value as a bound.
     """
 
-    response = requests.post(
+    response = request_json(
+        "POST",
         f"{CONFIG['GRAPH_AI_URL']}/video/detect_slides",
         headers=json_headers(token),
         json={"token": video_token, "force_non_self": True, "force": False, "language": language or "en"},
-        timeout=REQUEST_TIMEOUT,
     )
-    response.raise_for_status()
 
-    payload = poll_task("video/detect_slides", response.json()["task_id"], token)
+    payload = poll_task("video/detect_slides", response["task_id"], token)
     result = payload.get("task_result") or {}
 
     if not result.get("successful"):
-        logger.warning(f"Slide detection failed for {video_token}: {payload}")
-        return None
-        # raise RuntimeError(f"Slide detection failed for {video_token}: {payload}")
+        raise GraphAIError(f"Slide detection failed for {video_token}: {payload}")
 
     timestamps = []
     for slide in (result.get("slide_tokens") or {}).values():

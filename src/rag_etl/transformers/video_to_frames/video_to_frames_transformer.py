@@ -52,11 +52,13 @@ class VideoToFramesTransformer(BaseTransformer):
         # a page a student can open, so it cannot serve as the base.
         self.mediaspace_url = mediaspace_url
 
-    def slide_detected_timestamps(self, video_url: str) -> list[int]:
+    def slide_detected_timestamps(self, video_url: str) -> list[int] | None:
         """Return the slide change timestamps GraphAI reports for a video."""
 
         token = get_access_token()
         video_token = retrieve_video(video_url, token)
+        if video_token is None:
+            return None
 
         return detect_slides(video_token, token, self.language)
 
@@ -164,6 +166,10 @@ class VideoToFramesTransformer(BaseTransformer):
 
                 logger.info(f"Detecting slides in {resource.title} (entry {slides_entry_id})")
                 timestamps = self.slide_detected_timestamps(video_url)
+                if timestamps is None:
+                    logger.warning(f"Entry {slides_entry_id}: Slide detection = None ")
+                    continue
+
                 logger.info(f"Entry {slides_entry_id}: {len(timestamps)} slide changes detected")
 
                 # Filter out close in time timestamps

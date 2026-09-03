@@ -2,7 +2,7 @@ from datetime import date
 
 import logging
 from rag_etl.courses import BaseCourse
-from rag_etl.extractors import BaseExtractor, MediaspaceExtractor
+from rag_etl.extractors import BaseExtractor, MediaspaceExtractor, MOOCExtractor, MoodleExtractor
 from rag_etl.transformers import (
     BaseTransformer,
     PDFToMarkdownTransformer,
@@ -128,9 +128,30 @@ class CS119dCourse(BaseCourse):
             "split_exercises": True,
             "is_solution": True,
         },
-        "MOOC_ASSIGNMENT": {
+        ############## MOOC ##############
+        "MOOC_THEORY": {  # just in case
+            "type": "theory",
+            "subtype": "mooc_theory",
+            "one_chunk_per_page": False,
+            "one_chunk_per_doc": True,
+            "pdf_to_markdown": True,
+            "split_exercises": False,
+        },
+        "MOOC_TUTORIEL": {
             "type": "practice",
-            "subtype": "assignment",
+            "subtype": "mooc_tutoriel",
+            "one_chunk_per_page": False,
+            "one_chunk_per_doc": True,
+            "pdf_to_markdown": True,
+            "split_exercises": False,
+            "is_video": False,
+            "is_gemini_processed_video": False,
+            "processing_method": None,
+            "model": None,
+        },
+        "MOOC_EXERCICE": {
+            "type": "practice",
+            "subtype": "mooc_exercice",
             "one_chunk_per_page": False,
             "one_chunk_per_doc": True,
             "pdf_to_markdown": True,
@@ -140,9 +161,34 @@ class CS119dCourse(BaseCourse):
             "processing_method": None,
             "model": None,
         },
-        "MOOC_TUTORIAL_SOLUTION": {
+        "MOOC_EXERCICE_SOLUTION": {
             "type": "practice",
-            "subtype": "tutorial",
+            "subtype": "mooc_exercice",
+            "one_chunk_per_page": False,
+            "one_chunk_per_doc": True,
+            "pdf_to_markdown": True,
+            "split_exercises": True,
+            "is_video": False,
+            "is_gemini_processed_video": False,
+            "processing_method": None,
+            "model": None,
+            "is_solution": True,
+        },
+        "MOOC_EXERCICE_FACULTATIF": {
+            "type": "practice",
+            "subtype": "mooc_exercice_facultatif",
+            "one_chunk_per_page": False,
+            "one_chunk_per_doc": True,
+            "pdf_to_markdown": True,
+            "split_exercises": False,
+            "is_video": False,
+            "is_gemini_processed_video": False,
+            "processing_method": None,
+            "model": None,
+        },
+        "MOOC_EXERCICE_FACULTATIF_SOLUTION": {
+            "type": "practice",
+            "subtype": "mooc_exercice_facultatif",
             "one_chunk_per_page": False,
             "one_chunk_per_doc": True,
             "pdf_to_markdown": True,
@@ -153,23 +199,11 @@ class CS119dCourse(BaseCourse):
             "model": None,
             "is_solution": True,
         },
-        "MOOC_LECTURE_NOTES": {
-            "type": "theory",
-            "subtype": "lecture_notes",
+        "MOOC_DEVOIR": {
+            "type": "practice",
+            "subtype": "mooc_devoir",
             "one_chunk_per_page": False,
-            "one_chunk_per_doc": False,
-            "pdf_to_markdown": True,
-            "split_exercises": False,
-            "is_video": False,
-            "is_gemini_processed_video": False,
-            "processing_method": None,
-            "model": None,
-        },
-        "MOOC_RECOMMENDED_READING": {
-            "type": "theory",
-            "subtype": "recommended_reading",
-            "one_chunk_per_page": False,
-            "one_chunk_per_doc": False,
+            "one_chunk_per_doc": True,
             "pdf_to_markdown": True,
             "split_exercises": False,
             "is_video": False,
@@ -179,7 +213,7 @@ class CS119dCourse(BaseCourse):
         },
         "MOOC_QUIZ": {
             "type": "practice",
-            "subtype": "quiz",
+            "subtype": "mooc_quiz",
             "one_chunk_per_page": False,
             "one_chunk_per_doc": True,
             "pdf_to_markdown": False,
@@ -188,31 +222,6 @@ class CS119dCourse(BaseCourse):
             "is_gemini_processed_video": False,
             "processing_method": None,
             "model": None,
-        },
-        "MOOC_EXERCISES": {
-            "type": "practice",
-            "subtype": "exercises",
-            "one_chunk_per_page": False,
-            "one_chunk_per_doc": True,
-            "pdf_to_markdown": True,
-            "split_exercises": True,
-            "is_video": False,
-            "is_gemini_processed_video": False,
-            "processing_method": None,
-            "model": None,
-        },
-        "MOOC_EXERCISES_SOLUTION": {
-            "type": "practice",
-            "subtype": "exercises",
-            "one_chunk_per_page": False,
-            "one_chunk_per_doc": True,
-            "pdf_to_markdown": True,
-            "split_exercises": True,
-            "is_video": False,
-            "is_gemini_processed_video": False,
-            "processing_method": None,
-            "model": None,
-            "is_solution": True,
         },
         "MOOC_VIDEO": {
             "type": "theory",
@@ -281,18 +290,18 @@ class CS119dCourse(BaseCourse):
     def extractors(self) -> list[BaseExtractor]:
         """Single MOOC extractor."""
         return [
-            # MOOCExtractor(
-            #     mooc_base_path=self.mooc_base_path,
-            #     tag_metadata=self.tag_metadata,
-            #     mime_types=(self.mime_types + [mt.MP4, mt.JSON]),
-            #     language=self.course_info["course_language"],
-            # ),
-            # MoodleExtractor(
-            #     moodle_course_id=self.moodle_course_id,
-            #     moodle_base_path=self.moodle_base_path,
-            #     tag_metadata=self.tag_metadata,
-            #     mime_types=self.mime_types,
-            # ),
+            MOOCExtractor(
+                mooc_base_path=self.mooc_base_path,
+                tag_metadata=self.tag_metadata,
+                mime_types=(self.mime_types + [mt.MP4, mt.JSON]),
+                language=self.course_info["course_language"],
+            ),
+            MoodleExtractor(
+                moodle_course_id=self.moodle_course_id,
+                moodle_base_path=self.moodle_base_path,
+                tag_metadata=self.tag_metadata,
+                mime_types=self.mime_types,
+            ),
             MediaspaceExtractor(
                 playlist_or_channel_url=self.mediaspace_playlist_or_channel_url,
                 mediaspace_base_path=self.mediaspace_base_path,

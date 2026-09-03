@@ -5,7 +5,7 @@ from datetime import date
 import logging
 
 from rag_etl.courses import BaseCourse
-from rag_etl.extractors import BaseExtractor, MoodleExtractor
+from rag_etl.extractors import BaseExtractor, MoodleExtractor, MOOCExtractor
 from rag_etl.transformers import (
     BaseTransformer,
     ExtractZipTransformer,
@@ -66,7 +66,7 @@ class MICRO303Course(BaseCourse):
             "one_chunk_per_page": False,
             "one_chunk_per_doc": True,
             "pdf_to_markdown": True,
-            "split_exercises": True,
+            "split_exercises": False,
         },
         "MOOC_QUIZ": {
             "type": "practice",
@@ -136,6 +136,12 @@ class MICRO303Course(BaseCourse):
                 moodle_base_path=self.moodle_base_path,
                 tag_metadata=self.tag_metadata,
                 mime_types=(mt.DEFAULT_MIME_TYPES),
+            ),
+            MOOCExtractor(
+                mooc_base_path=self.mooc_base_path,
+                tag_metadata=self.tag_metadata,
+                mime_types=(self.mime_types + [mt.MP4, mt.JSON]),
+                language=self.course_info["course_language"],
             ),
             # EdDiscussionExtractor(
             #     ed_discussion_base_path=self.course_path,

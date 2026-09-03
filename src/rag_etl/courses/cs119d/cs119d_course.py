@@ -252,8 +252,8 @@ class CS119dCourse(BaseCourse):
 
     mediaspace_playlist_or_channel_url = "https://mediaspace.epfl.ch/channel/CS-119%2528d%2529%2BInformation_%2Bcalcul_%2Bcommunication%2B%2528SMA%2B%2526%2BSPH%2529/30888"
 
-    # Only keep recordings of this course edition
-    mediaspace_created_after = semester_start_date
+    # They want all videos in the channel
+    mediaspace_created_after = date(year=2020, month=8, day=1)
 
     mediaspace_base_path = f"{course_path}/mediaspace"
 

@@ -289,7 +289,7 @@ def convert_pdf_to_md(pdf_path, md_path):
     # Page images to page Markdown (bounded concurrency)           #
     ################################################################
 
-    max_concurrent_pages = 10
+    max_concurrent_pages = 20
 
     # Parse PDF pages to Markdown individually
     async def run_all(pil_pages):

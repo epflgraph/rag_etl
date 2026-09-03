@@ -87,7 +87,7 @@ class PHYS201aCourse(BaseCourse):
         },
         "EXAM": {
             "type": "exam",
-            "subtype": "previous_year_exam",
+            "subtype": "exam",
             "one_chunk_per_page": False,
             "one_chunk_per_doc": True,
             "pdf_to_markdown": True,
@@ -95,7 +95,7 @@ class PHYS201aCourse(BaseCourse):
         },
         "EXAM_SOLUTION": {
             "type": "exam",
-            "subtype": "previous_year_exam",
+            "subtype": "exam",
             "one_chunk_per_page": False,
             "one_chunk_per_doc": True,
             "pdf_to_markdown": True,

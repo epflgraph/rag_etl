@@ -6,6 +6,7 @@ import re
 from typing import List
 from pydantic import BaseModel, Field
 
+from rag_etl.utils.encoding import sanitize_for_filename
 from rag_etl.utils.llms import send_llm_request
 
 from rag_etl.config import CONFIG
@@ -540,5 +541,8 @@ you should output
     # Store exercises as individual Markdown files
     exercises_path.mkdir(parents=True, exist_ok=True)
     for number, is_solution in all_snippets:
-        exercise_path = exercises_path / f"{number}.md"
+        # The number comes from the model, which sometimes answers with a whole
+        # heading rather than a digit, and a heading can hold a slash or a dot
+        # that the filesystem would read as a path instead of a name
+        exercise_path = exercises_path / f"{sanitize_for_filename(number)}.md"
         exercise_path.write_text(all_snippets[(number, is_solution)], encoding="utf-8")

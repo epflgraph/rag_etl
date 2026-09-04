@@ -3,7 +3,7 @@ from pathlib import Path
 
 import re
 
-from typing import List
+from urllib.parse import quote
 from pydantic import BaseModel, Field
 
 from rag_etl.utils.encoding import sanitize_for_filename
@@ -17,7 +17,7 @@ def split_by_most_common_heading(md_text: str):
     matches = heading_pattern.findall(md_text)
 
     if not matches:
-        logging.warning(f"No headings found in Markdown code. Trying without splitting...")
+        logging.warning("No headings found in Markdown code. Trying without splitting...")
         return [md_text]
 
     # Count heading levels
@@ -468,7 +468,7 @@ you should output
         )
 
     class ExerciseList(BaseModel):
-        exercises: List[Exercise]
+        exercises: list[Exercise]
 
     # Read Markdown file to be split
     md_text = md_path.read_text(encoding="utf-8")
@@ -546,3 +546,19 @@ you should output
         # that the filesystem would read as a path instead of a name
         exercise_path = exercises_path / f"{sanitize_for_filename(number)}.md"
         exercise_path.write_text(all_snippets[(number, is_solution)], encoding="utf-8")
+
+
+def url_with_exercise(url: str | None, number: str) -> str | None:
+    """
+    It appends a #n to the URL to make it different
+
+    To test the issue in the pipeline, that neglects docs with the same URL.
+    """
+
+    if not url:
+        return None
+
+    # Avoid empty spaces
+    exercise_url = f"{url}#{quote(number, safe='')}"
+
+    return exercise_url

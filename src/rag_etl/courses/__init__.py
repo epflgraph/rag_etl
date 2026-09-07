@@ -32,6 +32,7 @@ from rag_etl.courses.cs550 import CS550Course
 from rag_etl.courses.math111a import MATH111aCourse
 from rag_etl.courses.micro303 import MICRO303Course
 from rag_etl.courses.micro452 import MICRO452Course
+from rag_etl.courses.micro452_case_studies import MICRO452CaseStudiesCourse
 from rag_etl.courses.phys201a import PHYS201aCourse
 from rag_etl.courses.me326 import ME326Course
 from rag_etl.courses.math101e import MATH101eCourse
@@ -71,6 +72,7 @@ __all__ = [
     "MATH111aCourse",
     "MICRO303Course",
     "MICRO452Course",
+    "MICRO452CaseStudiesCourse",
     "PHYS201aCourse",
     "ME326Course",
     "MATH101eCourse",

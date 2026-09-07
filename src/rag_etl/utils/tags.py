@@ -18,7 +18,11 @@ def split_tag_text(text):
 
 def split_tag_number_text(text):
     """
-    Extract tag and number from text (e.g. for "[SERIE_3] Serie 3" returns ("SERIE", "3", "Serie 3")).
+    Extract tag and number from text.
+
+    Examples:
+        "[SERIE_3] Serie 3" -> ("SERIE", "3", "Serie 3")
+        "[CASE_STUDY_L3C2] Case study L3C2" -> ("CASE_STUDY", "L3C2", "Case study L3C2")
     """
 
     tag, text = split_tag_text(text)
@@ -27,8 +31,9 @@ def split_tag_number_text(text):
     if tag is None:
         return (None, None, text)
 
-    # Try to extract number from tag
-    match = re.search(r"_(\d+)(?:_|$)", tag)
+    # Try to extract number from tag. Supports integer numbering ("_3") and
+    # lecture/case numbering ("_L3C2") used for case studies.
+    match = re.search(r"_((?:\d+)|(?:L\d+C\d+))(?:_|$)", tag)
 
     # If no number, return only tag
     if not match:

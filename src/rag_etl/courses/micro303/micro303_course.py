@@ -5,7 +5,7 @@ from datetime import date
 import logging
 
 from rag_etl.courses import BaseCourse
-from rag_etl.extractors import BaseExtractor, MoodleExtractor, MOOCExtractor
+from rag_etl.extractors import BaseExtractor, MoodleExtractor, MOOCExtractor, LocalFolderExtractor
 from rag_etl.transformers import (
     BaseTransformer,
     ExtractZipTransformer,
@@ -110,6 +110,8 @@ class MICRO303Course(BaseCourse):
 
     moodle_base_path = f"{course_path}/moodle"
 
+    local_folder_base_path = f"{course_path}/local"
+
     ################################################################
 
     @property
@@ -142,6 +144,11 @@ class MICRO303Course(BaseCourse):
                 tag_metadata=self.tag_metadata,
                 mime_types=(self.mime_types + [mt.MP4, mt.JSON]),
                 language=self.course_info["course_language"],
+            ),
+            LocalFolderExtractor(
+                folder_base_path=self.local_folder_base_path,
+                tag_metadata=self.tag_metadata,
+                mime_types=self.mime_types,
             ),
             # EdDiscussionExtractor(
             #     ed_discussion_base_path=self.course_path,

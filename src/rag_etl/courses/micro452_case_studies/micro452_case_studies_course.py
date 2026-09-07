@@ -50,6 +50,14 @@ class MICRO452CaseStudiesCourse(BaseCourse):
             "pdf_to_markdown": True,
             "split_exercises": False,
         },
+        "THEORY_SLIDES": {
+            "type": "theory",
+            "subtype": "theory",
+            "one_chunk_per_page": True,
+            "one_chunk_per_doc": False,
+            "pdf_to_markdown": True,
+            "split_exercises": False,
+        },
         "CASE_STUDY": {
             "type": "practice",
             "subtype": "case_study",

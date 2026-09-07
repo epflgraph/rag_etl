@@ -52,7 +52,7 @@ class MICRO452CaseStudiesCourse(BaseCourse):
         },
         "THEORY_SLIDES": {
             "type": "theory",
-            "subtype": "theory",
+            "subtype": "theory_slides",
             "one_chunk_per_page": True,
             "one_chunk_per_doc": False,
             "pdf_to_markdown": True,

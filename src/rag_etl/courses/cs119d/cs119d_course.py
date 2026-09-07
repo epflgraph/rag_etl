@@ -77,17 +77,18 @@ class CS119dCourse(BaseCourse):
             "split_exercises": True,
             "is_solution": True,
         },
-        "CASE_STUDY": {  # just in case
+        "CASE_STUDY_P_SOLUTION": {
             "type": "practice",
-            "subtype": "case_study",
+            "subtype": "case_study_prog",
             "one_chunk_per_page": False,
             "one_chunk_per_doc": True,
             "pdf_to_markdown": True,
             "split_exercises": True,
+            "is_solution": True,
         },
-        "CASE_STUDY_SOLUTION": {
+        "CASE_STUDY_T_SOLUTION": {
             "type": "practice",
-            "subtype": "case_study",
+            "subtype": "case_study_theory",
             "one_chunk_per_page": False,
             "one_chunk_per_doc": True,
             "pdf_to_markdown": True,

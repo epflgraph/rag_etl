@@ -2,13 +2,18 @@ import logging
 from pathlib import Path
 from rag_etl.extractors.mooc.chapter_parser import ChapterParser
 from rag_etl.resources.mooc_resource import MOOCResource
-from rag_etl.extractors.mooc.utils import cmp_key
+from rag_etl.extractors.mooc.utils import UntaggedDocuments, cmp_key
 import os
 import json
+import re
 import unicodedata
 
 
 logger = logging.getLogger(__name__)
+
+# The part of an edX asset link that is the same for every asset of a course,
+# as in "https://courses.edx.org/asset-v1:EPFLx+init-prog-cpp+1T2025+type@asset+"
+ASSET_BASE_URL = re.compile(r"https://[^\"\']*?type@asset\+")
 
 
 class CourseParser:
@@ -32,16 +37,47 @@ class CourseParser:
 
         return m
 
+    def load_asset_base_url(self, course_path: str) -> str | None:
+        """
+        Return the prefix an asset of this course is published under, or None.
+
+        The export's own course key is not usable: course.xml and assets.json
+        are rewritten on re-export and name a course that does not exist
+        publicly. The absolute links the authors wrote into the pages do name
+        the published run, so the prefix is read back from those.
+        """
+
+        found: dict[str, int] = {}
+        for html_path in (Path(course_path) / "html").glob("*.html"):
+            for match in ASSET_BASE_URL.findall(html_path.read_text(encoding="utf-8")):
+                found[match] = found.get(match, 0) + 1
+
+        if not found:
+            logger.warning(f"No absolute asset link in {course_path}, so linked files will carry no url")
+            return None
+
+        # One course publishes its assets under one prefix, so the most common
+        # is the right one even if a stale link survives somewhere
+        base_url = max(found, key=found.get)
+        logger.info(f"Asset base url: {base_url}")
+
+        return base_url
+
     def parse(
         self,
         course_path: str,
         tag_metadata: dict | None = None,
         language: str | None = None,
+        untagged_documents: UntaggedDocuments | None = None,
+        asset_base_url: str | None = None,
     ) -> list[MOOCResource]:
         """Parse a MOOC course"""
 
         # Load policies/assets.json with url_name to path mapping
         assets_map: dict[str, str] = self.load_assets_map(course_path)
+        # A stated prefix wins over one read back from the pages
+        if not asset_base_url:
+            asset_base_url = self.load_asset_base_url(course_path)
 
         items: list[MOOCResource] = []
 
@@ -55,6 +91,8 @@ class CourseParser:
                     course_path=course_path,
                     chapter_filename=chapter_filename,
                     assets_map=assets_map,
+                    asset_base_url=asset_base_url,
+                    untagged_documents=untagged_documents,
                     tag_metadata=tag_metadata,
                     language=language,
                 )

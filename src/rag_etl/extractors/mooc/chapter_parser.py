@@ -2,6 +2,7 @@ import logging
 from pathlib import Path
 
 from rag_etl.extractors.mooc.sequential_parser import SequentialParser
+from rag_etl.extractors.mooc.utils import UntaggedDocuments
 from rag_etl.resources.mooc_resource import MOOCResource
 from rag_etl.extractors.mooc.utils import load_root_elem_from_mooc_xml
 
@@ -18,6 +19,8 @@ class ChapterParser:
         course_path: str,
         chapter_filename: str,
         assets_map: dict[str, str],
+        asset_base_url: str | None = None,
+        untagged_documents: UntaggedDocuments | None = None,
         tag_metadata: dict | None = None,
         language: str | None = None,
     ) -> list[MOOCResource]:
@@ -44,6 +47,8 @@ class ChapterParser:
                     tag_metadata=tag_metadata,
                     language=language,
                     assets_map=assets_map,
+                    asset_base_url=asset_base_url,
+                    untagged_documents=untagged_documents,
                 )
             )
 

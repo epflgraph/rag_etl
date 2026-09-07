@@ -53,9 +53,9 @@ class BIO695Course(BaseCourse):
             "pdf_to_markdown": True,
             "split_exercises": False,
         },
-        "SERIE_SOLUTION": {
+        "QUIZ_SOLUTION": {
             "type": "practice",
-            "subtype": "serie",
+            "subtype": "quiz",
             "one_chunk_per_page": False,
             "one_chunk_per_doc": True,
             "pdf_to_markdown": True,

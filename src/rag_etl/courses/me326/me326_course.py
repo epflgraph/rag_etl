@@ -163,6 +163,13 @@ class ME326Course(BaseCourse):
                 mooc_base_path=self.mooc_base_path,
                 tag_metadata=self.tag_metadata,
                 mime_types=(self.mime_types + [mt.MP4, mt.JSON]),
+                # This MOOC tags nothing, so its readings and slide decks are
+                # picked up from the links themselves and told apart by looking
+                # at each PDF
+                include_untagged_documents=True,
+                course_url="https://courseware.epfl.ch/learning/course/course-v1:EPFL+controlsys+2017_T1/home",
+                theory_tag="THEORY",
+                theory_slides_tag="THEORY_SLIDES",
                 language=self.course_info["course_language"],
             ),
             MoodleExtractor(

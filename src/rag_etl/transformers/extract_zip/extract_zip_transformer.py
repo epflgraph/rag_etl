@@ -5,10 +5,12 @@ from pathlib import Path
 
 import logging
 
+import unicodedata
 import zipfile
 
 from rag_etl.transformers import BaseTransformer
 from rag_etl.resources import BaseResource
+from rag_etl.utils.encoding import ensure_utf8, zip_entry_filename
 
 import rag_etl.utils.mime_types as mt
 
@@ -26,11 +28,20 @@ def unzip_file(zip_path):
 
     zip_path = Path(zip_path)
 
-    extract_dir = zip_path.with_suffix("")
+    # The folder is named after the archive, composed, so that every path under
+    # it spells its accents the one way whatever form the archive itself carries
+    extract_dir = zip_path.with_suffix("").with_name(unicodedata.normalize("NFC", zip_path.with_suffix("").name))
     extract_dir.mkdir(parents=True, exist_ok=True)
 
     with zipfile.ZipFile(zip_path, "r") as zip_ref:
-        zip_ref.extractall(extract_dir)
+        entries = zip_ref.infolist()
+        for entry in entries:
+            entry.filename = zip_entry_filename(entry)
+
+        # The entries have to be handed over as objects: given names, extractall
+        # looks each one up in an index still keyed by the names they had before
+        # this, and raises for every one of them
+        zip_ref.extractall(extract_dir, members=entries)
 
     return extract_dir
 
@@ -88,6 +99,11 @@ class ExtractZipTransformer(BaseTransformer):
                 # Skip if mime type not in list
                 if mime_type not in self.mime_types:
                     continue
+
+                # An archive can hold text saved before UTF-8 was the norm, and
+                # a reader that assumes UTF-8 gets nothing at all out of it
+                if mime_type.startswith("text/"):
+                    ensure_utf8(extracted_file)
 
                 new_resource = resource.copy_with(
                     title=f"{resource.title} > {extracted_file.name}",

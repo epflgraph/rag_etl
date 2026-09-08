@@ -7,6 +7,7 @@ from rag_etl.extractors.mooc.html_parser import HtmlParser
 from rag_etl.extractors.mooc.quiz_parser import QuizParser
 from rag_etl.extractors.mooc.utils import load_root_elem_from_mooc_xml
 
+from rag_etl.extractors.mooc.utils import UntaggedDocuments
 from rag_etl.resources.mooc_resource import MOOCResource
 
 logger = logging.getLogger(__name__)
@@ -22,6 +23,8 @@ class VerticalParser:
         course_path: str,
         elem_vertical: _Element,
         assets_map: dict[str, str],
+        asset_base_url: str | None = None,
+        untagged_documents: UntaggedDocuments | None = None,
         tag_metadata: dict | None = None,
         language: str | None = None,
     ) -> list[MOOCResource]:
@@ -38,6 +41,11 @@ class VerticalParser:
 
         vertical_display_name = root_vertical.get("display_name", " ")
 
+        # A page that holds a video already has its slides indexed frame by
+        # frame, each linking to its own moment, so any document it also
+        # links is that same deck a second time
+        vertical_has_video = any(child.tag == "video" for child in root_vertical.iterchildren())
+
         items: list[MOOCResource] = []
         html_parser = HtmlParser()
         quiz_parser = QuizParser()
@@ -51,6 +59,9 @@ class VerticalParser:
                     elem_vertical=child,
                     vertical_display_name=vertical_display_name,
                     assets_map=assets_map,
+                    asset_base_url=asset_base_url,
+                    untagged_documents=untagged_documents,
+                    vertical_has_video=vertical_has_video,
                     tag_metadata=tag_metadata,
                 )
                 # Extend the returned list of resources

@@ -2,6 +2,7 @@ import logging
 from pathlib import Path
 from lxml.etree import _Element
 from rag_etl.extractors.mooc.vertical_parser import VerticalParser
+from rag_etl.extractors.mooc.utils import UntaggedDocuments
 from rag_etl.resources.mooc_resource import MOOCResource
 from rag_etl.extractors.mooc.utils import load_root_elem_from_mooc_xml
 
@@ -18,6 +19,8 @@ class SequentialParser:
         course_path: str,
         elem_sequential: _Element,
         assets_map: dict[str, str],
+        asset_base_url: str | None = None,
+        untagged_documents: UntaggedDocuments | None = None,
         tag_metadata: dict | None = None,
         language: str | None = None,
     ) -> list[MOOCResource]:
@@ -45,6 +48,8 @@ class SequentialParser:
                     course_path=course_path,
                     elem_vertical=elem_vertical,
                     assets_map=assets_map,
+                    asset_base_url=asset_base_url,
+                    untagged_documents=untagged_documents,
                     tag_metadata=tag_metadata,
                     language=language,
                 )

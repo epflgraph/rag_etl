@@ -1,5 +1,11 @@
+import logging
+from pathlib import Path
+
 import pathvalidate
 import unicodedata
+import zipfile
+
+logger = logging.getLogger(__name__)
 
 
 def sanitize_for_filename(text: str) -> str:
@@ -17,6 +23,76 @@ def sanitize_for_filename(text: str) -> str:
         raise ValueError(f"Text `{text}` is empty after sanitization")
 
     return sanitized_text
+
+
+# Bit 11 of an entry's flags: set when the archive states its names are UTF-8
+UTF8_FLAG = 0x800
+
+
+def zip_entry_filename(entry: zipfile.ZipInfo) -> str:
+    """
+    Return the name of an entry, readable and in one normal form.
+
+    An archive says whether its names are UTF-8 with a flag, and the ones
+    written on macOS do not set it. Reading those as the format's default
+    encoding turns every accent into a pair of box drawing characters, so a
+    name without the flag is decoded back to UTF-8 first.
+
+    The name is then composed, since macOS stores accents decomposed while the
+    rest of the tree writes them composed, and two spellings of one name look
+    like two different files to everything downstream.
+    """
+
+    name = entry.filename
+
+    utf8_flag = entry.flag_bits & UTF8_FLAG
+    if not utf8_flag:
+        try:
+            name = name.encode("cp437").decode("utf-8")
+        except UnicodeError:
+            # The name really was in the default encoding, so it stands
+            pass
+
+    return unicodedata.normalize("NFC", name)
+
+
+# Tried in turn on a file that is not UTF-8. The last one decodes any byte at
+# all, so a text file is never left unreadable
+FALLBACK_ENCODINGS = ("cp1252", "latin-1")
+
+
+def ensure_utf8(path: Path) -> bool:
+    """
+    Rewrite a text file as UTF-8 unless it already is, and say whether it was
+    rewritten.
+
+    Course material is written by many hands over many years, and some of it
+    predates UTF-8: an accent saved as a single byte reads as a broken
+    character, or stops a reader that expects UTF-8 from reading the file at
+    all. Everything handed on is UTF-8, so whoever reads it next does not have
+    to guess.
+    """
+
+    data = path.read_bytes()
+
+    try:
+        data.decode("utf-8")
+        return False
+    except UnicodeDecodeError:
+        pass
+
+    for encoding in FALLBACK_ENCODINGS:
+        try:
+            text = data.decode(encoding)
+        except UnicodeDecodeError:
+            continue
+
+        path.write_text(text, encoding="utf-8")
+        logger.info(f"Rewrote {path.name} as UTF-8, it was {encoding}")
+
+        return True
+
+    return False
 
 
 if __name__ == "__main__":

@@ -5,16 +5,13 @@ from datetime import date
 import logging
 
 from rag_etl.courses import BaseCourse
-from rag_etl.extractors import BaseExtractor, MoodleExtractor, MOOCExtractor, MediaspaceExtractor
+from rag_etl.extractors import BaseExtractor, MoodleExtractor, LocalFolderExtractor
 from rag_etl.transformers import (
     BaseTransformer,
     ExtractZipTransformer,
     JupyterToMarkdownTransformer,
     PDFToMarkdownTransformer,
     SplitExercisesTransformer,
-    ImageToMarkdownTransformer,
-    MergeSlideTranscriptTransformer,
-    VideoToFramesTransformer,
 )
 
 from rag_etl.loaders import BaseLoader, ContentMetadataLoader
@@ -24,28 +21,40 @@ import rag_etl.utils.mime_types as mt
 from rag_etl.config import CONFIG
 
 
-class ME326Course(BaseCourse):
+class CS200Course(BaseCourse):
     """
-    Course-specific pipeline for ME326
+    Course-specific pipeline for CS200
     """
 
     course_info = {
-        "course_title": "Automatique et commande numérique",
-        "course_id": "ME326",
+        "course_title": "",
+        "course_id": "CS200",
         "academic_course": "2026-2027",
         "semester": 1,
-        "admin_info_link": "https://moodle.epfl.ch/course/view.php?id=16347",
-        "coursebook_link": "https://edu.epfl.ch/coursebook/fr/automatique-et-commande-numerique-ME-326",
-        "course_language": "fr",
+        "admin_info_link": "",
+        "coursebook_link": "",
     }
 
-    # [THEORY_SLIDES]
-    # [SERIE_x]
-    # [SERIE_x_SOLUTION]
+    # [QUIZ_x] <- weekly slides with a quiz and its solutions
+    # [SERIE_x] <- a weekly series of exercises
+    # [SERIE_x_SOLUTION] <- the solutions to these weekly series
+    # [EXAM_xxxx] <- past exams
+    # [EXAM_xxxx_SOLUTION] <- the solutions to these past exams
+    # [MIDTERM_EXAM_xxxx] <- past midterm exams (including, later, this year's midterm)
+    # [MIDTERM_EXAM_xxxx_SOLUTION] <- past midterm exams (including, later, this year's midterm)
+
     tag_metadata = {
         "THEORY": {  # THEORY added just in case
             "type": "theory",
             "subtype": "theory",
+            "one_chunk_per_page": False,
+            "one_chunk_per_doc": False,
+            "pdf_to_markdown": True,
+            "split_exercises": False,
+        },
+        "NOTES": {
+            "type": "theory",
+            "subtype": "notes",
             "one_chunk_per_page": False,
             "one_chunk_per_doc": False,
             "pdf_to_markdown": True,
@@ -76,39 +85,48 @@ class ME326Course(BaseCourse):
             "split_exercises": True,
             "is_solution": True,
         },
-        "MOOC_QUIZ": {
+        "EXAM": {
+            "type": "exam",
+            "subtype": "exam",
+            "one_chunk_per_page": False,
+            "one_chunk_per_doc": True,
+            "pdf_to_markdown": True,
+            "split_exercises": True,
+        },
+        "EXAM_SOLUTION": {
+            "type": "exam",
+            "subtype": "exam",
+            "one_chunk_per_page": False,
+            "one_chunk_per_doc": True,
+            "pdf_to_markdown": True,
+            "split_exercises": True,
+            "is_solution": True,
+        },
+        "MIDTERM_EXAM": {
+            "type": "exam",
+            "subtype": "midterm_exam",
+            "one_chunk_per_page": False,
+            "one_chunk_per_doc": True,
+            "pdf_to_markdown": True,
+            "split_exercises": True,
+        },
+        "MIDTERM_EXAM_SOLUTION": {
+            "type": "exam",
+            "subtype": "midterm_exam",
+            "one_chunk_per_page": False,
+            "one_chunk_per_doc": True,
+            "pdf_to_markdown": True,
+            "split_exercises": True,
+            "is_solution": True,
+        },
+        "QUIZ": {
             "type": "practice",
-            "subtype": "mooc_quiz",
+            "subtype": "quiz",
             "one_chunk_per_page": False,
             "one_chunk_per_doc": True,
-            "pdf_to_markdown": False,
+            "pdf_to_markdown": True,
             "split_exercises": False,
-            "is_video": False,
-            "is_gemini_processed_video": False,
-            "processing_method": None,
-            "model": None,
-        },
-        "MOOC_VIDEO": {
-            "type": "theory",
-            "subtype": "mooc_video",
-            "one_chunk_per_page": False,
-            "one_chunk_per_doc": True,
-            "pdf_to_markdown": False,
-            "split_exercises": False,
-            "is_video": True,
-            "is_gemini_processed_video": False,
-            "processing_method": None,
-            "model": None,
-        },
-        "MEDIASPACE_VIDEO": {
-            "type": "theory",
-            "subtype": "mediaspace_video",
-            "one_chunk_per_page": False,
-            "one_chunk_per_doc": True,
-            "pdf_to_markdown": False,
-            "split_exercises": False,
-            "is_video": True,
-            "is_gemini_processed_video": False,
+            "is_solution": True,
         },
     }
 
@@ -118,25 +136,15 @@ class ME326Course(BaseCourse):
     course_path = f"{CONFIG['BASE_PATH']}/{course_info['course_id']}"
     output_path = f"{course_path}/output"
 
-    mooc_base_path = f"{course_path}/mooc"
+    ################################################################
+
+    moodle_course_id = 14288
+
+    moodle_base_path = f"{course_path}/moodle"
 
     mime_types = mt.DEFAULT_MIME_TYPES
 
-    ################################################################
-
-    mediaspace_playlist_or_channel_url = "https://mediaspace.epfl.ch/playlist/dedicated/55706/0_4a2i8lhf/0_dzalmgoo"
-
-    mediaspace_language = course_info["course_language"]
-
-    # The professor won't be uploading new videos this upcoming semester
-    # We were told to use the 2025 playlist
-    mediaspace_created_after = date(year=2025, month=9, day=1)
-
-    mediaspace_base_path = f"{course_path}/mediaspace"
-
-    moodle_course_id = 16347
-
-    moodle_base_path = f"{course_path}/moodle"
+    local_folder_base_path = f"{course_path}/local"
 
     ################################################################
 
@@ -159,31 +167,16 @@ class ME326Course(BaseCourse):
     @property
     def extractors(self) -> list[BaseExtractor]:
         return [
-            MOOCExtractor(
-                mooc_base_path=self.mooc_base_path,
-                tag_metadata=self.tag_metadata,
-                mime_types=(self.mime_types + [mt.MP4, mt.JSON]),
-                # This MOOC tags nothing, so its readings and slide decks are
-                # picked up from the links themselves and told apart by looking
-                # at each PDF
-                include_untagged_documents=True,
-                course_url="https://courseware.epfl.ch/learning/course/course-v1:EPFL+controlsys+2017_T1/home",
-                theory_tag="THEORY",
-                theory_slides_tag="THEORY_SLIDES",
-                language=self.course_info["course_language"],
-            ),
             MoodleExtractor(
                 moodle_course_id=self.moodle_course_id,
                 moodle_base_path=self.moodle_base_path,
                 tag_metadata=self.tag_metadata,
                 mime_types=self.mime_types,
             ),
-            MediaspaceExtractor(
-                playlist_or_channel_url=self.mediaspace_playlist_or_channel_url,
-                mediaspace_base_path=self.mediaspace_base_path,
+            LocalFolderExtractor(
+                folder_base_path=self.local_folder_base_path,
                 tag_metadata=self.tag_metadata,
-                language=self.mediaspace_language,
-                created_after=self.mediaspace_created_after,
+                mime_types=self.mime_types,
             ),
             # EdDiscussionExtractor(
             #     ed_discussion_base_path=self.course_path,
@@ -209,12 +202,6 @@ class ME326Course(BaseCourse):
             JupyterToMarkdownTransformer(cache=self.course_code),
             PDFToMarkdownTransformer(type_subtypes=self.pdf_to_markdown_type_subtypes, cache=self.course_code),
             SplitExercisesTransformer(type_subtypes=self.split_exercises_type_subtypes, cache=self.course_code),
-            VideoToFramesTransformer(
-                cache=self.course_code,
-                language=self.course_info["course_language"],
-            ),
-            ImageToMarkdownTransformer(cache=self.course_code),
-            MergeSlideTranscriptTransformer(cache=self.course_code),
         ]
 
     @property
@@ -231,5 +218,5 @@ if __name__ == "__main__":
         handlers=[logging.StreamHandler(sys.stdout)],
     )
 
-    course = BaseCourse.from_code("ME326")
+    course = BaseCourse.from_code("CS200")
     course.run()

@@ -2,8 +2,7 @@ import logging
 from pathlib import Path
 from rag_etl.extractors.mooc.chapter_parser import ChapterParser
 from rag_etl.resources.mooc_resource import MOOCResource
-from rag_etl.extractors.mooc.utils import UntaggedDocuments, cmp_key
-import os
+from rag_etl.extractors.mooc.utils import UntaggedDocuments, cmp_key, load_root_elem_from_mooc_xml
 import json
 import re
 import unicodedata
@@ -63,6 +62,48 @@ class CourseParser:
 
         return base_url
 
+    def load_chapter_weeks(
+        self, course_path: str, first_week_chapter: int | None, week_count: int | None
+    ) -> list[tuple[str, int | None]]:
+        """
+        Return the course's chapters in the order a student meets them, each
+        with the week it belongs to.
+
+        A MOOC is one chapter per week, but not every chapter is a week: a
+        preamble opens the course and a feedback survey or a closing note ends
+        it, and none of those is material of any week. The course says which
+        chapter opens week one and how many weeks follow, since the chapters
+        themselves are titled by subject and carry no number.
+        """
+
+        course_xml_path = next(iter((Path(course_path) / "course").glob("*.xml")), None)
+        if course_xml_path is None:
+            logger.warning(f"No course file under {course_path}, so no resource will carry a week")
+            return []
+
+        root_course = load_root_elem_from_mooc_xml(course_xml_path)
+        if root_course is None:
+            return []
+
+        chapters = []
+        position = 0
+        for child in root_course.iterchildren():
+            # A course holds more than its chapters, a wiki among them
+            if child.tag != "chapter":
+                continue
+
+            position += 1
+            week = None
+
+            if first_week_chapter is not None and position >= first_week_chapter:
+                candidate = position - first_week_chapter + 1
+                if week_count is None or candidate <= week_count:
+                    week = candidate
+
+            chapters.append((child.get("url_name", ""), week))
+
+        return chapters
+
     def parse(
         self,
         course_path: str,
@@ -70,6 +111,8 @@ class CourseParser:
         language: str | None = None,
         untagged_documents: UntaggedDocuments | None = None,
         asset_base_url: str | None = None,
+        first_week_chapter: int | None = None,
+        week_count: int | None = None,
     ) -> list[MOOCResource]:
         """Parse a MOOC course"""
 
@@ -81,15 +124,25 @@ class CourseParser:
 
         items: list[MOOCResource] = []
 
-        chapter_path = Path(course_path) / "chapter"
         chapter_parser = ChapterParser()
 
+        # Chapters are taken in course order rather than in the order the
+        # filesystem lists them, because a chapter's place in the course is
+        # what says which week it is
+        chapters = self.load_chapter_weeks(course_path, first_week_chapter, week_count)
+        for chapter_url_name, week in chapters:
+            logger.debug(f"chapter {chapter_url_name} is week {week}")
+
+        weeks = [week for _, week in chapters if week is not None]
+        logger.info(f"{len(chapters)} chapters, {len(weeks)} of them weeks {min(weeks, default=0)}-{max(weeks, default=0)}")
+
         # For each one of the chapters
-        for chapter_filename in os.listdir(chapter_path):
+        for chapter_url_name, week in chapters:
             items.extend(
                 chapter_parser.parse(
                     course_path=course_path,
-                    chapter_filename=chapter_filename,
+                    chapter_filename=f"{chapter_url_name}.xml",
+                    week=week,
                     assets_map=assets_map,
                     asset_base_url=asset_base_url,
                     untagged_documents=untagged_documents,

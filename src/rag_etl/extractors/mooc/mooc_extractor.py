@@ -24,6 +24,8 @@ class MOOCExtractor(BaseExtractor):
         theory_slides_tag: str | None = None,
         untagged_extensions: tuple[str, ...] = (".pdf", ".txt", ".zip"),
         course_url: str | None = None,
+        first_week_chapter: int | None = None,
+        week_count: int | None = None,
     ) -> None:
         # Both tags are needed to file an untagged document, so a course that
         # asks for them without saying where they go is refused here rather
@@ -45,6 +47,11 @@ class MOOCExtractor(BaseExtractor):
             self.asset_base_url = asset_base_url_from_course_url(course_url)
         else:
             self.asset_base_url = None
+
+        # Which chapter opens week one, and how many weeks follow it. The
+        # chapters before and after those carry no week
+        self.first_week_chapter = first_week_chapter
+        self.week_count = week_count
 
         self.mooc_base_path = mooc_base_path
         self.tag_metadata = tag_metadata
@@ -68,4 +75,6 @@ class MOOCExtractor(BaseExtractor):
             language=self.language,
             untagged_documents=self.untagged_documents,
             asset_base_url=self.asset_base_url,
+            first_week_chapter=self.first_week_chapter,
+            week_count=self.week_count,
         )

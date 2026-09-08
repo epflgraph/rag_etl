@@ -295,6 +295,10 @@ class CS119dCourse(BaseCourse):
                 mooc_base_path=self.mooc_base_path,
                 tag_metadata=self.tag_metadata,
                 mime_types=(self.mime_types + [mt.MP4, mt.JSON]),
+                # Week one opens at chapter 2 of the course, the ones
+                # before and after it being a preamble and a closing section
+                first_week_chapter=2,
+                week_count=8,
                 language=self.course_info["course_language"],
             ),
             MoodleExtractor(

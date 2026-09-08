@@ -240,7 +240,7 @@ class CS119dCourse(BaseCourse):
             "type": "theory",
             "subtype": "mediaspace_video",
             "one_chunk_per_page": False,
-            "one_chunk_per_doc": False,
+            "one_chunk_per_doc": True,
             "pdf_to_markdown": False,
             "split_exercises": False,
             "is_video": True,

@@ -5,7 +5,7 @@ import json
 import logging
 
 from rag_etl.resources.mooc_resource import MOOCResource
-from rag_etl.extractors.mooc.utils import extract_number, extract_week, load_root_elem_from_mooc_xml
+from rag_etl.extractors.mooc.utils import load_root_elem_from_mooc_xml
 from rag_etl.utils.kaltura import extract_entry_id_from_url
 import rag_etl.utils.mime_types as mt
 
@@ -66,6 +66,7 @@ class VideoParser:
         vertical_display_name: str,
         tag_metadata: dict,
         language: str | None = None,
+        week: int | None = None,
     ) -> MOOCResource | None:
         """Parse a MOOC video"""
 
@@ -118,7 +119,6 @@ class VideoParser:
 
         # The week is inherited by every slide cut from this video, while the
         # numbering itself is not: a slide is identified by its timestamp
-        week = extract_week(extract_number(mooc_resource_title))
         return MOOCResource(
             source="mooc",
             title=mooc_resource_title,

@@ -143,13 +143,11 @@ class MICRO303Course(BaseCourse):
                 mooc_base_path=self.mooc_base_path,
                 tag_metadata=self.tag_metadata,
                 mime_types=(self.mime_types + [mt.MP4, mt.JSON]),
-                # This MOOC tags nothing, so its readings and slide decks are
-                # picked up from the links themselves and told apart by looking
-                # at each PDF
+                # Week one opens at chapter 2 of the course, the ones
+                # before and after it being a preamble and a closing section
+                first_week_chapter=2,
+                week_count=7,
                 include_untagged_documents=True,
-                # The export states no absolute link, so the address of the
-                # published course is given here and its files are looked for
-                # on the same host
                 course_url="https://courseware.epfl.ch/learning/course/course-v1:EPFL+mems+2023/home",
                 theory_tag="THEORY",
                 theory_slides_tag="THEORY_SLIDES",

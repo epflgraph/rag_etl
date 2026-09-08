@@ -163,9 +163,10 @@ class ME326Course(BaseCourse):
                 mooc_base_path=self.mooc_base_path,
                 tag_metadata=self.tag_metadata,
                 mime_types=(self.mime_types + [mt.MP4, mt.JSON]),
-                # This MOOC tags nothing, so its readings and slide decks are
-                # picked up from the links themselves and told apart by looking
-                # at each PDF
+                # Week one opens at chapter 2 of the course, the ones
+                # before and after it being a preamble and a closing section
+                first_week_chapter=2,
+                week_count=8,
                 include_untagged_documents=True,
                 course_url="https://courseware.epfl.ch/learning/course/course-v1:EPFL+controlsys+2017_T1/home",
                 theory_tag="THEORY",

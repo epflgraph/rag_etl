@@ -21,6 +21,7 @@ class SequentialParser:
         assets_map: dict[str, str],
         asset_base_url: str | None = None,
         untagged_documents: UntaggedDocuments | None = None,
+        week: int | None = None,
         tag_metadata: dict | None = None,
         language: str | None = None,
     ) -> list[MOOCResource]:
@@ -50,6 +51,7 @@ class SequentialParser:
                     assets_map=assets_map,
                     asset_base_url=asset_base_url,
                     untagged_documents=untagged_documents,
+                    week=week,
                     tag_metadata=tag_metadata,
                     language=language,
                 )

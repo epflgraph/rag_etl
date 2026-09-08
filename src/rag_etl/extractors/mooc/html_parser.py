@@ -287,6 +287,7 @@ class HtmlParser:
         tag_metadata: dict,
         untagged_documents: UntaggedDocuments,
         vertical_has_video: bool,
+        week: int | None,
     ) -> list[MOOCResource]:
         """
         Build a resource for every document a page links without tagging it.
@@ -348,6 +349,7 @@ class HtmlParser:
                     type=tag_dict.get("type"),
                     subtype=tag_dict.get("subtype"),
                     is_solution=tag_dict.get("is_solution", False),
+                    week=week,
                     one_chunk_per_page=tag_dict.get("one_chunk_per_page"),
                     one_chunk_per_doc=tag_dict.get("one_chunk_per_doc"),
                     processing_method=processing_method,
@@ -392,6 +394,7 @@ class HtmlParser:
         asset_base_url: str | None = None,
         untagged_documents: UntaggedDocuments | None = None,
         vertical_has_video: bool = False,
+        week: int | None = None,
     ) -> list[MOOCResource]:
         """Parse a MOOC HTML file"""
 
@@ -462,6 +465,7 @@ class HtmlParser:
                 tag_metadata=tag_metadata,
                 untagged_documents=untagged_documents,
                 vertical_has_video=vertical_has_video,
+                week=week,
             )
 
         tag_dict = tag_metadata.get(module_tag)
@@ -504,6 +508,7 @@ class HtmlParser:
                 type=tag_dict.get("type"),
                 subtype=tag_dict.get("subtype"),
                 number=module_number,
+                week=week,
                 one_chunk_per_page=tag_dict.get("one_chunk_per_page"),
                 one_chunk_per_doc=tag_dict.get("one_chunk_per_doc"),
                 processing_method=tag_dict.get("processing_method"),
@@ -612,6 +617,7 @@ class HtmlParser:
                 type=tag_dict.get("type"),
                 subtype=tag_dict.get("subtype"),
                 number=link_module_number,
+                week=week,
                 is_solution=tag_dict.get("is_solution", False),
                 one_chunk_per_page=tag_dict.get("one_chunk_per_page"),
                 one_chunk_per_doc=tag_dict.get("one_chunk_per_doc"),

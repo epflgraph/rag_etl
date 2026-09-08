@@ -10,7 +10,6 @@ import rag_etl.utils.mime_types as mt
 from rag_etl.resources.mooc_resource import MOOCResource
 from rag_etl.extractors.mooc.utils import (
     extract_number,
-    extract_week,
     load_root_elem_from_mooc_xml,
     clean_text,
     normalize_markdown,
@@ -60,6 +59,7 @@ class QuizParser:
         elem_vertical: _Element,
         vertical_display_name: str,
         tag_metadata: dict,
+        week: int | None = None,
     ) -> list[MOOCResource]:
         mooc_resources: list[MOOCResource] = []
 
@@ -104,7 +104,6 @@ class QuizParser:
         # We split the quiz between quiz and quiz with solutions for keeping the structure of
         # assignment vs solution used by Tutor Bot
         number_str = extract_number(resource_title)
-        week = extract_week(number_str)
 
         # Quiz
         quiz_res: MOOCResource = MOOCResource(

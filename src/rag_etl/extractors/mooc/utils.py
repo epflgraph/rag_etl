@@ -124,9 +124,15 @@ def get_filename_via_assets(course_path: str, href: str, assets_map: dict[str, s
     compare_key = cmp_key(href_name)
 
     real_name = assets_map.get(compare_key, href_name)
-    real_name = sanitize_for_filename(real_name)
 
-    return Path(course_path) / "static" / real_name
+    # assets.json names the file as the export wrote it, punctuation and all,
+    # so it is tried untouched first. Sanitising is only a fallback, for a name
+    # the filesystem could not have taken as it stands
+    resource_path = Path(course_path) / "static" / real_name
+    if resource_path.exists():
+        return resource_path
+
+    return Path(course_path) / "static" / sanitize_for_filename(real_name)
 
 
 def extract_number(resource_title: str) -> str | None:

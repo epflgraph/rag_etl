@@ -517,6 +517,9 @@ class HtmlParser:
                 resource_path_exists = resource_path.exists()
                 if not resource_path_exists:
                     logger.warning("Missing asset: href=%r resolved=%s", linked, resource_path)
+                    # A resource pointing at a file that is not there only
+                    # fails later, in whichever transformer opens it first
+                    continue
 
                 logger.debug(
                     "resource_path resolved exists? %s (%s)",

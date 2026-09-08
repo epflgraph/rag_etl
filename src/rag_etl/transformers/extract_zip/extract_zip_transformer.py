@@ -10,7 +10,7 @@ import zipfile
 
 from rag_etl.transformers import BaseTransformer
 from rag_etl.resources import BaseResource
-from rag_etl.utils.encoding import zip_entry_filename
+from rag_etl.utils.encoding import ensure_utf8, zip_entry_filename
 
 import rag_etl.utils.mime_types as mt
 
@@ -99,6 +99,11 @@ class ExtractZipTransformer(BaseTransformer):
                 # Skip if mime type not in list
                 if mime_type not in self.mime_types:
                     continue
+
+                # An archive can hold text saved before UTF-8 was the norm, and
+                # a reader that assumes UTF-8 gets nothing at all out of it
+                if mime_type.startswith("text/"):
+                    ensure_utf8(extracted_file)
 
                 new_resource = resource.copy_with(
                     title=f"{resource.title} > {extracted_file.name}",

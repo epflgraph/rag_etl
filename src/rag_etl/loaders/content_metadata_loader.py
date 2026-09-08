@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import shutil
+
+from rag_etl.utils.encoding import ensure_utf8
 from pathlib import Path
 
 import json
@@ -52,7 +54,13 @@ class ContentMetadataLoader(BaseLoader):
             resource_output_path.parent.mkdir(parents=True, exist_ok=True)
 
             # Copy actual file
-            shutil.copy(resource.path, resource_output_path.parent)
+            shutil.copy(resource.path, resource_output_path)
+
+            # Everything handed on is UTF-8, so whoever reads it next does not
+            # have to guess. The copy is converted rather than the original,
+            # which belongs to whoever the pipeline took it from
+            if resource.mime_type and resource.mime_type.startswith("text/"):
+                ensure_utf8(resource_output_path)
 
             # Make path relative to base path
             resource.path = str(

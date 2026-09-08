@@ -15,7 +15,7 @@ IPYNB = "application/x-ipynb+json"
 MP4 = "video/mp4"
 JSON = "application/json"
 
-C_SOURCES = ["text/x-c", "text/x-chdr", "text/x-csrc", "text/x-c++src"]
+C_SOURCES = ["text/x-c", "text/x-chdr", "text/x-csrc", "text/x-c++src", "text/x-c++hdr"]
 
 TCL_SOURCE = "application/x-tcl"
 
@@ -24,6 +24,7 @@ PYTHON_SOURCE = "text/x-python"
 MATLAB_SOURCE = "text/x-matlab"
 
 mimetypes.add_type(IPYNB, ".ipynb")
+
 
 DEFAULT_MIME_TYPES = [
     MARKDOWN,

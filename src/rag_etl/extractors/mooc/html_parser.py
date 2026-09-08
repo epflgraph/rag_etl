@@ -27,6 +27,11 @@ import rag_etl.utils.mime_types as mt
 
 logger = logging.getLogger(__name__)
 
+# A tag as it is written into a page, as in "[MOOC_EXERCICE_6_SOLUTION]".
+# Spaces are allowed because a tag split across two HTML elements gains one
+# when the elements are joined back into text
+TAG_MARKER = re.compile(r"\[[A-Z_0-9][A-Z_0-9 ]*\]")
+
 
 class HtmlParser:
     """
@@ -250,6 +255,28 @@ class HtmlParser:
 
         return inferred_url
 
+    def strip_tag_markers(self, md_text: str, tag_metadata: dict) -> str:
+        """
+        Remove the tag markers a page carries from the text taken out of it.
+
+        A tag says how to file the thing it sits next to; it is not something a
+        student reads, and left in place it is indexed as course content and
+        read back by later stages as if it were a heading. Only markers naming
+        a tag the course declares are removed, so bracketed prose survives.
+        """
+
+        for marker in set(TAG_MARKER.findall(md_text)):
+            tag, _, _ = split_tag_number_text(marker.replace(" ", ""))
+            if tag in tag_metadata:
+                md_text = md_text.replace(marker, "")
+
+        # Taking a marker out of a line can leave the space it sat in
+        lines = []
+        for line in md_text.splitlines():
+            lines.append(line.strip())
+
+        return "\n".join(lines).strip()
+
     def parse_untagged_documents(
         self,
         soup: BeautifulSoup,
@@ -441,6 +468,7 @@ class HtmlParser:
 
         # HTML to MarkDown
         md_text = self.convert_html_text_to_markdown(soup)
+        md_text = self.strip_tag_markers(md_text, tag_metadata)
 
         # We sanitize the filename of the MarkDown file we create
         markdown_filename = sanitize_for_filename(markdown_filename)
@@ -459,22 +487,29 @@ class HtmlParser:
         if module_number is not None:
             module_number = str(module_number)
 
-        # Create resource
-        html_resource: MOOCResource = MOOCResource(
-            source="mooc",
-            url=None,
-            title=mooc_resource_title,
-            path=str(markdown_path),
-            mime_type=mime_type,
-            type=tag_dict.get("type"),
-            subtype=tag_dict.get("subtype"),
-            number=module_number,
-            one_chunk_per_page=tag_dict.get("one_chunk_per_page"),
-            one_chunk_per_doc=tag_dict.get("one_chunk_per_doc"),
-            processing_method=tag_dict.get("processing_method"),
-            model=tag_dict.get("model"),
-        )
-        mooc_resources.append(html_resource)
+        # A page is a wrapper around the files it links, so it can never be
+        # split into exercises. Claiming a subtype whose tag says it is split
+        # would promise a sub_number this resource cannot have, and whoever
+        # reads that metadata would go looking for one. The files it links are
+        # still extracted below
+        if tag_dict.get("split_exercises"):
+            logger.info(f"Not indexing the page {markdown_filename}, only the files it links")
+        else:
+            html_resource: MOOCResource = MOOCResource(
+                source="mooc",
+                url=None,
+                title=mooc_resource_title,
+                path=str(markdown_path),
+                mime_type=mime_type,
+                type=tag_dict.get("type"),
+                subtype=tag_dict.get("subtype"),
+                number=module_number,
+                one_chunk_per_page=tag_dict.get("one_chunk_per_page"),
+                one_chunk_per_doc=tag_dict.get("one_chunk_per_doc"),
+                processing_method=tag_dict.get("processing_method"),
+                model=tag_dict.get("model"),
+            )
+            mooc_resources.append(html_resource)
 
         # For all supported linked files, each with the tag of its own paragraph
         for linked, link_tag in self.tagged_links(soup, (".pdf", ".txt", ".zip", ".md")):

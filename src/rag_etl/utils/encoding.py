@@ -1,5 +1,6 @@
 import pathvalidate
 import unicodedata
+import zipfile
 
 
 def sanitize_for_filename(text: str) -> str:
@@ -17,6 +18,37 @@ def sanitize_for_filename(text: str) -> str:
         raise ValueError(f"Text `{text}` is empty after sanitization")
 
     return sanitized_text
+
+
+# Bit 11 of an entry's flags: set when the archive states its names are UTF-8
+UTF8_FLAG = 0x800
+
+
+def zip_entry_filename(entry: zipfile.ZipInfo) -> str:
+    """
+    Return the name of an entry, readable and in one normal form.
+
+    An archive says whether its names are UTF-8 with a flag, and the ones
+    written on macOS do not set it. Reading those as the format's default
+    encoding turns every accent into a pair of box drawing characters, so a
+    name without the flag is decoded back to UTF-8 first.
+
+    The name is then composed, since macOS stores accents decomposed while the
+    rest of the tree writes them composed, and two spellings of one name look
+    like two different files to everything downstream.
+    """
+
+    name = entry.filename
+
+    utf8_flag = entry.flag_bits & UTF8_FLAG
+    if not utf8_flag:
+        try:
+            name = name.encode("cp437").decode("utf-8")
+        except UnicodeError:
+            # The name really was in the default encoding, so it stands
+            pass
+
+    return unicodedata.normalize("NFC", name)
 
 
 if __name__ == "__main__":

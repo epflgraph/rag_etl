@@ -220,7 +220,15 @@ class HtmlParser:
         Pages link their files both ways: some write the full published url,
         others only "/static/name". The second kind is published under the same
         prefix, so the name is enough to name it.
+
+        An archive never gets one, whichever way it was linked.
         """
+
+        # An archive is a way of handing files over rather than something to
+        # read, and everything unpacked from it inherits this url, so linking
+        # to it would send a reader a whole download instead of the file
+        if href.lower().split("?")[0].endswith(".zip"):
+            return None
 
         # A url the page states is taken at its word
         if "block@" in href:

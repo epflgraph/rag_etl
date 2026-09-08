@@ -83,7 +83,7 @@ class CS119dCourse(BaseCourse):
             "one_chunk_per_page": False,
             "one_chunk_per_doc": True,
             "pdf_to_markdown": True,
-            "split_exercises": True,
+            "split_exercises": False,
             "is_solution": True,
         },
         "CASE_STUDY_T_SOLUTION": {
@@ -92,7 +92,7 @@ class CS119dCourse(BaseCourse):
             "one_chunk_per_page": False,
             "one_chunk_per_doc": True,
             "pdf_to_markdown": True,
-            "split_exercises": True,
+            "split_exercises": False,
             "is_solution": True,
         },
         "MIDTERM_EXAM": {

@@ -3,7 +3,7 @@ from datetime import date
 import logging
 
 from rag_etl.courses import BaseCourse
-from rag_etl.extractors import BaseExtractor, MediaspaceExtractor, MoodleExtractor
+from rag_etl.extractors import BaseExtractor, MoodleExtractor
 from rag_etl.transformers import (
     BaseTransformer,
     ExtractZipTransformer,
@@ -166,13 +166,13 @@ class CS200Course(BaseCourse):
                 tag_metadata=self.tag_metadata,
                 mime_types=mt.DEFAULT_MIME_TYPES,
             ),
-            MediaspaceExtractor(
-                playlist_or_channel_url=self.mediaspace_playlist_or_channel_url,
-                mediaspace_base_path=self.mediaspace_base_path,
-                tag_metadata=self.tag_metadata,
-                language=self.mediaspace_language,
-                created_after=self.mediaspace_created_after,
-            ),
+            # MediaspaceExtractor(
+            #     playlist_or_channel_url=self.mediaspace_playlist_or_channel_url,
+            #     mediaspace_base_path=self.mediaspace_base_path,
+            #     tag_metadata=self.tag_metadata,
+            #     language=self.mediaspace_language,
+            #     created_after=self.mediaspace_created_after,
+            # ),
         ]
 
     @property

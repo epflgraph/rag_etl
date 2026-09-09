@@ -134,7 +134,7 @@ class CS200Course(BaseCourse):
 
     mediaspace_base_path = f"{course_path}/mediaspace"
 
-    moodle_course_id = 14840
+    moodle_course_id = 18287
 
     moodle_base_path = f"{course_path}/moodle"
 

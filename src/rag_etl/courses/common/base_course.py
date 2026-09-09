@@ -54,6 +54,20 @@ class BaseCourse(ABC):
         return self.__class__.__name__.removesuffix("Course")
 
     @property
+    def page_split_type_subtypes(self) -> list[tuple[str, str]]:
+        """
+        PDF (type, subtype) pairs that should be split into one resource per page.
+
+        Defaults to tags with `split_pages=True`. Subclasses can override.
+        """
+        tag_metadata = getattr(self, "tag_metadata", {})
+        return [
+            (tag_metadata[tag].get("type"), tag_metadata[tag].get("subtype"))
+            for tag in tag_metadata
+            if tag_metadata[tag].get("split_pages")
+        ]
+
+    @property
     @abstractmethod
     def extractors(self) -> List[BaseExtractor]:
         """Ordered sequence of extractor instances to run."""

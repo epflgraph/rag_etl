@@ -9,6 +9,7 @@ from rag_etl.extractors import BaseExtractor, MOOCExtractor, MoodleExtractor
 from rag_etl.transformers import (
     BaseTransformer,
     PDFToMarkdownTransformer,
+    SplitPagesTransformer,
     VideoToJSONTransformer,
     ExtractZipTransformer,
     SplitExercisesTransformer,
@@ -234,6 +235,7 @@ class COM202Course(BaseCourse):
             ExtractZipTransformer(cache=self.course_code),
             JupyterToMarkdownTransformer(cache=self.course_code),
             PDFToMarkdownTransformer(type_subtypes=self.pdf_to_markdown_type_subtypes, cache=self.course_code),
+            SplitPagesTransformer(type_subtypes=self.page_split_type_subtypes, cache=self.course_code),
             SplitExercisesTransformer(type_subtypes=self.split_exercises_type_subtypes, cache=self.course_code),
         ]
 

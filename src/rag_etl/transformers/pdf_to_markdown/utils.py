@@ -204,6 +204,7 @@ def stitch_md_pages(md_pages):
     - Merge multi-page tables if a table is clearly split across two consecutive pages; preserve valid GFM table syntax.
     - Merge multi-page display equations if a block is split across two consecutive pages; keep LaTeX integrity.
     - Keep image `![ALT]` items and captions in place; do not generate images.
+    - Preserve page boundary markers of the form `<!-- page N -->` exactly as they appear.
 
     Output **only** the final Markdown (no explanations, metadata, or commentary).
     """
@@ -307,6 +308,9 @@ def convert_pdf_to_md(pdf_path, md_path):
         return await asyncio.gather(*tasks)
 
     md_pages = asyncio.run(run_all(pil_pages))
+
+    # Insert page markers so downstream transformers can map content back to PDF pages.
+    md_pages = [f"<!-- page {page_number} -->\n\n{md_page}" for page_number, md_page in enumerate(md_pages, start=1)]
 
     ################################################################
     # Stitch page Markdown into one coherent Markdown              #

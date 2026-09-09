@@ -9,6 +9,7 @@ from rag_etl.transformers import (
     ExtractZipTransformer,
     JupyterToMarkdownTransformer,
     PDFToMarkdownTransformer,
+    SplitPagesTransformer,
     SplitExercisesTransformer,
     VideoToFramesTransformer,
     ImageToMarkdownTransformer,
@@ -58,6 +59,7 @@ class MATH101eCourse(BaseCourse):
             "one_chunk_per_doc": False,
             "pdf_to_markdown": True,
             "split_exercises": False,
+            "split_pages": True,
         },
         "THEORY_SLIDES": {
             "type": "theory",
@@ -66,6 +68,7 @@ class MATH101eCourse(BaseCourse):
             "one_chunk_per_doc": False,
             "pdf_to_markdown": True,
             "split_exercises": False,
+            "split_pages": True,
         },
         "SERIE": {
             "type": "practice",
@@ -248,6 +251,7 @@ class MATH101eCourse(BaseCourse):
             ExtractZipTransformer(cache=self.course_code),
             JupyterToMarkdownTransformer(cache=self.course_code),
             PDFToMarkdownTransformer(type_subtypes=self.pdf_to_markdown_type_subtypes, cache=self.course_code),
+            SplitPagesTransformer(type_subtypes=self.page_split_type_subtypes, cache=self.course_code),
             SplitExercisesTransformer(type_subtypes=self.split_exercises_type_subtypes, cache=self.course_code),
             VideoToFramesTransformer(
                 cache=self.course_code,

@@ -4,11 +4,12 @@ from typing import List, Sequence
 from pathlib import Path
 
 import logging
+import re
 
 from rag_etl.transformers import BaseTransformer
 from rag_etl.resources import BaseResource
 
-from rag_etl.transformers.split_exercises.utils import split_md_into_exercises, url_with_exercise
+from rag_etl.transformers.split_exercises.utils import split_md_into_exercises
 
 import rag_etl.utils.mime_types as mt
 
@@ -70,11 +71,19 @@ class SplitExercisesTransformer(BaseTransformer):
                 else:
                     number = sub_number
 
+                # Link to the PDF page where this exercise starts.
+                exercise_md_text = exercise_md_path.read_text(encoding="utf-8")
+                page_match = re.search(r"<!-- page (\d+) -->", exercise_md_text)
+                if resource.url and page_match:
+                    exercise_url = f"{resource.url}#page={page_match.group(1)}"
+                else:
+                    exercise_url = resource.url
+
                 # Create and append new resource
                 new_resource = resource.copy_with(
                     title=f"{resource.title} > Exercise {exercise_md_path.stem}",
                     path=str(exercise_md_path),
-                    url=url_with_exercise(resource.url, sub_number),
+                    url=exercise_url,
                     number=number,
                     sub_number=sub_number,
                     processing_method=None,

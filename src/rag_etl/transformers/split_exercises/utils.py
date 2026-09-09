@@ -531,21 +531,16 @@ you should output
         # Merge snippets
         all_snippets = all_snippets | snippets
 
-    # Exercises could be repeated (statement and solution). Make unique by number by prioritising the solution
-    all_snippets = {
-        (number, is_solution): value
-        for (number, is_solution), value in all_snippets.items()
-        if is_solution or not all_snippets.get((number, True))
-    }
-
     # Store exercises as individual Markdown files
     exercises_path.mkdir(parents=True, exist_ok=True)
-    for number, is_solution in all_snippets:
+    for (number, is_solution), snippet in all_snippets.items():
         # The number comes from the model, which sometimes answers with a whole
         # heading rather than a digit, and a heading can hold a slash or a dot
-        # that the filesystem would read as a path instead of a name
-        exercise_path = exercises_path / f"{sanitize_for_filename(number)}.md"
-        exercise_path.write_text(all_snippets[(number, is_solution)], encoding="utf-8")
+        # that the filesystem would read as a path instead of a name.
+        # Solution files get a suffix so they do not overwrite their statement.
+        suffix = "_solution" if is_solution else ""
+        exercise_path = exercises_path / f"{sanitize_for_filename(number)}{suffix}.md"
+        exercise_path.write_text(snippet, encoding="utf-8")
 
 
 def url_with_exercise(url: str | None, number: str) -> str | None:

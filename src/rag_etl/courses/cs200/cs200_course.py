@@ -39,6 +39,15 @@ class CS200Course(BaseCourse):
     }
 
     tag_metadata = {
+        "REFERENCE": {
+            "type": "theory",
+            "subtype": "theory_reference",
+            "one_chunk_per_page": False,
+            "one_chunk_per_doc": False,
+            "pdf_to_markdown": True,
+            "split_exercises": False,
+            "split_pages": True,
+        },
         "THEORY": {
             "type": "theory",
             "subtype": "theory",
@@ -51,6 +60,15 @@ class CS200Course(BaseCourse):
         "THEORY_SLIDES": {
             "type": "theory",
             "subtype": "theory_slides",
+            "one_chunk_per_page": True,
+            "one_chunk_per_doc": False,
+            "pdf_to_markdown": True,
+            "split_exercises": False,
+            "split_pages": True,
+        },
+        "THEORY_SLIDES_SOLUTIONS": {
+            "type": "theory",
+            "subtype": "theory_slides_solutions",
             "one_chunk_per_page": True,
             "one_chunk_per_doc": False,
             "pdf_to_markdown": True,

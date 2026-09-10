@@ -3,7 +3,6 @@ from pathlib import Path
 
 import re
 
-from urllib.parse import quote
 from pydantic import BaseModel, Field
 
 from rag_etl.utils.encoding import sanitize_for_filename
@@ -543,17 +542,3 @@ you should output
         exercise_path.write_text(snippet, encoding="utf-8")
 
 
-def url_with_exercise(url: str | None, number: str) -> str | None:
-    """
-    It appends a #n to the URL to make it different
-
-    To test the issue in the pipeline, that neglects docs with the same URL.
-    """
-
-    if not url:
-        return None
-
-    # Avoid empty spaces
-    exercise_url = f"{url}#{quote(number, safe='')}"
-
-    return exercise_url

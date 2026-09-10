@@ -8,6 +8,7 @@ from rag_etl.extractors import BaseExtractor, MOOCExtractor, LocalFolderExtracto
 from rag_etl.transformers import (
     BaseTransformer,
     PDFToMarkdownTransformer,
+    SplitPagesTransformer,
     VideoToJSONTransformer,
 )
 
@@ -134,6 +135,7 @@ class MGT645Course(BaseCourse):
         return [
             VideoToJSONTransformer(cache=self.course_code),
             PDFToMarkdownTransformer(type_subtypes=self.pdf_to_markdown_type_subtypes, cache=self.course_code),
+            SplitPagesTransformer(type_subtypes=self.page_split_type_subtypes, cache=self.course_code),
         ]
 
     @property

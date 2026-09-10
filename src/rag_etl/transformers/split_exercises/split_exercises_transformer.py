@@ -64,12 +64,19 @@ class SplitExercisesTransformer(BaseTransformer):
 
             # Build resource for each exercise file
             for exercise_md_path in sorted(exercises_path.glob("*.md")):
+                # File names may end with `_solution` to distinguish solutions from statements.
+                exercise_is_solution = exercise_md_path.stem.endswith("_solution")
+                exercise_number = exercise_md_path.stem[: -len("_solution")] if exercise_is_solution else exercise_md_path.stem
+
                 # Extracted exercise number is always the sub_number, and is copied to number only if that is empty
-                sub_number = exercise_md_path.stem
+                sub_number = exercise_number
                 if resource.number:
                     number = resource.number
                 else:
                     number = sub_number
+                
+                # Solution resources get a distinct title
+                title_suffix = " (solution)" if exercise_is_solution else ""
 
                 # Link to the PDF page where this exercise starts.
                 exercise_md_text = exercise_md_path.read_text(encoding="utf-8")
@@ -81,11 +88,12 @@ class SplitExercisesTransformer(BaseTransformer):
 
                 # Create and append new resource
                 new_resource = resource.copy_with(
-                    title=f"{resource.title} > Exercise {exercise_md_path.stem}",
+                    title=f"{resource.title} > Exercise {exercise_number}{title_suffix}",
                     path=str(exercise_md_path),
                     url=exercise_url,
                     number=number,
                     sub_number=sub_number,
+                    is_solution=exercise_is_solution,
                     processing_method=None,
                     one_chunk_per_doc=True,
                 )

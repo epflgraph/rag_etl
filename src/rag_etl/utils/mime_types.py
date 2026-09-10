@@ -23,6 +23,8 @@ PYTHON_SOURCE = "text/x-python"
 
 MATLAB_SOURCE = "text/x-matlab"
 
+ASSEMBLY_SOURCES = ["text/x-asm", "text/x-verilog"]
+
 mimetypes.add_type(IPYNB, ".ipynb")
 
 

@@ -3,7 +3,7 @@ from datetime import date
 import logging
 
 from rag_etl.courses import BaseCourse
-from rag_etl.extractors import BaseExtractor, MoodleExtractor
+from rag_etl.extractors import BaseExtractor, MoodleExtractor, MediaspaceExtractor
 from rag_etl.transformers import (
     BaseTransformer,
     ExtractZipTransformer,
@@ -13,6 +13,7 @@ from rag_etl.transformers import (
     VideoToFramesTransformer,
     ImageToMarkdownTransformer,
     MergeSlideTranscriptTransformer,
+    SplitPagesTransformer,
 )
 
 from rag_etl.loaders import BaseLoader, ContentMetadataLoader
@@ -45,6 +46,7 @@ class CS200Course(BaseCourse):
             "one_chunk_per_doc": False,
             "pdf_to_markdown": True,
             "split_exercises": False,
+            "split_pages": True,
         },
         "THEORY_SLIDES": {
             "type": "theory",
@@ -53,6 +55,7 @@ class CS200Course(BaseCourse):
             "one_chunk_per_doc": False,
             "pdf_to_markdown": True,
             "split_exercises": False,
+            "split_pages": True,
         },
         "EXERCISE": {
             "type": "practice",
@@ -109,7 +112,7 @@ class CS200Course(BaseCourse):
             "type": "theory",
             "subtype": "mediaspace_video",
             "one_chunk_per_page": False,
-            "one_chunk_per_doc": False,
+            "one_chunk_per_doc": True,
             "pdf_to_markdown": False,
             "split_exercises": False,
             "is_video": True,
@@ -125,12 +128,12 @@ class CS200Course(BaseCourse):
 
     ################################################################
 
-    mediaspace_playlist_or_channel_url = ""
+    mediaspace_playlist_or_channel_url = "https://mediaspace.epfl.ch/playlist/dedicated/55022/0_78dtdaar/0_rdtytun5"
 
     mediaspace_language = course_info["course_language"]
 
-    # Only keep recordings of this course edition
-    mediaspace_created_after = semester_start_date
+    # use the medispace passed
+    mediaspace_created_after = date(year=2024, month=9, day=1)
 
     mediaspace_base_path = f"{course_path}/mediaspace"
 
@@ -164,15 +167,15 @@ class CS200Course(BaseCourse):
                 moodle_course_id=self.moodle_course_id,
                 moodle_base_path=self.moodle_base_path,
                 tag_metadata=self.tag_metadata,
-                mime_types=mt.DEFAULT_MIME_TYPES,
+                mime_types=mt.DEFAULT_MIME_TYPES + mt.ASSEMBLY_SOURCES,
             ),
-            # MediaspaceExtractor(
-            #     playlist_or_channel_url=self.mediaspace_playlist_or_channel_url,
-            #     mediaspace_base_path=self.mediaspace_base_path,
-            #     tag_metadata=self.tag_metadata,
-            #     language=self.mediaspace_language,
-            #     created_after=self.mediaspace_created_after,
-            # ),
+            MediaspaceExtractor(
+                playlist_or_channel_url=self.mediaspace_playlist_or_channel_url,
+                mediaspace_base_path=self.mediaspace_base_path,
+                tag_metadata=self.tag_metadata,
+                language=self.mediaspace_language,
+                created_after=self.mediaspace_created_after,
+            ),
         ]
 
     @property
@@ -182,6 +185,7 @@ class CS200Course(BaseCourse):
             ExtractZipTransformer(cache=self.course_code),
             JupyterToMarkdownTransformer(cache=self.course_code),
             PDFToMarkdownTransformer(type_subtypes=self.pdf_to_markdown_type_subtypes, cache=self.course_code),
+            SplitPagesTransformer(type_subtypes=self.page_split_type_subtypes, cache=self.course_code),
             SplitExercisesTransformer(type_subtypes=self.split_exercises_type_subtypes, cache=self.course_code),
             VideoToFramesTransformer(
                 cache=self.course_code,

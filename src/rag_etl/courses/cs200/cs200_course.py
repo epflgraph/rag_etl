@@ -175,7 +175,7 @@ class CS200Course(BaseCourse):
             "one_chunk_per_page": False,
             "one_chunk_per_doc": True,
             "pdf_to_markdown": True,
-            "split_exercises": True,
+            "split_exercises": False,
         },
         "LAB_B_PART": {
             "type": "practice",
@@ -183,8 +183,7 @@ class CS200Course(BaseCourse):
             "one_chunk_per_page": False,
             "one_chunk_per_doc": True,
             "pdf_to_markdown": True,
-            "split_exercises": True,
-            "is_solution": True,
+            "split_exercises": False,
         },
         "LAB_C_PART": {
             "type": "practice",
@@ -192,8 +191,7 @@ class CS200Course(BaseCourse):
             "one_chunk_per_page": False,
             "one_chunk_per_doc": True,
             "pdf_to_markdown": True,
-            "split_exercises": True,
-            "is_solution": True,
+            "split_exercises": False,
         },
         "EXAM": {
             "type": "exam",

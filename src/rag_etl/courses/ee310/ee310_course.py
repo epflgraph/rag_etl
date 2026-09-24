@@ -175,5 +175,5 @@ if __name__ == "__main__":
         handlers=[logging.StreamHandler(sys.stdout)],
     )
 
-    course = BaseCourse.from_code("MATH310")
+    course = BaseCourse.from_code("EE310")
     course.run()

@@ -1,0 +1,35 @@
+- Keep structure extractors → transformers → loaders, but some transformers can be split/updated/composed
+- Cache individual pages: i.e. if a 200-page PDF changes a comma, reprocess only pages that have changed
+- Link to individual PDF pages
+- Resources need to be rethinked: they should be a conceptual model representing any resource to be indexed. Flags like one_chunk_per_page , processing_method , is_gemini_processed_video, etc. that are passed downstream for technical reasons do not really belong here, and are examples of what we don’t want.. For example, what model processes what should be handled differently.
+- We still have one chunk per exercise, even when spread across several pages.
+- Make more general, not necessarily X_course (e.g. plasma_course is not a course)
+- Drop db cache manager dependency
+- Issue: Metadata at course level is cumbersome: e.g. passing to the transformers the type subtypes they need to act upon is a bit weird, I wonder if there's a better way. Also, there's currently no way of parsing two PDFs in the same zip file in different ways (e.g. exercises + theory)
+- Idea: Nested resources. e.g. a PDF can be a resource containing a list of its pages (as image resources or pdf page resources, or whatever), these would be transformed into Markdown and then either stitched, chunked or combined depending on the file, the parameters, the metadata or the config. Same with videos a video could be a resource with a list of videosegments, which in turn would have a list of slides and a list of transcripts. Or maybe we can skip the videosegment altogether, I don't know. In any case, nested resources allow us to keep the original url in the container and update the url of the content resources with page numbers or timestamps.
+- Find a reasonable way to identify documents: url is not working (url clashes, documents without url, etc.)
+- Simplify as much as possible
+- Other colleagues should be able to pip install the package and run any of its parts, for instance for OCR, or to convert jupyter notebooks to markdown.
+- Conform to best practices as much as possible, be proactive in bringing up when things could be done in a better way that would stick more closely to good practices.
+- Make rag_etl agnostic of course/admin/other RAGs
+- MCP server exposing tools to access course documents should be configured automatically from some form of output of the pipeline
+- How to handle documents that need different processing (e.g. split by page or by exercise)? Can we somehow normalise the transformation so that we don't need to repeat all the transformer list in every course?
+- Chunking should go in the transformation phase, but probably at the end. Do we need some ordering among the transformers? Something like elasticsearch's analyzers with character filters, tokenizers and token filters. I don't know. A colleague suggested the following, but I'm not entirely sure since we have a lot of metadata (e.g. from the Moodle tags) already at the beginning, but it's worth exploring:
+  - Format normalization — collapse every source format (PDF, HTML, DOCX, code) to one canonical intermediate representation (plain text or structured markdown, ideally preserving headings/tables as structure rather than flattening everything, since structure is useful for smarter chunking later).
+  - Cleaning — strip boilerplate, dedupe, fix encoding issues.
+  - Chunking — operate on the canonical representation, not on format-specific quirks.
+  - Enrichment — attach metadata (source, section, timestamps), possibly generate embeddings here or treat embedding as its own stage.
+
+---
+
+- Related to the nested resources: a link between slide PDFs and video lectures that use those slides in the form of nested docs
+- Nested resources would also help in retrieving publications that are linked to a lab session
+- Explore the impact (retrieval, latency) of newer embedding models available via RCP (e.g, Qwen3-Embedding-8B)
+- Explore the impact (retrieval, latency) of integrating a reranking model available via RCP (e.g, Qwen3-Reranker-8B, bge-reranker-v2-m3)
+- No more manual tagging (only [NO_BOT] to exclude or [BOT] to include) -> Automatic metadata fields (type, subtype, number, sub_number, is_solution) with a simplified variant of LLM-as-a-jury with HITL only when no consensus reached (if reliable)
+- The metadata flag 'is_solution' is not enough for documents that contain statement+solution
+- I shouldn't have to use rag/retrieve to list document titles and their release dates, we need an extra tool+graphai endpoint that only retrieves what we need
+- Support for fetching content automatically from gitlab+github 
+- Support for fetching Moodle assignments (not possible)
+- A method (generated files + scp?,  an endpoint?) for Anna's dashboard to access course metadata (she needs it for some of her analysis)
+- Improved slide detection method in videos

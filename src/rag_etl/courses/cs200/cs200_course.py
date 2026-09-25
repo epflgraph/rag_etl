@@ -260,6 +260,8 @@ class CS200Course(BaseCourse):
 
     moodle_base_path = f"{course_path}/moodle"
 
+    mime_types = mt.DEFAULT_MIME_TYPES + mt.ASSEMBLY_SOURCES
+
     ################################################################
 
     @property
@@ -286,7 +288,7 @@ class CS200Course(BaseCourse):
                 moodle_course_id=self.moodle_course_id,
                 moodle_base_path=self.moodle_base_path,
                 tag_metadata=self.tag_metadata,
-                mime_types=(mt.DEFAULT_MIME_TYPES + [mt.ASSEMBLY_SOURCES]),
+                mime_types=self.mime_types,
             ),
             MediaspaceExtractor(
                 playlist_or_channel_url=self.mediaspace_playlist_or_channel_url,
@@ -301,7 +303,7 @@ class CS200Course(BaseCourse):
     def transformers(self) -> list[BaseTransformer]:
         """Single transformer that converts PDFs into Markdown text."""
         return [
-            ExtractZipTransformer(cache=self.course_code),
+            ExtractZipTransformer(mime_types=self.mime_types, cache=self.course_code),
             JupyterToMarkdownTransformer(cache=self.course_code),
             PDFToMarkdownTransformer(type_subtypes=self.pdf_to_markdown_type_subtypes, cache=self.course_code),
             SplitPagesTransformer(type_subtypes=self.page_split_type_subtypes, cache=self.course_code),

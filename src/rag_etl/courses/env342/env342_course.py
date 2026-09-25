@@ -209,7 +209,7 @@ class ENV342Course(BaseCourse):
         """Single transformer that converts PDFs into Markdown text."""
         return [
             VideoToJSONTransformer(cache=self.course_code),
-            ExtractZipTransformer(cache=self.course_code),
+            ExtractZipTransformer(mime_types=self.mime_types, cache=self.course_code),
             PDFToMarkdownTransformer(type_subtypes=self.pdf_to_markdown_type_subtypes, cache=self.course_code),
             SplitPagesTransformer(type_subtypes=self.page_split_type_subtypes, cache=self.course_code),
             SplitExercisesTransformer(type_subtypes=self.split_exercises_type_subtypes, cache=self.course_code),

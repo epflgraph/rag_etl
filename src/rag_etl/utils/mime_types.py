@@ -27,6 +27,9 @@ ASSEMBLY_SOURCES = ["text/x-asm", "text/x-verilog"]
 
 mimetypes.add_type(IPYNB, ".ipynb")
 
+# .s is not registered in Python's MIME map
+mimetypes.add_type("text/x-asm", ".s")
+
 
 DEFAULT_MIME_TYPES = [
     MARKDOWN,

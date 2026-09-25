@@ -8,7 +8,6 @@ import requests
 
 import json
 
-from typing import List, Optional
 
 import logging
 
@@ -140,8 +139,17 @@ class MoodleExtractor(BaseExtractor):
                 module_path = self.moodle_base_path / module_unique_name / "content"
 
                 for module_contents in module.get("contents", []):
+                    mime_type = module_contents["mimetype"]
+
+                    # Moodle reports "document/unknown" for extensions it does not know (e.g. .s).
+                    # Fall back to the filename. The list check below still decides what is kept
+                    if mime_type == mt.MOODLE_UNKNOWN:
+                        guessed = mt.guess_mime_type(module_contents["filename"])
+                        if guessed:
+                            mime_type = guessed
+
                     # Skip if mime type not in list
-                    if module_contents["mimetype"] not in self.mime_types:
+                    if mime_type not in self.mime_types:
                         continue
 
                     # Extract module contents tag and number, default to module ones
@@ -185,7 +193,7 @@ class MoodleExtractor(BaseExtractor):
                     )
 
                     # Add .pdf extension if not there
-                    if not module_contents_path.suffix and module_contents["mimetype"] == mt.PDF:
+                    if not module_contents_path.suffix and mime_type == mt.PDF:
                         module_contents_path = module_contents_path.with_suffix(".pdf")
 
                     # Save file to disk
@@ -199,7 +207,7 @@ class MoodleExtractor(BaseExtractor):
                     from_, until = extract_from_and_until(module)
 
                     # Processing method and model
-                    if module_contents["mimetype"] == mt.PDF:
+                    if mime_type == mt.PDF:
                         processing_method = "rcp"
                         model = CONFIG["RCP_VISION_MODEL"]
                     else:
@@ -216,7 +224,7 @@ class MoodleExtractor(BaseExtractor):
                             url=url,
                             path=str(module_contents_path),
                             source="moodle",
-                            mime_type=module_contents["mimetype"],
+                            mime_type=mime_type,
                             type=type_,
                             subtype=subtype,
                             number=number,

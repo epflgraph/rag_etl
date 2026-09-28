@@ -30,10 +30,12 @@ ASSEMBLY_SOURCES = ["text/x-asm", "text/x-verilog"]
 
 mimetypes.add_type(IPYNB, ".ipynb")
 
-# .s and .m not registered in Python's MIME map
+# programming types not registered in Python's MIME map
 mimetypes.add_type("text/x-asm", ".s")
+mimetypes.add_type("text/x-asm", ".v")
+mimetypes.add_type("text/x-asm", ".ld")
 mimetypes.add_type(MATLAB_SOURCE, ".m")
-
+# ToDo: Support (.tar.gz) for CS-200
 
 DEFAULT_MIME_TYPES = [
     MARKDOWN,

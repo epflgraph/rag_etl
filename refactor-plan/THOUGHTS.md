@@ -33,3 +33,7 @@
 - Support for fetching Moodle assignments (not possible)
 - A method (generated files + scp?,  an endpoint?) for Anna's dashboard to access course metadata (she needs it for some of her analysis)
 - Improved slide detection method in videos
+
+---
+
+- Add a filter for large files in the normalisation step.

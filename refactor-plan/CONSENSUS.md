@@ -28,10 +28,10 @@ Status markers:
 ## 3. Labels, tags, and release windows
 
 - **Decided.** `type`/`subtype` stay free-form strings anchored on a small documented "recommended set" — no closed enum, no validation that bites a new course. Deviations are sometimes necessary.
-- **Decided.** Two scenarios for professor involvement until Javier's tag-automation experiment concludes; they are mutually exclusive for label production: **(A) tags remain** — they are the source of truth for selection and metadata; they arrive late; the pipeline runs weekly with nothing asynchronous or preemptive on the pipeline side; untagged/unselected material stays excluded until tagged. **(B) automated metadata** — `type`/`subtype`/`is_solution` come from the LLM-as-a-judge; the professor role shrinks to a minimal include/exclude signal (include-only, exclude-only, or none — decided when Javier's results land).
-- **Decided.** One manual override channel (the project spec) sits on top of whichever default channel is in force (A: professor tags; B: the judge). No per-label provenance and no jury-consensus flags are tracked — the reviewer knows which scenario is in force, trusts the values, and reacts via override + rerun.
+- **Decided.** The scenario fork is resolved: **(B) automated metadata** is the way forward — Javier's tag-automation experiment works. `type`/`subtype`/`is_solution` come from the LLM-as-a-judge; the professor role shrinks to an **exclude-only** signal: the professor marks what to exclude in Moodle, everything else is judged. Scenario A (tags remain) was the alternative until the experiment landed and is dropped.
+- **Decided.** One manual override channel (the project spec) sits on top of the judge's default labels. No per-label provenance and no jury-consensus flags are tracked — the reviewer trusts the values and reacts via override + rerun.
 - **Decided.** HITL lives between runs: a new project's first run is manual (dry run → fixes recorded as overrides → enroll in the weekly cron); weekly runs are fully automatic — the reviewer checks the record and, when something is off, adds an override and reruns that project.
-- **Decided.** In every scenario the index loads exactly the selected material, and nothing else: (A) everything professor-tagged; (B, include-mode) only what is selected; (B, exclude-mode) everything minus the exclusions. Changes to the selection take effect on the weekly run after they happen.
+- **Decided.** The index loads exactly the selected material, and nothing else: everything the judge labels minus the professor's exclusions. Changes to the selection take effect on the weekly run after they happen.
 - **Decided.** Release windows (`from`/`until`) are captured automatically from Moodle availability dates by the extractor — reliable source-side data, not a professor labeling burden. Every index document carries them as plain fields; they are never a load filter — consumers (e.g. the MCP server) filter in-window at query time, so all selected material is pre-indexed and becomes available the second its window opens.
 
 ## 4. Rules, overrides, and project definitions
@@ -39,7 +39,7 @@ Status markers:
 - **Decided.** Projects never list transformers. The pipeline is one fixed sequence; projects declare *data*: rules that assign labels and/or processing recipes, matched against resource attributes via `where`-predicates.
 - **Decided.** The Moodle tag→label table and the staff override table are the *same mechanism*: a Moodle tag is just one more matchable attribute (`where={"source_tag": "EXERCISES"}`). One uniform mechanism replaces the three steering channels today (tag tables, type/subtype plumbing, transformer lists).
 - **Decided.** `where`-matching discipline: flat ANDed globs over fields the resource actually carries (title, filename, path, mime, ...); no nested logic. (E.g. two PDFs inside one zip each match their own rules — different recipes for exercises and theory.) A nested condition is the signal that a case wants custom code, not a bigger config language.
-- **Decided.** Priority: **the human override wins**; everything not overridden comes from the scenario's default channel (A: professor tag / structural default; B: the judge). "Most specific wins" applies only *within* the rule table; if two staff rules match the same resource sufficiently ambiguously, it warns rather than resolving silently.
+- **Decided.** Priority: **the human override wins**; everything not overridden comes from the judge (the default channel). "Most specific wins" applies only *within* the rule table; if two staff rules match the same resource sufficiently ambiguously, it warns rather than resolving silently.
 - **Decided.** Overrides are deliberate fixes written when a particularity arises (cost of a rare quirk ≈ two lines); they live in the project spec and are reviewed in the repo. They are not maintained forever: they are pruned whenever a review shows one has become redundant.
 - **Decided.** Unknown material never crashes and never silently mis-shunks: it falls to a per-project default recipe and is visible in the dry-run output.
 - **Decided.** Every model invocation is configurable — not only embeddings: the OCR vision LLM, the metadata judge, the `per_exercise` annotator each take their model *and* inference parameters (temperature, top_p, thinking enabled/disabled, ...) from the project/run spec, never baked into code. Since cache keys ignore the model and its parameters (section 6), new settings take effect after an explicit cache refresh (section 6).
@@ -48,9 +48,11 @@ Status markers:
 
 - **Decided.** One fixed sequence shared by every project:
 
-  extract → normalize (zip→files, notebook→md) → materialize (PDF/video/image → clean text) → cut (chunk) → embed + load
+  extract → normalize (zip, tar.gz → files; notebook→md) → materialize (PDF/video/image → clean text) → cut (chunk) → embed + load
 
   Ordering is inherent to the structure (no analyzer-like ordering DSL). No step-level escape hatch.
+- **Decided.** The normalize step also filters large files: the size limit is per file type (mime type), and oversized files are dropped rather than passed on to materialize (the same reasonable default the git extractor applies).
+- **Decided.** The metadata judge is a transformer in the fixed sequence: it runs after normalize and materialize — it labels the produced text rather than a hand-prepared file — and before cut.
 - **Decided.** A git extractor (gitlab+github) joins as a new source: a repo or branch URL becomes a container resource whose files are child resources. Reasonable defaults apply (e.g. oversized files ignored), and everything in the repo/branch is indexed by default, at least for now. No existing project uses it yet.
 - **Decided.** New kinds of cuts join the shared recipe catalogue — a PR to `rag-etl`, referenced by name in rules — never course-local code. Plausible v0 set: `whole_document` (with a size guard; covers a code file), `one_per_page`, `per_exercise`, `text` (header-aware chunking for typeset notes), `per_slide` (videos).
 - **Decided.** Materialization is uniform: every PDF → container + one child per page, each page OCR'd via the RCP vision LLM (page-by-page is the only way to OCR via a vision model, and it happens with all PDFs). The `<!-- page N -->` marker mechanism is dropped: it was an artifact of the file-based pipeline; page geometry is native in the resource model.
@@ -83,7 +85,8 @@ Status markers:
 
 - **Decided.** One index per project (`rag_{project}`), instantiated from a common mapping template, alias atomically shifted per run. A weekly run for one course never touches other projects' indices; stale-document handling is trivial (whole index replaced). The course chatbot and the forum bot point at the same project alias.
 - **Decided.** Project-level metadata lives in the project definition; nothing is denormalized into chunk documents — no course title, year, or language per chunk. The record loader outputs the full project section into the metadata file (the single shared artifact, section 9), where consumers (the MCP server for its config and overview, Anna's dashboard, the team) read it. The project id travels via the index/alias (`rag_{project}`), not per-chunk.
-- **Open.** The concrete Elasticsearch mapping (text fields, filter fields, embeddings config — dense/sparse, model choice). The per-chunk field set falls out of the resource model: `type`/`subtype`, `number`/`subnumber`, `is_solution`, `from`/`until`, lineage + deep links, text, embeddings — nothing project-level; project id and course facts travel via the index/alias and the metadata file.
+- **Decided.** `week` stays in the per-chunk field set: Javier uses it for the MOOCs (it had been dropped as unused in retrieval).
+- **Open.** The concrete Elasticsearch mapping (text fields, filter fields, embeddings config — dense/sparse, model choice). The per-chunk field set falls out of the resource model: `type`/`subtype`, `number`/`subnumber`, `week`, `is_solution`, `from`/`until`, lineage + deep links, text, embeddings — nothing project-level; project id and course facts travel via the index/alias and the metadata file.
 
 ## 9. MCP server and overview tool
 
@@ -104,7 +107,6 @@ Status markers:
 - **prompt/model/config in the cache key** — content-only keys plus explicit invalidation instead.
 - **Asynchronous/webhook refresh or preemptive Moodle parsing** — the pipeline runs weekly, nothing more.
 - **Per-label provenance and consensus flags in the record (dry runs included)** — inferable from the scenario in force; the reviewer trusts the values and reacts via the override list + rerun.
-- **`week` numbers derived from semester dates** — unused in retrieval, dropped.
 - **Arbitrary links between resource trees** — not a priority and likely unnecessary complexity (Javier); nesting is the only structural relation (§2), anything link-like rides on metadata joins.
 
 ## 11. Open topics

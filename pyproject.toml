@@ -32,6 +32,9 @@ dependencies = [
     "KalturaApiClient",
 ]
 
+[project.scripts]
+rag-etl = "rag_etl.cli:main"
+
 [tool.setuptools]
 package-dir = {"" = "src"}
 
@@ -56,6 +59,24 @@ line-length = 120
 [tool.ruff.lint]
 ignore = [
     "I001",   # avoids import reordering
-    "RUF012", # avoids linting in course_info and tag_metadata 
+    "RUF012", # avoids linting in course_info and tag_metadata
     "RUF022", # avoids expecting alphabetical order
-] 
+]
+
+[tool.mypy]
+python_version = "3.12"
+ignore_missing_imports = true
+
+# Legacy modules, pre-refactor: type errors suppressed until each is rewritten.
+# As a phase rewrites a module, remove its entry here so mypy gates it.
+[[tool.mypy.overrides]]
+module = [
+    "rag_etl.config",
+    "rag_etl.loaders.*",
+    "rag_etl.extractors.*",
+    "rag_etl.transformers.*",
+    "rag_etl.utils.*",
+    "rag_etl.projects.*",
+    "rag_etl.resources.*",
+]
+ignore_errors = true

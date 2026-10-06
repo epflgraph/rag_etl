@@ -12,3 +12,15 @@ __pycache__/
 
 # MACOS .DS_Store
 .DS_Store
+
+# Virtual environment
+venv/
+
+# Ruff cache
+.ruff_cache/
+
+# Mypy cache
+.mypy_cache/
+
+# Pytest cache
+.pytest_cache/

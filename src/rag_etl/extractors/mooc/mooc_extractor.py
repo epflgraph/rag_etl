@@ -1,4 +1,3 @@
-from pathlib import Path
 
 from rag_etl.resources import MOOCResource
 from rag_etl.extractors import BaseExtractor

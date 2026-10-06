@@ -5,7 +5,6 @@ from rag_etl.resources.mooc_resource import MOOCResource
 from rag_etl.extractors.mooc.utils import UntaggedDocuments, cmp_key, load_root_elem_from_mooc_xml
 import json
 import re
-import unicodedata
 
 
 logger = logging.getLogger(__name__)

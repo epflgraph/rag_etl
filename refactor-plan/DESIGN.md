@@ -1,27 +1,35 @@
 # DESIGN
 
-Short note fixing the two core dataclass shapes that Phases 1–5 implement, so the phases build against one agreement rather than re-deciding per phase. Module names follow IMPLEMENTATION.md §3; nothing here is implemented yet.
+Short note fixing the core shapes that Phases 1–5 implement, updated as the phases settle them.
+
+## Pipeline order
+
+extract (plain documents) → normalize → materialize (OCR etc.) → judge → cut → embed + load
+
+- Extractors return plain documents — whatever is includable (Moodle: everything not marked NO_BOT). No tags anywhere.
+- The **judge** (a stub we build, replaced by Javier's inference) fills `type`/`subtype`/`is_solution` and the `cut` per resource — or drops the resource. It sits after materialize and before cut, because the cut depends on it. There is **no type/subtype → cut mapping in this codebase**: how the judge decides is Javier's business.
+- Exceptions (below) correct specific resources the judge would mislabel.
 
 ## `Resource` (Phase 1, `src/rag_etl/core/`)
 
-One recursive dataclass. Container / child / chunk is *state*, not subclassing; policy never sits in the data.
+One recursive dataclass. Nodes are created from extracted files and reshaped in place as the pipeline runs: operations add, update and remove children (or whole nodes), recursively. A chunk is just a leaf with text. Policy never sits in the data.
 
 ```python
 @dataclass
 class Resource:
     # identity
     path: Path | None             # where the content lives on disk; None for pure containers
-    content_hash: str             # sha256 of the content this node represents
     mime_type: str | None = None
 
     # lineage
     parent: Resource | None = None
     children: list["Resource"] = field(default_factory=list)
 
-    # descriptive metadata (extractors fill some; judge fills type/subtype/is_solution; rules resolve conflicts)
+    # descriptive metadata (extractors fill some; the judge fills type/subtype/is_solution/cut; exceptions correct)
     title: str | None = None
-    type: str | None = None       # theory / practice / ... (resource-level, resolved by rules or judge)
-    subtype: str | None = None    # lecture_slides / homework / notebook / ...
+    type: str | None = None       # theory / practice / ... (inferred by the judge)
+    subtype: str | None = None    # lecture_slides / homework / ...
+    cut: str | None = None        # whole_document | per_child | per_exercise | text
     number: int | None = None     # exercise number (per_exercise annotator)
     sub_number: int | None = None # exercise sub-number
     week: int | None = None       # lecture week (slides, recordings)
@@ -35,43 +43,54 @@ class Resource:
 
 Invariants:
 
-- A container has non-empty `children`; a file has none until cut; a chunk has `text`. `kind` is derived (`container` iff children, `chunk` iff text), not stored.
-- `content_hash` is computed from file bytes for files/pages and from text for chunks. Equal content anywhere in any project → equal hash → shared cache entries, `(transform, content_hash)` keys.
-- Deep links (Moodle URL, Mediaspace timestamp, Ed post, Git commit) travel as `path`/URL fragments on the node so every chunk keeps a link back to its origin.
-- Embeddings are **not** on the node: the embed step produces them per chunk and hands the ES loader `(chunk, embedding)` pairs, cache-aligned with `content_hash` (settled in Phase 3/4).
+- `is_leaf` is derived (`not children`), never stored. A freshly extracted PDF is a leaf; materialize adds page children; a cut produces chunk leaves. Always current, never outdated.
+- `content_hash` is a derived property computed fresh on every access, never stored, so it can never go stale when a step changes content:
+  - `text` set → sha256 of the text (most-derived: chunks, OCR'd pages, extracted docs)
+  - else children → sha256 over the children's hashes in document order (a container's content IS its children; order matters)
+  - else path → sha256 of the file bytes
+  - else → sha256 of empty
+  Equal content anywhere in any project → equal hash → shared cache entries, `(transform, content_hash)` keys.
+- Deep links (Moodle URL, Mediaspace timestamp, Ed post, Git commit) travel as `path`/URL fragments; `lineage()` reconstructs the chain from any node back to its source.
+- Embeddings are **not** on the node: the embed step produces them per chunk and hands the ES loader `(chunk, embedding)` pairs.
 
-State helpers on the class: `is_container`, `walk()` (depth-first), `lineage()` (root→self list), `add_child()`. The pipeline passes trees; transformers reshape them in place.
+State helpers on the class: `is_leaf`, `walk()` (depth-first), `lineage()` (root→self), `add_child()`. The hashing helpers `hash_bytes`/`hash_text` are the single sha256 implementation behind `content_hash`.
 
-## `ProjectSpec` (Phase 1, `src/rag_etl/projects/`)
+## Exceptions (Phase 1, `src/rag_etl/core/rules.py`)
 
-One thin, declarative spec per project replaces the 41 course classes with their `course_info` + `tag_metadata` dicts and `*_type_subtypes` plumbing.
+The only rules in the system: manual corrections for specific resources that would trip up the judge.
 
 ```python
 @dataclass(frozen=True)
 class Rule:
-    where: str                    # flat ANDed globs over resource attributes, e.g. "filename=*_exercises.pdf AND path=week*"
+    where: str                    # flat ANDed globs over resource attributes, e.g. 'title="*[[]HOMEWORK*]*"'
     type: str | None = None
     subtype: str | None = None
-    recipe: str | None = None     # whole_document | one_per_page | per_exercise | per_slide | text
+    cut: str | None = None        # whole_document | per_child | per_exercise | text
     number: int | None = None
     week: int | None = None
     is_solution: bool | None = None
-    exclude: bool = False         # exclude-only rules (professor's Moodle exclusions)
-
-@dataclass(frozen=True)
-class ProjectSpec:
-    id: str                       # lowercase, e.g. "com202"; names the index/alias rag_{id}
-    rules: tuple[Rule, ...] = ()
-    overrides: tuple[Rule, ...] = ()   # staff corrections; win over rules and judge defaults
-    default_recipe: str = "text"       # fallback for anything no rule matches
-    sources: tuple[SourceConfig, ...] = ()   # extractor configs (moodle course id, mooc path, mediaspace channel, ...)
-    models: ModelConfigs = ModelConfigs()    # OCR, judge, annotator, embedding model + parameters
 ```
 
-Resolution order (Phase 1): staff override > judge default > rules; most-specific within a table; ambiguity → warn, never silent. The `where`-matcher is flat ANDed globs — no nesting, no logic beyond AND.
+- `apply(resource, exceptions)` corrects matching resources in place, on top of whatever the judge filled.
+- Most-specific wins (most predicates); equal specificity → first-declared wins, loudly (warn, never silently resolve); no match → resource untouched.
+- Globs are fnmatch patterns; a literal `[` is written `[[]`. A `where` naming a non-existent attribute never matches, with a warning.
+
+## `ProjectSpec` (Phase 1, `src/rag_etl/projects/`)
+
+One thin, declarative spec per project.
+
+```python
+@dataclass(frozen=True)
+class ProjectSpec:
+    id: str                                  # lowercase, e.g. "com202"; names the index/alias rag_{id}
+    exceptions: tuple[Rule, ...] = ()
+    sources: tuple[SourceConfig, ...] = ()   # extractor configs (Phase 2)
+    models: ModelConfigs = ModelConfigs()    # OCR, judge, annotator, embedding (Phase 3)
+```
 
 ## What this kills
 
-- `BaseCourse` + 41 subclasses, `tag_metadata`, `course_info`, and every `*_type_subtypes` derived property (Phase 1 converts the tables mechanically, with a round-trip check).
+- The 41 `tag_metadata` tables and `course_info`: **not converted — dropped.** Type/subtype/is_solution/cut are inferred by the judge; only manual exceptions survive as rules.
 - Policy flags in data (`one_chunk_per_page`, `processing_method`, `model`, `is_gemini_processed_video`, `tikz`).
 - The two parallel video paths and `<!-- page N -->` markers (Phase 3 materialize: PDF → page children OCR'd by RCP; video → GraphAI `detect_slides` + Kaltura SRT upstream, then frame OCR).
+- Moodle exclusions: the extractor returns only what is includable (everything not NO_BOT); nothing downstream re-decides exclusion.

@@ -36,15 +36,15 @@ Status markers:
 
 ## 4. Rules, overrides, and project definitions
 
-- **Decided.** Projects never list transformers. The pipeline is one fixed sequence; projects declare *data*: rules that assign labels and/or processing recipes, matched against resource attributes via `where`-predicates.
-- **Decided.** The Moodle tag→label table and the staff override table are the *same mechanism*: a Moodle tag is just one more matchable attribute (`where={"source_tag": "EXERCISES"}`). One uniform mechanism replaces the three steering channels today (tag tables, type/subtype plumbing, transformer lists).
-- **Decided.** `where`-matching discipline: flat ANDed globs over fields the resource actually carries (title, filename, path, mime, ...); no nested logic. (E.g. two PDFs inside one zip each match their own rules — different recipes for exercises and theory.) A nested condition is the signal that a case wants custom code, not a bigger config language.
+- **Decided.** Projects never list transformers. The pipeline is one fixed sequence; projects declare *data*: exceptions that correct the judge's labels for specific resources, matched against resource attributes via `where`-predicates.
+- **Decided.** There are no tags anywhere: extractors return plain includable documents (Moodle: everything not marked NO_BOT), and the judge infers the rest. The only rule table is the exception table (staff corrections).
+- **Decided.** `where`-matching discipline: flat ANDed globs over fields the resource actually carries (title, filename, path, mime, ...); no nested logic. (E.g. two PDFs inside one zip each match their own rules — different cuts for exercises and theory.) A nested condition is the signal that a case wants custom code, not a bigger config language.
 - **Decided.** Priority: **the human override wins**; everything not overridden comes from the judge (the default channel). "Most specific wins" applies only *within* the rule table; if two staff rules match the same resource sufficiently ambiguously, it warns rather than resolving silently.
 - **Decided.** Overrides are deliberate fixes written when a particularity arises (cost of a rare quirk ≈ two lines); they live in the project spec and are reviewed in the repo. They are not maintained forever: they are pruned whenever a review shows one has become redundant.
-- **Decided.** Unknown material never crashes and never silently mis-shunks: it falls to a per-project default recipe and is visible in the dry-run output.
+- **Decided.** The judge fills type/subtype/is_solution/cut for every resource — or drops the resource. There is **no type/subtype → cut mapping in the codebase**: how the judge decides (a mapping, an LLM pass per resource, ...) is Javier's business.
 - **Decided.** Every model invocation is configurable — not only embeddings: the OCR vision LLM, the metadata judge, the `per_exercise` annotator each take their model *and* inference parameters (temperature, top_p, thinking enabled/disabled, ...) from the project/run spec, never baked into code. Since cache keys ignore the model and its parameters (section 6), new settings take effect after an explicit cache refresh (section 6).
 
-## 5. Pipeline shape and recipes
+## 5. Pipeline shape and cuts
 
 - **Decided.** One fixed sequence shared by every project:
 
@@ -54,13 +54,13 @@ Status markers:
 - **Decided.** The normalize step also filters large files: the size limit is per file type (mime type), and oversized files are dropped rather than passed on to materialize (the same reasonable default the git extractor applies).
 - **Decided.** The metadata judge is a transformer in the fixed sequence: it runs after normalize and materialize — it labels the produced text rather than a hand-prepared file — and before cut.
 - **Decided.** A git extractor (gitlab+github) joins as a new source: a repo or branch URL becomes a container resource whose files are child resources. Reasonable defaults apply (e.g. oversized files ignored), and everything in the repo/branch is indexed by default, at least for now. No existing project uses it yet.
-- **Decided.** New kinds of cuts join the shared recipe catalogue — a PR to `rag-etl`, referenced by name in rules — never course-local code. Plausible v0 set: `whole_document` (with a size guard; covers a code file), `one_per_page`, `per_exercise`, `text` (header-aware chunking for typeset notes), `per_slide` (videos).
+- **Decided.** New kinds of cuts join the shared cut catalogue — a PR to `rag-etl` — never course-local code. The v0 set: `whole_document` (with a size guard; covers a code file), `per_child` (one chunk per child — pages and video segments alike), `per_exercise`, `text` (header-aware chunking for typeset notes).
 - **Decided.** Materialization is uniform: every PDF → container + one child per page, each page OCR'd via the RCP vision LLM (page-by-page is the only way to OCR via a vision model, and it happens with all PDFs). The `<!-- page N -->` marker mechanism is dropped: it was an artifact of the file-based pipeline; page geometry is native in the resource model.
 - **Decided.** OCR stays pure and reusable: transcription only, nothing else folded into it. No local text-layer fast path. Rendering must be deterministic (stable rasterization settings), because a page's rendered input is what gets hashed.
-- **Decided.** The `per_exercise` recipe is rule-gated annotation + cut: an LLM pass first annotates each exercise's number and whether it holds a statement or a solution; then the ordered sibling pages are concatenated; then the text is cut at the annotated markers. Nothing is annotated unless the rules ask for it.
-- **Decided.** `is_solution` is chunk-level: a document split by a recipe is itself neither solution nor statement — its children are, labeled by the `per_exercise` annotator. The judge's document-level guess is consulted only by recipes that leave a document whole. (The `per_exercise` annotator and the metadata judge share model infrastructure but are separate concerns.)
-- **Decided.** The combinatorial cases (statement-only / solution-only / both documents / statements-and-solutions siblings / stitch or not) decompose into: detect + pick one of the cuts + derive labels. Sibling PDFs pair via the shared exercise number; whether inline solutions become one chunk or two is a recipe *parameter*, not a new path.
-- **Decided.** Videos: slide-change detection and captions are resolved once upstream in materialization; the course picks `per_slide` vs a whole-document recipe. (Which upstream service does detection is an open topic.)
+- **Decided.** `per_exercise` is annotation + cut: an LLM pass first annotates each exercise's number and whether it holds a statement or a solution; then the ordered sibling pages are concatenated; then the text is cut at the annotated markers. Nothing is annotated unless the cut asks for it.
+- **Decided.** `is_solution` is chunk-level: a document split by a cut is itself neither solution nor statement — its children are, labeled by the `per_exercise` annotator. (The `per_exercise` annotator and the metadata judge share model infrastructure but are separate concerns.)
+- **Decided.** The combinatorial cases (statement-only / solution-only / both documents / statements-and-solutions siblings / stitch or not) decompose into: detect + pick one of the cuts + derive labels. Sibling PDFs pair via the shared exercise number; whether inline solutions become one chunk or two is a cut *parameter*, not a new path.
+- **Decided.** Videos: slide-change detection and captions are resolved once upstream in materialization; the judge picks the cut. (Which upstream service does detection is an open topic.)
 
 ## 6. Identity and caching
 
@@ -101,7 +101,7 @@ Status markers:
 - **Locator/URL-based identity** — sources churn constantly (Moodle URL edits on metadata change, re-uploaded videos); identity is content, locators are properties.
 - **Page-marked text as pipeline geometry** — replaced by nested per-page child resources; markers were the artifact that kept page geometry fake.
 - **Folding exercise/section detection into the OCR call** — OCR stays clean and reusable; detection is a later, rule-gated pass.
-- **Per-course transformer lists and a step-level escape hatch** — shared recipes; growth happens in the catalogue via PR, not course-local code.
+- **Per-course transformer lists and a step-level escape hatch** — shared cuts; growth happens in the catalogue via PR, not course-local code.
 - **Single-LLM auto-labeling (the ~80% experiment) as the labeling mechanism** — superseded by the two-scenario model; the LLM-as-a-judge exists only in scenario B, wrapped by overrides and HITL.
 - **A dedicated inspection CLI command** — Kibana plus the always-on record cover inspection; no new tooling.
 - **prompt/model/config in the cache key** — content-only keys plus explicit invalidation instead.

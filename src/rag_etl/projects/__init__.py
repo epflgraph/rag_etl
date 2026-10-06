@@ -1,4 +1,5 @@
 from rag_etl.projects.common.base import BaseProject
+from rag_etl.projects.spec import ProjectSpec
 
 from rag_etl.projects.cs470 import CS470Project
 from rag_etl.projects.phys108 import PHYS108Project
@@ -45,6 +46,7 @@ from rag_etl.projects.math111c import MATH111cProject
 
 __all__ = [
     "BaseProject",
+    "ProjectSpec",
     "CS470Project",
     "PHYS108Project",
     "MICRO315Project",

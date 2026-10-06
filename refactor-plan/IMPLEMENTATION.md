@@ -33,7 +33,7 @@ What the audit of the two repos found, for reference while implementing.
 
 - ES: common settings (analyzers: `raw`, `base_en`, `base_fr`, `trigram`) + common mappings (`content.en`/`content.fr` with `raw`/`sayt`/`trigram` subfields; `embedding` dense_vector, 384 dims, dot_product, int8_hnsw); course pipe adds `description.en/fr` and `from`/`until` date fields.
 - Index flow: fresh index `rag_{type}_{name}_index_{YYYY_MM_DD}` → bulk load (chunk 100–500) → alias `rag_{type}_{name}_index` shifted atomically (via `elasticsearch_interface`). This flow is the template for the new loader, minus the MySQL hop.
-- Chunking (GraphAI `chunk_text`, 400/100) and bilingual translation (GraphAI) are absorbed differently: local header-aware chunking (`text` recipe), translation dropped.
+- Chunking (GraphAI `chunk_text`, 400/100) and bilingual translation (GraphAI) are absorbed differently: local header-aware chunking (`text` cut), translation dropped.
 - Cache: MySQL `graphai_cache_rag.<type>_<name>_es_index_table` (`id_token`, `origin_token`, `json_result`, `processing_date`, `content_hash`) — dropped; `rag-etl` owns caching on disk.
 - `not_core_file` skip mechanism and the `translate` flag die with the repo.
 - What survives conceptually: slide OCR (already uniform in the new design: every PDF page is OCR'd), quiz parsing (inside the MOOC extractor), and the ES-writing flow.
@@ -43,9 +43,9 @@ What the audit of the two repos found, for reference while implementing.
 | Today | rag-etl |
 |---|---|
 | `BaseResource` flat dataclass + 5 subclasses, policy flags in data | One recursive `Resource` dataclass; container/child/chunk is *state*; policy lives in project rules |
-| 41 course classes with `tag_metadata` dicts + `*_type_subtypes` plumbing | Per-project **dataclass spec**: rules (`where`-predicates → labels + recipe), overrides, model configs, default recipe |
+| 41 course classes with `tag_metadata` dicts + `*_type_subtypes` plumbing | The judge infers type/subtype/is_solution/cut per resource; per-project **dataclass spec** carries exceptions (`where`-predicates → label corrections), extractor configs, model configs |
 | Transformer list per course | One **fixed sequence**: extract → normalize → materialize → judge → cut → embed + load |
-| `<!-- page N -->` markers, 2 parallel video paths, Gemini video JSON | PDF → container + page children (OCR each, RCP); video → segments + captions (GraphAI `detect_slides` + Kaltura SRT); cuts: `whole_document`, `one_per_page`, `per_exercise`, `per_slide`, `text` |
+| `<!-- page N -->` markers, 2 parallel video paths, Gemini video JSON | PDF → container + page children (OCR each, RCP); video → segments + captions (GraphAI `detect_slides` + Kaltura SRT); cuts: `whole_document`, `per_child`, `per_exercise`, `text` |
 | Disk cache keyed per-course-scope, no eviction, no refresh | Content-only keys, scope `(transform, content-hash)` shared across projects, per-run `--refresh` flag |
 | GraphAI embed + chunk + bilingual translate | RCP embeddings (Qwen3-Embedding-8B, model+params from spec), local header-aware chunking, **no translation** |
 | Record loader → `chatbot-pipelines` contract | Record/manifest loader (content-hash pointers, `dry` flag, schema snapshot) + **new ES loader** (fresh index `rag_{project}`, atomic alias shift) |
@@ -61,7 +61,7 @@ src/rag_etl/
 ├── cache/                    # content-hash disk cache facade (refresh flag, (transform, hash) scoping)
 ├── llm/                      # RCP client (vision/text/structured/embeddings), judge, per-exercise annotator
 ├── extractors/               # moodle, mooc/, mediaspace, local_folder, ed_discussion, git (new)
-├── transforms/               # normalize/, materialize/, cuts/ (recipe registry)
+├── transforms/               # normalize/, materialize/, cuts/ (cut registry)
 ├── embed/                    # RCP embedder, per chunk, cache-aware
 ├── loaders/                  # record (manifest), elasticsearch
 └── cli.py                    # rag-etl run --project X [--dry] [--refresh TRANSFORM]
@@ -81,12 +81,12 @@ Each phase ends with a verification gate; no phase starts before the previous ga
 
 **Gate:** CI green; `pip install -e .` works; `rag-etl --help` responds.
 
-### Phase 1 — Core model + rules engine
-- Recursive `Resource` (state helpers, lineage child→parent, content hash).
-- Flat ANDed glob `where`-matcher; `Rule` resolution (staff override > judge default; most-specific within the table; ambiguity → warn, not silently resolve); per-project default recipe.
-- Mechanical conversion of the 41 `tag_metadata` tables → rule specs, with a round-trip check that every old entry is expressible as a rule.
+### Phase 1 — Core model + exceptions
+- Recursive `Resource` (derived `is_leaf` and `content_hash`, lineage child→parent, tree helpers).
+- Exception mechanism: flat ANDed glob `where`-matcher; most-specific wins; equal specificity → first-declared wins, loudly (warn); applied on top of the judge's labels.
+- The 41 `tag_metadata` tables are dropped, not converted: type/subtype/is_solution/cut are inferred by the judge (a stub for Javier's algorithm, which lands in Phase 4).
 
-**Gate:** unit tests for matcher + resolution; conversion covers all 41; unknown material visibly falls to the default recipe in dry-run output.
+**Gate:** unit tests for the resource tree and the exception matcher; ambiguity warns visibly; unmatched resources stay untouched.
 
 ### Phase 2 — Extractors
 - Adapt Moodle (auto-capture `from`/`until` from availability dates), MOOC, Mediaspace, LocalFolder, Ed Discussion to emit `Resource` trees.
@@ -104,12 +104,12 @@ Each phase ends with a verification gate; no phase starts before the previous ga
 **Gate:** unit tests; COM202 dry run with cache reuse vs `--refresh` (per-resource cost flags correct; one-comma-in-200-pages re-OCRs one page).
 
 ### Phase 4 — Judge + cuts + embeddings
-- Metadata judge transformer (after materialize, before cut): labels `type`/`subtype`/`is_solution` at document level; professor's Moodle exclusions are exclude-only; overrides on top of judge defaults.
+- Judge transformer (after materialize, before cut): a stub for Javier's inference, filling `type`/`subtype`/`is_solution` and the `cut` per resource (or dropping the resource); exceptions correct on top of judge output.
 - `per_exercise` annotator: exercise number + is-solution (chunk-level), separate concern from the judge, shared model infrastructure; nothing annotated unless rules ask for it.
-- Cuts registry: `whole_document` (size guard), `one_per_page`, `per_exercise` (annotate + stitch ordered sibling pages + cut at markers), `per_slide`, `text` (header-aware chunking with size guard). New cuts join via PR, never course-local code.
+- Cuts registry: `whole_document` (size guard), `per_child`, `per_exercise` (annotate + stitch ordered sibling pages + cut at markers), `text` (header-aware chunking with size guard). New cuts join via PR, never course-local code.
 - RCP embeddings per chunk (Qwen3-Embedding-8B), cache-aware (see §5 open items for cache interaction).
 
-**Gate:** unit tests on cuts with synthetic docs; judge + annotator spot-checks on real COM202 pages; override rules change labels on rerun.
+**Gate:** unit tests on cuts with synthetic docs; judge + annotator spot-checks on real COM202 pages; exceptions change labels on rerun.
 
 ### Phase 5 — Loaders: record + Elasticsearch
 - Record/manifest loader: header (run timestamp, `dry` flag, project id, index name + alias, pipeline version, schema snapshot) + resource-tree body; metadata-only with content-hash pointers (no text, no embeddings); dry records land separately from real-run records.

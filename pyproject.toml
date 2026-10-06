@@ -76,7 +76,7 @@ module = [
     "rag_etl.extractors.*",
     "rag_etl.transformers.*",
     "rag_etl.utils.*",
-    "rag_etl.projects.*",
+    "rag_etl.projects.*.*",
     "rag_etl.resources.*",
 ]
 ignore_errors = true

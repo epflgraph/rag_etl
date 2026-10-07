@@ -123,11 +123,11 @@ def add_synthesised_parents(
     for entry in grouped.values():
         if entry.number is None or entry.sub_number is None:
             continue
-        parent_key = (entry.type, entry.subtype, entry.number)
+        parent_key: tuple[str, str | None, str | None] = (entry.type, entry.subtype, entry.number)
         children_by_parent.setdefault(parent_key, []).append(entry)
 
     for parent_key, children in children_by_parent.items():
-        full_key = (parent_key[0], parent_key[1], parent_key[2], None)
+        full_key: tuple[str, str | None, str | None, str | None] = (parent_key[0], parent_key[1], parent_key[2], None)
         if full_key in grouped:
             continue
         grouped[full_key] = synthesise_parent_entry(parent_key, children)

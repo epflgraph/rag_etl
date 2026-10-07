@@ -1,19 +1,22 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 from lxml.etree import _Element
 
 import rag_etl.utils.mime_types as mt
-from rag_etl.resources.mooc_resource import MOOCResource
+from rag_etl.core import Resource
 from rag_etl.extractors.mooc.utils import (
     extract_number,
     load_root_elem_from_mooc_xml,
     clean_text,
     normalize_markdown,
     escape_markdown,
+    cut_from_flags,
 )
 
 
@@ -48,20 +51,20 @@ class QuizData:
 
 class QuizParser:
     """
-    Parse Open edX problem XML quizzes to Markdown, returning two MOOCResources:
+    Parse Open edX problem XML quizzes to Markdown, returning two Resources:
     - quiz without solutions
     - quiz with solutions and hints if any
     """
 
     def parse(
         self,
-        course_path: str,
+        course_path: Path,
         elem_vertical: _Element,
         vertical_display_name: str,
-        tag_metadata: dict,
+        tag_metadata: Mapping[str, Mapping[str, Any]],
         week: int | None = None,
-    ) -> list[MOOCResource]:
-        mooc_resources: list[MOOCResource] = []
+    ) -> list[Resource]:
+        mooc_resources: list[Resource] = []
 
         tag_name = "MOOC_QUIZ"
         tag_dict = tag_metadata.get(tag_name)
@@ -106,46 +109,32 @@ class QuizParser:
         number_str = extract_number(resource_title)
 
         # Quiz
-        quiz_res: MOOCResource = MOOCResource(
-            source="mooc",
+        quiz_res: Resource = Resource(
             title=resource_title,
             url=None,
-            path=str(quiz_md_path),
+            path=quiz_md_path,
             mime_type=mt.guess_mime_type(str(quiz_md_path)),
-            is_video=False,
             is_solution=False,
-            is_gemini_processed_video=False,
-            model=None,
-            tag=tag_name,
             type=tag_dict.get("type"),
             subtype=tag_dict.get("subtype"),
             number=number_str,
             week=week,
-            one_chunk_per_page=tag_dict.get("one_chunk_per_page"),
-            one_chunk_per_doc=tag_dict.get("one_chunk_per_doc"),
-            processing_method=tag_dict.get("processing_method"),
+            cut=cut_from_flags(tag_dict.get("one_chunk_per_page"), tag_dict.get("one_chunk_per_doc")),
         )
         mooc_resources.append(quiz_res)
 
         # Quiz with solution
-        quiz_sol_res: MOOCResource = MOOCResource(
-            source="mooc",
+        quiz_sol_res: Resource = Resource(
             title=resource_title,
             url=None,
-            path=str(quiz_sol_md_path),
+            path=quiz_sol_md_path,
             mime_type=mt.guess_mime_type(str(quiz_sol_md_path)),
-            is_video=False,
             is_solution=True,
-            is_gemini_processed_video=False,
-            model=None,
-            tag=tag_name,
             type=tag_dict.get("type"),
             subtype=tag_dict.get("subtype"),
             number=number_str,
             week=week,
-            one_chunk_per_page=tag_dict.get("one_chunk_per_page"),
-            one_chunk_per_doc=tag_dict.get("one_chunk_per_doc"),
-            processing_method=tag_dict.get("processing_method"),
+            cut=cut_from_flags(tag_dict.get("one_chunk_per_page"), tag_dict.get("one_chunk_per_doc")),
         )
         mooc_resources.append(quiz_sol_res)
 
@@ -260,7 +249,7 @@ class QuizParser:
 
         return options
 
-    def choice_text(self, choice: _Element) -> tuple[str, str | None]:
+    def choice_text(self, choice: _Element) -> str:
         """
         Extract text
         """

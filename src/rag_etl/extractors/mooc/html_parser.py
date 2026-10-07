@@ -1,15 +1,18 @@
 import logging
+from collections.abc import Mapping
 from pathlib import Path
 from lxml.etree import _Element
 from pathlib import PurePosixPath
 from urllib.parse import unquote, urljoin
 import re
 import unicodedata
+from typing import Any
+
 from bs4 import BeautifulSoup
 from bs4.element import Tag, NavigableString
 
 
-from rag_etl.resources.mooc_resource import MOOCResource
+from rag_etl.core import Resource
 from rag_etl.extractors.mooc.utils import (
     clean_text,
     load_root_elem_from_mooc_xml,
@@ -17,6 +20,7 @@ from rag_etl.extractors.mooc.utils import (
     UntaggedDocuments,
     pdf_is_slides,
     url_exists,
+    cut_from_flags,
 )
 
 from rag_etl.utils.tags import split_tag_number_text, split_tag_text
@@ -37,9 +41,6 @@ class HtmlParser:
     """
     HTML Parser for MOOCs.
     """
-
-    pdf_default_processing_method = "rcp"
-    pdf_default_model = "Qwen/Qwen3-VL-235B-A22B-Thinking-fp8"
 
     def convert_html_text_to_markdown(self, soup: BeautifulSoup) -> str:
         """Convert HTML text to Markdown with BeautifulSoup"""
@@ -207,7 +208,7 @@ class HtmlParser:
 
             for anchor in paragraph.find_all("a"):
                 href = anchor.get("href")
-                if not href:
+                if not isinstance(href, str) or not href:
                     continue
 
                 if not href.lower().split("?")[0].endswith(extensions):
@@ -255,7 +256,7 @@ class HtmlParser:
 
         return inferred_url
 
-    def strip_tag_markers(self, md_text: str, tag_metadata: dict) -> str:
+    def strip_tag_markers(self, md_text: str, tag_metadata: Mapping[str, Mapping[str, Any]]) -> str:
         """
         Remove the tag markers a page carries from the text taken out of it.
 
@@ -280,18 +281,17 @@ class HtmlParser:
     def parse_untagged_documents(
         self,
         soup: BeautifulSoup,
-        course_path: str,
+        course_path: Path,
         html_display_name: str,
         assets_map: dict[str, str],
         asset_base_url: str | None,
-        tag_metadata: dict,
+        tag_metadata: Mapping[str, Mapping[str, Any]],
         untagged_documents: UntaggedDocuments,
         vertical_has_video: bool,
         week: int | None,
-    ) -> list[MOOCResource]:
+    ) -> list[Resource]:
         """
         Build a resource for every document a page links without tagging it.
-
         Which tag a PDF gets is decided by looking at its first page, since a
         slide deck and a reading want to be chunked differently. Anything that
         is not a PDF cannot be a deck, so it is filed as theory.
@@ -302,7 +302,7 @@ class HtmlParser:
         if vertical_has_video:
             return []
 
-        mooc_resources: list[MOOCResource] = []
+        mooc_resources: list[Resource] = []
 
         for linked, link_tag in self.tagged_links(soup, untagged_documents.extensions):
             # A tagged link is not this method's business
@@ -333,36 +333,24 @@ class HtmlParser:
 
             logger.info(f"Untagged document {resource_path.name} filed as {tag}")
 
-            processing_method = None
-            model = None
-            if mime_type == mt.PDF:
-                processing_method = self.pdf_default_processing_method
-                model = self.pdf_default_model
-
             mooc_resources.append(
-                MOOCResource(
+                Resource(
                     title=self.generate_title_for_found_resource(html_display_name, str(linked)),
-                    source="mooc",
                     url=resource_url,
-                    path=str(resource_path),
+                    path=resource_path,
                     mime_type=mime_type,
                     type=tag_dict.get("type"),
                     subtype=tag_dict.get("subtype"),
                     is_solution=tag_dict.get("is_solution", False),
                     week=week,
-                    one_chunk_per_page=tag_dict.get("one_chunk_per_page"),
-                    one_chunk_per_doc=tag_dict.get("one_chunk_per_doc"),
-                    processing_method=processing_method,
-                    model=model,
-                    is_video=False,
-                    is_gemini_processed_video=False,
+                    cut=cut_from_flags(tag_dict.get("one_chunk_per_page"), tag_dict.get("one_chunk_per_doc")),
                 )
             )
 
         return mooc_resources
 
     def resolve_link(
-        self, linked: str, course_path: str, assets_map: dict[str, str], asset_base_url: str | None
+        self, linked: str, course_path: Path, assets_map: dict[str, str], asset_base_url: str | None
     ) -> tuple[Path, str | None]:
         """Return where a linked file is in the export, and the url it is published at."""
 
@@ -386,19 +374,19 @@ class HtmlParser:
 
     def parse(
         self,
-        course_path: str,
+        course_path: Path,
         elem_vertical: _Element,
         vertical_display_name: str,
         assets_map: dict[str, str],
-        tag_metadata: dict,
+        tag_metadata: Mapping[str, Mapping[str, Any]],
         asset_base_url: str | None = None,
         untagged_documents: UntaggedDocuments | None = None,
         vertical_has_video: bool = False,
         week: int | None = None,
-    ) -> list[MOOCResource]:
+    ) -> list[Resource]:
         """Parse a MOOC HTML file"""
 
-        mooc_resources: list[MOOCResource] = []
+        mooc_resources: list[Resource] = []
 
         html_url_name = elem_vertical.get("url_name", "")
         html_filename = html_url_name + ".html"
@@ -435,9 +423,6 @@ class HtmlParser:
 
         soup = BeautifulSoup(html_text, "html.parser")
 
-        if untagged_documents is None:
-            untagged_documents = UntaggedDocuments()
-
         if not module_tag:
             plain_text = soup.get_text()
 
@@ -453,7 +438,7 @@ class HtmlParser:
         # A page carrying no tag the course declares has no metadata of its
         # own, but the documents it links can still be classified one by one
         if module_tag not in tag_metadata:
-            if not untagged_documents.include:
+            if untagged_documents is None:
                 return []
 
             return self.parse_untagged_documents(
@@ -468,7 +453,8 @@ class HtmlParser:
                 week=week,
             )
 
-        tag_dict = tag_metadata.get(module_tag)
+        # The membership check above guarantees the tag is declared
+        tag_dict = tag_metadata[module_tag]
 
         # HTML to MarkDown
         md_text = self.convert_html_text_to_markdown(soup)
@@ -499,20 +485,16 @@ class HtmlParser:
         if tag_dict.get("split_exercises"):
             logger.info(f"Not indexing the page {markdown_filename}, only the files it links")
         else:
-            html_resource: MOOCResource = MOOCResource(
-                source="mooc",
-                url=None,
+            html_resource: Resource = Resource(
                 title=mooc_resource_title,
-                path=str(markdown_path),
+                url=None,
+                path=markdown_path,
                 mime_type=mime_type,
                 type=tag_dict.get("type"),
                 subtype=tag_dict.get("subtype"),
                 number=module_number,
                 week=week,
-                one_chunk_per_page=tag_dict.get("one_chunk_per_page"),
-                one_chunk_per_doc=tag_dict.get("one_chunk_per_doc"),
-                processing_method=tag_dict.get("processing_method"),
-                model=tag_dict.get("model"),
+                cut=cut_from_flags(tag_dict.get("one_chunk_per_page"), tag_dict.get("one_chunk_per_doc")),
             )
             mooc_resources.append(html_resource)
 
@@ -588,43 +570,29 @@ class HtmlParser:
                 continue
 
             logger.debug(f"link_module_tag={link_module_tag}")
-            tag_dict = tag_metadata.get(link_module_tag)
+            link_tag_dict = tag_metadata.get(link_module_tag)
 
             # A tag the course does not declare carries no metadata, so the
             # file is skipped rather than indexed unclassified
-            if tag_dict is None:
+            if link_tag_dict is None:
                 logger.info(f"Skipping {linked} because its tag ({link_module_tag}) is unexpected")
                 continue
 
             if link_module_number is not None:
                 link_module_number = str(link_module_number)
 
-            # Set processing method and model for PDFs. Both are reset each
-            # time, so a PDF's settings cannot leak onto the next file
-            processing_method = None
-            model = None
-            if mime_type == mt.PDF:
-                processing_method = self.pdf_default_processing_method
-                model = self.pdf_default_model
-
             # Create resource and append it
-            mooc_resource: MOOCResource = MOOCResource(
+            mooc_resource: Resource = Resource(
                 title=resource_title,
-                source="mooc",
                 url=linked_url,
-                path=str(resource_path),
+                path=resource_path,
                 mime_type=mime_type,
-                type=tag_dict.get("type"),
-                subtype=tag_dict.get("subtype"),
+                type=link_tag_dict.get("type"),
+                subtype=link_tag_dict.get("subtype"),
                 number=link_module_number,
                 week=week,
-                is_solution=tag_dict.get("is_solution", False),
-                one_chunk_per_page=tag_dict.get("one_chunk_per_page"),
-                one_chunk_per_doc=tag_dict.get("one_chunk_per_doc"),
-                processing_method=processing_method,
-                model=model,
-                is_video=False,
-                is_gemini_processed_video=False,
+                is_solution=link_tag_dict.get("is_solution", False),
+                cut=cut_from_flags(link_tag_dict.get("one_chunk_per_page"), link_tag_dict.get("one_chunk_per_doc")),
             )
 
             mooc_resources.append(mooc_resource)

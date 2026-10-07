@@ -5,7 +5,7 @@ from datetime import date
 import logging
 
 from rag_etl.projects import BaseProject
-from rag_etl.extractors import BaseExtractor, LocalFolderExtractor
+from rag_etl.extractors import Extractor, LocalFolderExtractor
 from rag_etl.transformers import (
     BaseTransformer,
     ExtractZipTransformer,
@@ -102,7 +102,7 @@ class BIO695Project(BaseProject):
         ]
 
     @property
-    def extractors(self) -> list[BaseExtractor]:
+    def extractors(self) -> list[Extractor]:
         return [
             LocalFolderExtractor(
                 folder_base_path=self.local_folder_base_path,

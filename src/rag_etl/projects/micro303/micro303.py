@@ -6,7 +6,7 @@ import logging
 
 from rag_etl.projects import BaseProject
 from rag_etl.extractors import (
-    BaseExtractor,
+    Extractor,
     MoodleExtractor,
     MOOCExtractor,
     LocalFolderExtractor,
@@ -141,7 +141,7 @@ class MICRO303Project(BaseProject):
         ]
 
     @property
-    def extractors(self) -> list[BaseExtractor]:
+    def extractors(self) -> list[Extractor]:
         return [
             MoodleExtractor(
                 moodle_course_id=self.moodle_course_id,

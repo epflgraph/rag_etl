@@ -73,7 +73,6 @@ ignore_missing_imports = true
 module = [
     "rag_etl.config",
     "rag_etl.loaders.*",
-    "rag_etl.extractors.*",
     "rag_etl.transformers.*",
     "rag_etl.utils.*",
     "rag_etl.projects.*.*",

@@ -55,7 +55,7 @@ class ThreadClassification(BaseModel):
     confidence: int = Field(ge=0, le=10)
 
 
-def get_user_roles(users: list[dict]) -> dict[int, str]:
+def get_user_roles(users: list[dict]) -> dict[int, str | None]:
     """Build a mapping from user_id to course_role."""
 
     return {user["id"]: user.get("course_role") for user in users}
@@ -295,7 +295,7 @@ def classify_thread_with_cascade(
 
 def extract_messages_from_thread(
     thread: dict,
-    user_roles: dict[int, str],
+    user_roles: dict[int, str | None],
     thread_title: str,
     include_student_endorsed: bool,
     images_dir: Path,
@@ -368,7 +368,7 @@ def extract_messages_from_thread(
 
 def process_comment(
     comment: dict,
-    user_roles: dict[int, str],
+    user_roles: dict[int, str | None],
     include_student_endorsed: bool,
     thread_title: str,
     images_dir: Path,
@@ -377,7 +377,8 @@ def process_comment(
     """Process a comment and its nested comments."""
 
     results = []
-    role = user_roles.get(comment.get("user_id"))
+    user_id = comment.get("user_id")
+    role = user_roles.get(user_id) if user_id is not None else None
     endorsed = comment.get("is_endorsed", False)
 
     if role in STAFF_ROLES:

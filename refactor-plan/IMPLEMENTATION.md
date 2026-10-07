@@ -92,7 +92,7 @@ Each phase ends with a verification gate; no phase starts before the previous ga
 - Adapt Moodle (auto-capture `from`/`until` from availability dates), MOOC, Mediaspace, LocalFolder, Ed Discussion to emit `Resource` trees.
 - New git extractor: GitLab/GitHub repo or branch URL → container resource + file children, reasonable defaults, everything indexed by default.
 
-**Gate:** unit tests; one real extraction per source (COM202 Moodle + MOOC first); behavior when a source is temporarily unreachable defined (skip-with-warning).
+**Gate:** unit tests; one real extraction per source (MICRO-303 Moodle first; MOOC, Mediaspace, Ed and git wait for their inputs); a temporarily unreachable source fails the run loud (SourceUnavailable) rather than indexing half of it.
 
 ### Phase 3 — Pipeline + cache + normalize + materialize
 - Fixed-sequence orchestrator.

@@ -3,7 +3,8 @@ import logging
 from pathlib import Path
 
 from rag_etl.config import CONFIG
-from rag_etl.extractors import BaseExtractor
+from rag_etl.core import Resource
+from rag_etl.extractors.base_extractor import Extractor
 from rag_etl.extractors.ed_discussion.catalogue import build_catalogue, find_entry, render_catalogue_entry
 from rag_etl.extractors.ed_discussion.utils import (
     MESSAGE_TYPES,
@@ -14,7 +15,6 @@ from rag_etl.extractors.ed_discussion.utils import (
     format_qa,
     get_user_roles,
 )
-from rag_etl.resources.ed_discussion_resource import EdDiscussionResource
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 CATALOGUE_REQUIRED_TYPES = ("practice", "exam")
 
 
-class EdDiscussionExtractor(BaseExtractor):
+class EdDiscussionExtractor(Extractor):
     """Extractor for retrieving previously answered questions from Ed Discussion."""
 
     def __init__(
@@ -60,7 +60,10 @@ class EdDiscussionExtractor(BaseExtractor):
     def default_models() -> list[str]:
         """Build the juror model list from config: the required model plus any optional jurors."""
 
-        models = [CONFIG["RCP_EDSTEM_EXTRACTOR_MODEL"]]
+        models: list[str] = []
+        first_model = CONFIG["RCP_EDSTEM_EXTRACTOR_MODEL"]
+        if first_model:
+            models.append(first_model)
         for key in ("RCP_EDSTEM_EXTRACTOR_MODEL_2", "RCP_EDSTEM_EXTRACTOR_MODEL_3"):
             extra_model = CONFIG.get(key)
             if extra_model:
@@ -77,8 +80,8 @@ class EdDiscussionExtractor(BaseExtractor):
             return years[1] if self.semester == 2 else years[0]
         return self.academic_year
 
-    def extract(self) -> list[EdDiscussionResource]:
-        """Extract resources for Ed Discussion Q&A threads."""
+    def extract(self) -> Resource:
+        """Extract the threads' material as leaves under one container."""
 
         # The catalogue comes from the previous run's output, so a course's first run has none. Classifying
         # against an empty catalogue would leave every practice/exam thread unmatched, so wait for the next run
@@ -87,7 +90,7 @@ class EdDiscussionExtractor(BaseExtractor):
                 "Skipping Ed Discussion: no theory/practice/exam documents in the previous run's metadata. "
                 "This run writes them, the next one will classify the threads"
             )
-            return []
+            return Resource(title=f"Ed Discussion {self.academic_year}")
 
         ed_dir = self.ed_discussion_base_path / "ed_discussion" / self.academic_year
 
@@ -108,9 +111,13 @@ class EdDiscussionExtractor(BaseExtractor):
         intermediate_jsons = self.get_or_create_intermediate_jsons(ed_dir, processed_dir, images_dir)
 
         # Markdown (final) files are created from the JSON files
-        resources = self.create_resources_from_jsons(intermediate_jsons, markdown_dir)
+        base = Resource(title=f"Ed Discussion {self.academic_year}")
 
-        return resources
+        resources = self.create_resources_from_jsons(intermediate_jsons, markdown_dir)
+        for resource in resources:
+            base.add_child(resource)
+
+        return base
 
     def get_or_create_intermediate_jsons(
         self,
@@ -151,7 +158,7 @@ class EdDiscussionExtractor(BaseExtractor):
         input_files = list(ed_dir.glob("*.json"))
         logger.info(f"Processing {len(input_files)} JSON files from {ed_dir}")
 
-        categorized = {msg_type: [] for msg_type in MESSAGE_TYPES}
+        categorized: dict[str, list[dict]] = {msg_type: [] for msg_type in MESSAGE_TYPES}
         failed_threads = []
         disputed_threads = []
 
@@ -445,8 +452,8 @@ class EdDiscussionExtractor(BaseExtractor):
         self,
         intermediate_jsons: dict[str, Path],
         markdown_dir: Path,
-    ) -> list[EdDiscussionResource]:
-        """Create EdDiscussionResource instances from intermediate JSONs."""
+    ) -> list[Resource]:
+        """Create Resource instances from intermediate JSONs."""
 
         resources = []
 
@@ -465,7 +472,7 @@ class EdDiscussionExtractor(BaseExtractor):
                 continue
 
             for thread in threads:
-                resource = self.create_resource_from_thread(thread, category, json_path, markdown_dir)
+                resource = self.create_resource_from_thread(thread, category, markdown_dir)
                 if resource is not None:
                     resources.append(resource)
 
@@ -476,10 +483,9 @@ class EdDiscussionExtractor(BaseExtractor):
         self,
         thread: dict,
         category: str,
-        json_path: Path,
         markdown_dir: Path,
-    ) -> EdDiscussionResource | None:
-        """Create an EdDiscussionResource from a Ed Discussion thread."""
+    ) -> Resource | None:
+        """Create a Resource from a Ed Discussion thread."""
 
         if self.is_unmatched(thread):
             logger.info(f"Skipping {thread.get('filename')}: no catalogue entry yet, revisited at the next update")
@@ -525,27 +531,20 @@ class EdDiscussionExtractor(BaseExtractor):
                     f"type={thread_type}, subtype={subtype}, number={doc_number}, sub_number={doc_subnumber}"
                 )
 
-        return EdDiscussionResource(
+        return Resource(
             title=thread_title,
-            source="ed_discussion",
             url=None,
-            path=str(md_path),
+            path=md_path,
             mime_type="text/markdown",
             type=thread_type,
             subtype=subtype,
             is_solution=False,
-            is_qa=True,
-            is_video=False,
-            is_gemini_processed_video=False,
             week=week,
             number=doc_number,
-            sub_number=doc_subnumber,
+            subnumber=doc_subnumber,
             from_=from_,
             until=until,
-            one_chunk_per_page=False,
-            one_chunk_per_doc=True,
-            category=category,
-            path_to_intermediate_json_file=str(json_path),
+            cut="whole_document",
         )
 
 

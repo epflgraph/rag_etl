@@ -1,7 +1,9 @@
 import logging
+from collections.abc import Mapping
 from pathlib import Path
+from typing import Any
 from rag_etl.extractors.mooc.chapter_parser import ChapterParser
-from rag_etl.resources.mooc_resource import MOOCResource
+from rag_etl.core import Resource
 from rag_etl.extractors.mooc.utils import UntaggedDocuments, cmp_key, load_root_elem_from_mooc_xml
 import json
 import re
@@ -19,7 +21,7 @@ class CourseParser:
     MOOC Parser.
     """
 
-    def load_assets_map(self, course_path: str) -> dict[str, str]:
+    def load_assets_map(self, course_path: Path) -> dict[str, str]:
 
         # assets.json is always in the same path
         assets_path = Path(course_path) / "policies" / "assets.json"
@@ -35,7 +37,7 @@ class CourseParser:
 
         return m
 
-    def load_asset_base_url(self, course_path: str) -> str | None:
+    def load_asset_base_url(self, course_path: Path) -> str | None:
         """
         Return the prefix an asset of this course is published under, or None.
 
@@ -56,13 +58,13 @@ class CourseParser:
 
         # One course publishes its assets under one prefix, so the most common
         # is the right one even if a stale link survives somewhere
-        base_url = max(found, key=found.get)
+        base_url = max(found, key=lambda name: found[name])
         logger.info(f"Asset base url: {base_url}")
 
         return base_url
 
     def load_chapter_weeks(
-        self, course_path: str, first_week_chapter: int | None, week_count: int | None
+        self, course_path: Path, first_week_chapter: int | None, week_count: int | None
     ) -> list[tuple[str, int | None]]:
         """
         Return the course's chapters in the order a student meets them, each
@@ -103,17 +105,31 @@ class CourseParser:
 
         return chapters
 
+    def course_title(self, course_path: Path) -> str | None:
+        """Return the course's display name from course.xml, or None."""
+
+        course_xml_path = next(iter((Path(course_path) / "course").glob("*.xml")), None)
+        if course_xml_path is None:
+            return None
+
+        root_course = load_root_elem_from_mooc_xml(course_xml_path)
+        if root_course is None:
+            return None
+
+        return root_course.get("display_name")
+
     def parse(
         self,
-        course_path: str,
-        tag_metadata: dict | None = None,
+        course_path: Path,
+        course_url: str | None = None,
+        tag_metadata: Mapping[str, Mapping[str, Any]] | None = None,
         language: str | None = None,
         untagged_documents: UntaggedDocuments | None = None,
         asset_base_url: str | None = None,
         first_week_chapter: int | None = None,
         week_count: int | None = None,
-    ) -> list[MOOCResource]:
-        """Parse a MOOC course"""
+    ) -> Resource:
+        """Parse a MOOC course into a resource tree"""
 
         # Load policies/assets.json with url_name to path mapping
         assets_map: dict[str, str] = self.load_assets_map(course_path)
@@ -121,8 +137,7 @@ class CourseParser:
         if not asset_base_url:
             asset_base_url = self.load_asset_base_url(course_path)
 
-        items: list[MOOCResource] = []
-
+        root = Resource(title=self.course_title(course_path), url=course_url)
         chapter_parser = ChapterParser()
 
         # Chapters are taken in course order rather than in the order the
@@ -137,20 +152,17 @@ class CourseParser:
 
         # For each one of the chapters
         for chapter_url_name, week in chapters:
-            items.extend(
-                chapter_parser.parse(
-                    course_path=course_path,
-                    chapter_filename=f"{chapter_url_name}.xml",
-                    week=week,
-                    assets_map=assets_map,
-                    asset_base_url=asset_base_url,
-                    untagged_documents=untagged_documents,
-                    tag_metadata=tag_metadata,
-                    language=language,
-                )
+            chapter = chapter_parser.parse(
+                course_path=course_path,
+                chapter_filename=f"{chapter_url_name}.xml",
+                week=week,
+                assets_map=assets_map,
+                asset_base_url=asset_base_url,
+                untagged_documents=untagged_documents,
+                tag_metadata=tag_metadata or {},
+                language=language,
             )
+            if chapter is not None:
+                root.add_child(chapter)
 
-        for item in items:
-            logger.debug(f"item={item}")
-
-        return items
+        return root

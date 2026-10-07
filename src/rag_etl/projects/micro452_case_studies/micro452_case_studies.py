@@ -5,7 +5,7 @@ from datetime import date
 import logging
 
 from rag_etl.projects import BaseProject
-from rag_etl.extractors import BaseExtractor, MoodleExtractor
+from rag_etl.extractors import Extractor, MoodleExtractor
 from rag_etl.transformers import (
     BaseTransformer,
     ExtractZipTransformer,
@@ -123,7 +123,7 @@ class MICRO452CaseStudiesProject(BaseProject):
         ]
 
     @property
-    def extractors(self) -> list[BaseExtractor]:
+    def extractors(self) -> list[Extractor]:
         return [
             MoodleExtractor(
                 moodle_course_id=self.moodle_course_id,

@@ -5,7 +5,7 @@ from datetime import date
 import logging
 
 from rag_etl.projects import BaseProject
-from rag_etl.extractors import BaseExtractor, MoodleExtractor, MOOCExtractor, MediaspaceExtractor, EdDiscussionExtractor
+from rag_etl.extractors import Extractor, MoodleExtractor, MOOCExtractor, MediaspaceExtractor, EdDiscussionExtractor
 from rag_etl.transformers import (
     BaseTransformer,
     ExtractZipTransformer,
@@ -160,7 +160,7 @@ class ME326Project(BaseProject):
         ]
 
     @property
-    def extractors(self) -> list[BaseExtractor]:
+    def extractors(self) -> list[Extractor]:
         return [
             MOOCExtractor(
                 mooc_base_path=self.mooc_base_path,

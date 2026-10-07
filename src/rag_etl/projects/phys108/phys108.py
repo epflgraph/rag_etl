@@ -6,7 +6,7 @@ import logging
 from typing import List, Tuple
 
 from rag_etl.projects import BaseProject
-from rag_etl.extractors import BaseExtractor, MoodleExtractor
+from rag_etl.extractors import Extractor, MoodleExtractor
 from rag_etl.transformers import (
     BaseTransformer,
     ExtractZipTransformer,
@@ -138,7 +138,7 @@ class PHYS108Project(BaseProject):
         ]
 
     @property
-    def extractors(self) -> List[BaseExtractor]:
+    def extractors(self) -> List[Extractor]:
         """Single Moodle extractor."""
         return [
             MoodleExtractor(

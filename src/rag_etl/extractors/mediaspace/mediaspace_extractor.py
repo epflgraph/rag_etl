@@ -1,11 +1,14 @@
 import json
 import logging
 import shutil
+from collections.abc import Sequence
+from dataclasses import dataclass
 from datetime import date, datetime
 from pathlib import Path
 
 from rag_etl.config import CONFIG
-from rag_etl.extractors.base_extractor import BaseExtractor
+from rag_etl.core import Resource
+from rag_etl.extractors.base_extractor import Extractor, SourceUnavailable
 from rag_etl.extractors.mediaspace.utils import (
     caption_matches_language,
     entry_created_after,
@@ -23,16 +26,21 @@ from rag_etl.utils.kaltura import (
     list_channel_entries,
     list_playlist_entries,
 )
-from rag_etl.resources.mediaspace_resource import MediaspaceResource
 import rag_etl.utils.mime_types as mt
 
 logger = logging.getLogger(__name__)
 
-# The tag is only for defining the metadata fields in each course
-TAG = "MEDIASPACE_VIDEO"
+
+def config_value(key: str) -> str:
+    """Return a required config value, failing loud when it is missing."""
+    value = CONFIG.get(key)
+    if not value:
+        raise SourceUnavailable(f"Missing required config value: {key}")
+    return value
 
 
-class MediaspaceExtractor(BaseExtractor):
+@dataclass(frozen=True)
+class MediaspaceExtractor(Extractor):
     """
     Extractor for retrieving videos from an EPFL Mediaspace (Kaltura)
     playlist or channel.
@@ -41,40 +49,21 @@ class MediaspaceExtractor(BaseExtractor):
     naming the entry. The video itself is never downloaded.
     VideoToFramesTransformer reads it over HTTP
 
-    Subtitles are downloaded (when available), and reached through srt_path.
-    We process a video published without subtitles. This matches how the MOOC
-    extractor already describes a video, which points at the export's video XML
-    and carries srt_path beside it.
+    Subtitles are downloaded (when available) and travel beside the video as
+    caption leaves.
 
     Note that mime_types filters caption assets. The resources themselves are
     videos and carry mt.MP4
     """
 
-    def __init__(
-        self,
-        playlist_or_channel_url: str,
-        mediaspace_base_path: str,
-        tag_metadata: dict | None = None,
-        mime_types: list[str] | None = None,
-        language: str | None = None,
-        created_after: str | date | datetime | float | None = None,
-    ) -> None:
-        self.playlist_or_channel_url = playlist_or_channel_url
-        self.mediaspace_base_path = Path(mediaspace_base_path)
-        self.language = language
-        self.created_after = created_after
-
-        if tag_metadata:
-            self.tag_metadata = tag_metadata
-        else:
-            self.tag_metadata = {}
-
-        # Kaltura publishes captions in several formats (SRT, WebVTT, DFXP)
-        # We'll use SRT
-        if mime_types is None:
-            self.mime_types = [mt.SRT]
-        else:
-            self.mime_types = mime_types
+    playlist_or_channel_url: str
+    type: str | None = None
+    subtype: str | None = None
+    is_solution: bool = False
+    cut: str | None = None
+    language: str | None = None
+    created_after: str | date | datetime | float | None = None
+    mime_types: Sequence[str] = (mt.SRT,)
 
     def list_entries(self, client) -> list:
         """Return the entries of the configured playlist or channel."""
@@ -162,7 +151,7 @@ class MediaspaceExtractor(BaseExtractor):
 
         file_stem = "_".join(name_parts)
         file_name = f"{file_stem}.{file_ext}"
-        caption_path = self.mediaspace_base_path / file_name
+        caption_path = self.dir / file_name
 
         return caption_path
 
@@ -176,7 +165,7 @@ class MediaspaceExtractor(BaseExtractor):
             name_parts.append(safe_filename(entry_name))
 
         file_stem = "_".join(name_parts)
-        descriptor_path = self.mediaspace_base_path / f"{file_stem}.json"
+        descriptor_path = self.dir / f"{file_stem}.json"
 
         return descriptor_path
 
@@ -194,34 +183,36 @@ class MediaspaceExtractor(BaseExtractor):
 
         return descriptor_path
 
-    def extract(self) -> list[MediaspaceResource]:
+    def extract(self) -> Resource:
         """
-        Extract video resources for this course from Mediaspace.
-
-        Returns:
-            list[MediaspaceResource]: List of raw Resources.
+        Extract video resources for this course from Mediaspace into a
+        container of video leaves, each carrying its captions beside it.
         """
 
-        client = create_kaltura_session(
-            api_url=CONFIG["SWITCH_API_URL"],
-            kaltura_app_token_id=CONFIG["KALTURA_APP_TOKEN_ID"],
-            kaltura_user_id=CONFIG["KALTURA_USER_ID"],
-            kaltura_token=CONFIG["KALTURA_TOKEN"],
-            kaltura_partner_id=int(CONFIG["KALTURA_PARTNER_ID"]),
-        )
+        # Reaching the source, failing loud when it cannot be reached
+        try:
+            client = create_kaltura_session(
+                api_url=config_value("SWITCH_API_URL"),
+                kaltura_app_token_id=config_value("KALTURA_APP_TOKEN_ID"),
+                kaltura_user_id=config_value("KALTURA_USER_ID"),
+                kaltura_token=config_value("KALTURA_TOKEN"),
+                kaltura_partner_id=int(config_value("KALTURA_PARTNER_ID")),
+            )
+        except Exception as error:
+            raise SourceUnavailable(f"Kaltura session could not be created: {error}") from error
 
-        entries = self.list_entries(client)
+        try:
+            entries = self.list_entries(client)
+        except Exception as error:
+            raise SourceUnavailable(f"Could not list Mediaspace entries: {error}") from error
 
         # Deleting first so the folder ends up holding exactly
         # what this run extracted
-        if self.mediaspace_base_path.exists():
-            shutil.rmtree(self.mediaspace_base_path)
+        if self.dir.exists():
+            shutil.rmtree(self.dir)
 
-        # A channel holds one kind of material, so every resource it produces
-        # carries the same metadata, declared by the course under this tag
-        tag_dict = self.tag_metadata.get(TAG, {})
+        resources = Resource(title=self.playlist_or_channel_url, url=self.playlist_or_channel_url)
 
-        resources = []
         for entry in entries:
             entry_id = entry.id
             entry_name = getattr(entry, "name", "") or ""
@@ -244,7 +235,6 @@ class MediaspaceExtractor(BaseExtractor):
             caption = self.select_caption(get_subtitle_urls(client, entry_id), entry_id)
 
             srt_path = None
-            caption_asset_id = None
 
             if caption is not None:
                 caption_path = self.build_caption_path(caption, entry_id, entry_name)
@@ -254,32 +244,27 @@ class MediaspaceExtractor(BaseExtractor):
                 if download_caption(client, caption, caption_path):
                     logger.info(f"Entry {entry_id}: wrote {caption_path}")
                     srt_path = str(caption_path)
-                    caption_asset_id = caption.get("caption_asset_id")
 
             descriptor_path = self.write_descriptor(entry_id, entry_name)
 
-            resources.append(
-                MediaspaceResource(
+            video = resources.add_child(
+                Resource(
                     title=entry_name,
-                    source="mediaspace",
                     url=build_entry_url(entry_id, self.playlist_or_channel_url),
-                    path=str(descriptor_path),
+                    path=descriptor_path,
                     mime_type=mt.MP4,
-                    srt_path=srt_path,
-                    is_video=True,
-                    is_gemini_processed_video=False,
-                    entry_id=entry_id,
-                    caption_asset_id=caption_asset_id,
-                    tag=TAG,
-                    type=tag_dict.get("type"),
-                    subtype=tag_dict.get("subtype"),
-                    is_solution=tag_dict.get("is_solution", False),
-                    one_chunk_per_page=tag_dict.get("one_chunk_per_page", False),
-                    one_chunk_per_doc=tag_dict.get("one_chunk_per_doc", False),
+                    type=self.type,
+                    subtype=self.subtype,
+                    is_solution=self.is_solution,
+                    cut=self.cut,
                 )
             )
 
-        if not resources:
+            # Subtitles travel beside the video as a caption leaf
+            if srt_path is not None:
+                video.add_child(Resource(path=Path(srt_path), mime_type=mt.SRT))
+
+        if not resources.children:
             logger.warning(f"No videos extracted from {self.playlist_or_channel_url}")
 
         return resources

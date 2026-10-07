@@ -4,7 +4,7 @@ from datetime import date
 
 import logging
 from rag_etl.projects import BaseProject
-from rag_etl.extractors import BaseExtractor, MOOCExtractor, LocalFolderExtractor
+from rag_etl.extractors import Extractor, MOOCExtractor, LocalFolderExtractor
 from rag_etl.transformers import (
     BaseTransformer,
     PDFToMarkdownTransformer,
@@ -114,7 +114,7 @@ class MGT645Project(BaseProject):
         ]
 
     @property
-    def extractors(self) -> list[BaseExtractor]:
+    def extractors(self) -> list[Extractor]:
         """Single Moodle extractor."""
         return [
             MOOCExtractor(

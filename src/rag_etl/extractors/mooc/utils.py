@@ -5,6 +5,7 @@ from pathlib import Path, PurePosixPath
 from lxml import etree
 import re
 from html import unescape
+from typing import Any
 from urllib.parse import unquote, urlparse
 import unicodedata
 from pydantic import BaseModel, Field
@@ -78,9 +79,24 @@ def escape_markdown(text: str) -> str:
     return t
 
 
+def cut_from_flags(one_chunk_per_page: Any, one_chunk_per_doc: Any) -> str | None:
+    """
+    Return the cut a tag's one-chunk flags stand for.
+
+    A tag filed one chunk per page cuts per child; a tag filed one chunk per
+    document cuts the document whole. A tag carrying neither leaves the cut
+    to the judge.
+    """
+
+    if one_chunk_per_page:
+        return "per_child"
+    if one_chunk_per_doc:
+        return "whole_document"
+    return None
+
+
 # For comparison only
 def cmp_key(s: str) -> str:
-
     # Standardize text (except accents) for comparison
     # .casefold() -> like .lower() but unicode-aware
     s = unicodedata.normalize("NFKC", s).casefold()
@@ -103,7 +119,7 @@ def cmp_key(s: str) -> str:
     return s
 
 
-def get_filename_via_assets(course_path: str, href: str, assets_map: dict[str, str]) -> Path:
+def get_filename_via_assets(course_path: str | Path, href: str, assets_map: dict[str, str]) -> Path:
     """
     Find actual file path using previously loaded assets.json into assets_map
     """
@@ -227,7 +243,7 @@ def url_exists(url: str) -> bool:
     return exists
 
 
-@dataclass
+@dataclass(frozen=True)
 class UntaggedDocuments:
     """
     How to treat the documents a MOOC page links without tagging them.
@@ -235,11 +251,12 @@ class UntaggedDocuments:
     A course that tags nothing still publishes readings and slide decks, and
     they are worth indexing. Which of the two tags a PDF gets is decided by
     looking at it, since only the file itself says whether it is a deck.
+
+    Built only when a course asks for them, so both tags are always set.
     """
 
-    include: bool = False
-    theory_tag: str | None = None
-    theory_slides_tag: str | None = None
+    theory_tag: str
+    theory_slides_tag: str
     extensions: tuple[str, ...] = (".pdf", ".txt", ".zip")
 
 

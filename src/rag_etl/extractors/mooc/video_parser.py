@@ -1,12 +1,13 @@
 from lxml.etree import _Element
+from collections.abc import Mapping
 from pathlib import Path
+from typing import Any
 
 import json
 import logging
 
-from rag_etl.resources.mooc_resource import MOOCResource
-from rag_etl.extractors.mooc.utils import load_root_elem_from_mooc_xml
-from rag_etl.utils.kaltura import extract_entry_id_from_url
+from rag_etl.core import Resource
+from rag_etl.extractors.mooc.utils import load_root_elem_from_mooc_xml, cut_from_flags
 import rag_etl.utils.mime_types as mt
 
 logger = logging.getLogger(__name__)
@@ -24,7 +25,7 @@ class VideoParser:
             video_platform = "youtube"
         return video_platform
 
-    def find_transcript(self, root_video: _Element, course_path: str, language: str | None) -> str | None:
+    def find_transcript(self, root_video: _Element, course_path: Path, language: str | None) -> str | None:
         """
         Return the path of the video's subtitle file in the MOOC export.
 
@@ -61,13 +62,13 @@ class VideoParser:
 
     def parse(
         self,
-        course_path: str,
+        course_path: Path,
         elem_vertical: _Element,
         vertical_display_name: str,
-        tag_metadata: dict,
+        tag_metadata: Mapping[str, Mapping[str, Any]],
         language: str | None = None,
         week: int | None = None,
-    ) -> MOOCResource | None:
+    ) -> Resource | None:
         """Parse a MOOC video"""
 
         video_url_name = elem_vertical.get("url_name")
@@ -93,7 +94,6 @@ class VideoParser:
             if elem.tag == "source":
                 switch_video_url = elem.get("src")
 
-        entry_id = extract_entry_id_from_url(switch_video_url)
         srt_path = self.find_transcript(root_video, course_path, language)
 
         video_platform = self.get_video_platform_id(video_url=switch_video_url, youtube_id=youtube_id)
@@ -119,21 +119,19 @@ class VideoParser:
 
         # The week is inherited by every slide cut from this video, while the
         # numbering itself is not: a slide is identified by its timestamp
-        return MOOCResource(
-            source="mooc",
+        video = Resource(
             title=mooc_resource_title,
             url=video_url,
-            path=str(video_xml_path),
+            path=video_xml_path,
             mime_type=mt.MP4,
-            is_video=True,
-            is_gemini_processed_video=tag_dict.get("is_gemini_processed_video", False),
-            srt_path=srt_path,
             week=week,
-            entry_id=entry_id,
-            tag=tag_name,
             type=tag_dict.get("type"),
             subtype=tag_dict.get("subtype"),
-            processing_method=tag_dict.get("processing_method"),
-            model=tag_dict.get("model"),
-            vertical=vertical_display_name,
+            cut=cut_from_flags(tag_dict.get("one_chunk_per_page"), tag_dict.get("one_chunk_per_doc")),
         )
+
+        # A transcript found in the export travels beside the video as a caption leaf
+        if srt_path is not None:
+            video.add_child(Resource(path=Path(srt_path), mime_type=mt.SRT))
+
+        return video

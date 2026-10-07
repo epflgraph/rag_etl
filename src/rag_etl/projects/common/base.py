@@ -6,7 +6,7 @@ from typing import List, Sequence
 import logging
 
 from rag_etl.resources import BaseResource
-from rag_etl.extractors import BaseExtractor
+from rag_etl.extractors import Extractor
 from rag_etl.transformers import BaseTransformer
 from rag_etl.loaders import BaseLoader
 
@@ -16,7 +16,7 @@ class BaseProject(ABC):
     Template for a project-specific RAG pipeline.
 
     Subclasses must define:
-      - `extractors`: sequence of BaseExtractor
+      - `extractors`: sequence of Extractor
       - `transformers`: sequence of BaseTransformer
       - `loaders`: sequence of BaseLoader
 
@@ -69,7 +69,7 @@ class BaseProject(ABC):
 
     @property
     @abstractmethod
-    def extractors(self) -> List[BaseExtractor]:
+    def extractors(self) -> List[Extractor]:
         """Ordered sequence of extractor instances to run."""
         raise NotImplementedError
 

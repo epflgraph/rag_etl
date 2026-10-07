@@ -5,7 +5,8 @@ from datetime import date
 import logging
 from rag_etl.projects import BaseProject
 from rag_etl.extractors import (
-    BaseExtractor,
+    Extractor,
+    EdDiscussionExtractor,
     MOOCExtractor,
     MoodleExtractor,
 )
@@ -224,7 +225,7 @@ class CS112gProject(BaseProject):
         ]
 
     @property
-    def extractors(self) -> list[BaseExtractor]:
+    def extractors(self) -> list[Extractor]:
         """Single MOOC extractor."""
         return [
             MOOCExtractor(

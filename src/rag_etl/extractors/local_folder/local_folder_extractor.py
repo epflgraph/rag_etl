@@ -7,9 +7,12 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
-import rag_etl.utils.mime_types as mt
+from rag_etl.utils.mime_types import DEFAULT_MIME_TYPES, guess_mime_type
 from rag_etl.core import Resource
 from rag_etl.extractors.base_extractor import Extractor, SourceUnavailable
+
+# A module or file marked NO_BOT is not for the bots; everything else is extracted
+NO_BOT = re.compile(r"\[NO_BOT\]")
 
 
 @dataclass(frozen=True)
@@ -23,10 +26,7 @@ class LocalFolderExtractor(Extractor):
 
     METADATA_FILES = ["from", "until", "url"]
 
-    # A file or folder marked NO_BOT is not for the bots; everything else is extracted
-    NO_BOT = re.compile(r"\[NO_BOT\]")
-
-    mime_types: Sequence[str] = tuple(mt.DEFAULT_MIME_TYPES)
+    mime_types: Sequence[str] = tuple(DEFAULT_MIME_TYPES)
 
     def extract_closest_metadata(self, path, metadata_file):
         # Try to get metadata from current path
@@ -35,7 +35,7 @@ class LocalFolderExtractor(Extractor):
             return metadata_file_path.read_text(encoding="utf-8").strip()
 
         # If base is a proper subpath of path, we recurse
-        if path.is_relative_to(self.folder_base_path) and not self.folder_base_path.is_relative_to(path):
+        if path.is_relative_to(self.dir) and not self.dir.is_relative_to(path):
             return self.extract_closest_metadata(path.parent, metadata_file)
 
         # Otherwise we stop
@@ -77,7 +77,7 @@ class LocalFolderExtractor(Extractor):
                     continue
 
                 # Skip if unexpected mime type
-                mime_type = mt.guess_mime_type(str(file_path))
+                mime_type = guess_mime_type(str(file_path))
                 if mime_type not in self.mime_types:
                     logging.info(
                         f"Skipping file {str(file_path)} because its mime type ({mime_type}) is not expected ({self.mime_types})."

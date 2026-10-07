@@ -6,7 +6,7 @@ import logging
 from typing import List, Tuple
 
 from rag_etl.projects import BaseProject
-from rag_etl.extractors import BaseExtractor, MoodleExtractor, LocalFolderExtractor
+from rag_etl.extractors import Extractor, MoodleExtractor, LocalFolderExtractor
 from rag_etl.transformers import (
     BaseTransformer,
     ExtractZipTransformer,
@@ -126,7 +126,7 @@ class MICRO315Project(BaseProject):
         ]
 
     @property
-    def extractors(self) -> List[BaseExtractor]:
+    def extractors(self) -> List[Extractor]:
         return [
             LocalFolderExtractor(
                 folder_base_path=self.local_folder_base_path,

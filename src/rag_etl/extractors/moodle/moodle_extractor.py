@@ -6,7 +6,7 @@ import shutil
 import json
 from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import datetime
 from pathlib import Path
 
 import requests
@@ -21,6 +21,11 @@ from rag_etl.utils.tags import split_tag_text
 
 # A module or file marked NO_BOT is not for the bots; everything else is extracted
 NO_BOT = re.compile(r"\[NO_BOT\]")
+
+
+def display(name: str) -> str:
+    """Return the name with its legacy tag marker stripped, as a student reads it."""
+    return split_tag_text(name)[1]
 
 
 def extract_url(module, module_contents):
@@ -40,7 +45,7 @@ def extract_url(module, module_contents):
     return url
 
 
-def extract_from_and_until(module) -> tuple[date | None, date | None]:
+def extract_from_and_until(module) -> tuple[str | None, str | None]:
     # If not specified availability, return
     if not module["availability"]:
         return (None, None)
@@ -110,6 +115,9 @@ class MoodleExtractor(Extractor):
         # An error (a bad token among them) arrives as an error object, not a list
         if not isinstance(sections, list):
             raise SourceUnavailable(f"Moodle API did not answer with course contents: {sections}")
+
+        course_url = f"{CONFIG['MOODLE_URL']}/course/view.php?id={self.course_id}"
+        course = Resource(title=f"Moodle course {self.course_id}", url=course_url)
 
         # Empty dir if it exists
         if self.dir.exists():

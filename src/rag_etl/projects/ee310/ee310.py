@@ -3,7 +3,7 @@ from datetime import date
 import logging
 
 from rag_etl.projects import BaseProject
-from rag_etl.extractors import BaseExtractor, MoodleExtractor
+from rag_etl.extractors import Extractor, MoodleExtractor
 from rag_etl.transformers import (
     BaseTransformer,
     ExtractZipTransformer,
@@ -140,7 +140,7 @@ class EE310Project(BaseProject):
         ]
 
     @property
-    def extractors(self) -> list[BaseExtractor]:
+    def extractors(self) -> list[Extractor]:
         """Moodle course materials, plus the subtitles of the Mediaspace lecture recordings."""
         return [
             MoodleExtractor(

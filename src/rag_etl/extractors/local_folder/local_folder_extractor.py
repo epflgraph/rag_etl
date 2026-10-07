@@ -1,62 +1,32 @@
 from __future__ import annotations
 
+import logging
 import os
+import re
+from collections.abc import Sequence
+from dataclasses import dataclass
 from pathlib import Path
 
-from typing import List, Optional
-
-import logging
-
-from rag_etl.resources import LocalResource
-from rag_etl.extractors import BaseExtractor
-
 import rag_etl.utils.mime_types as mt
-from rag_etl.utils.tags import split_tag_number_text
+from rag_etl.core import Resource
+from rag_etl.extractors.base_extractor import Extractor, SourceUnavailable
 
-from rag_etl.config import CONFIG
 
-
-class LocalFolderExtractor(BaseExtractor):
+@dataclass(frozen=True)
+class LocalFolderExtractor(Extractor):
     """
-    Extractor for retrieving course materials from a local folder.
+    Extractor for retrieving project material from a local folder.
+
+    One leaf per file, with the metadata files (from, until, url) beside it.
+    Everything not marked NO_BOT is extracted; the judge labels it later.
     """
 
     METADATA_FILES = ["from", "until", "url"]
 
-    def __init__(
-        self,
-        folder_base_path: str,
-        tag_metadata: Optional[dict] = None,
-        mime_types: Optional[list[str]] = None,
-    ) -> None:
-        self.folder_base_path = Path(folder_base_path)
+    # A file or folder marked NO_BOT is not for the bots; everything else is extracted
+    NO_BOT = re.compile(r"\[NO_BOT\]")
 
-        if tag_metadata:
-            self.tag_metadata = tag_metadata
-        else:
-            self.tag_metadata = {}
-
-        if mime_types is None:
-            self.mime_types = mt.DEFAULT_MIME_TYPES
-        else:
-            self.mime_types = mime_types
-
-    def extract_closest_tag_number_text(self, path):
-        # Extract tag and number from current path
-        tag, number, text = split_tag_number_text(path.name)
-
-        # If found, return them
-        if tag:
-            return (tag, number, text)
-
-        # If base is a proper subpath of path, we recurse
-        if path.is_relative_to(self.folder_base_path) and not self.folder_base_path.is_relative_to(path):
-            tag, number, text = self.extract_closest_tag_number_text(path.parent)
-            text = f"{text} > {path.name}"
-            return (tag, number, text)
-
-        # Otherwise we stop
-        return (None, None, None)
+    mime_types: Sequence[str] = tuple(mt.DEFAULT_MIME_TYPES)
 
     def extract_closest_metadata(self, path, metadata_file):
         # Try to get metadata from current path
@@ -71,26 +41,30 @@ class LocalFolderExtractor(BaseExtractor):
         # Otherwise we stop
         return None
 
-    def extract(self) -> List[LocalResource]:
+    def extract(self) -> Resource:
         """
-        Extract resources for this course from a local folder.
-
-        Returns:
-            List[BaseResource]: List of raw Resources.
+        Extract the folder's material as leaves under one container.
         """
 
-        # Check that folder exists
-        if not self.folder_base_path.exists():
-            raise ValueError(f"Directory {self.folder_base_path} does not exist.")
+        # Check that folder exists, failing loud when it does not
+        if not self.dir.exists():
+            raise SourceUnavailable(f"Directory {self.dir} does not exist.")
+
+        base = Resource(title=f"Local folder {self.dir.name}")
 
         # Iterate over all files in folder and subfolders
-        resources = []
-        for dir_path, dir_names, file_names in os.walk(self.folder_base_path, topdown=True):
+        for dir_path, dir_names, file_names in os.walk(self.dir, topdown=True):
             # Drop hidden directories to prevent descending into them
             dir_names[:] = [d for d in dir_names if not d.startswith(".")]
 
             for file_name in file_names:
                 file_path = Path(dir_path) / file_name
+                relative = file_path.relative_to(self.dir)
+
+                # A file under a NO_BOT-marked folder, or marked itself, is not for the bots
+                if any(NO_BOT.search(part) for part in relative.parts):
+                    logging.info(f"Skipping file {str(file_path)} because it is marked NO_BOT.")
+                    continue
 
                 # Skip if hidden file (e.g. .DS_STORE, .git, .idea, etc.)
                 if file_path.name.startswith("."):
@@ -110,63 +84,22 @@ class LocalFolderExtractor(BaseExtractor):
                     )
                     continue
 
-                # Extract tag from filename
-                tag, number, title = self.extract_closest_tag_number_text(file_path)
-                if not title:
-                    title = str(file_path.relative_to(self.folder_base_path))
-
-                # Skip if no tag
-                if not tag:
-                    logging.info(f"Skipping file {str(file_path)} because it has no tag.")
-                    continue
-
-                # Skip if unrecognised tag
-                if tag not in self.tag_metadata:
-                    logging.info(
-                        f"Skipping file {str(file_path)} because its tag ({tag}) is unexpected ({self.tag_metadata.keys()})"
-                    )
-                    continue
-
-                # Extract tag metadata
-                type_ = self.tag_metadata.get(tag, {}).get("type")
-                subtype = self.tag_metadata.get(tag, {}).get("subtype")
-                is_solution = self.tag_metadata.get(tag, {}).get("is_solution", False)
-                one_chunk_per_page = self.tag_metadata.get(tag, {}).get("one_chunk_per_page", False)
-                one_chunk_per_doc = self.tag_metadata.get(tag, {}).get("one_chunk_per_doc", False)
+                title = str(relative)
 
                 # Extract metadata from files
                 from_ = self.extract_closest_metadata(file_path.parent, "from")
                 until = self.extract_closest_metadata(file_path.parent, "until")
                 url = self.extract_closest_metadata(file_path.parent, "url")
 
-                # Processing method and model
-                if mime_type == mt.PDF:
-                    processing_method = "rcp"
-                    model = CONFIG["RCP_VISION_MODEL"]
-                else:
-                    processing_method = None
-                    model = None
-
-                # Append resource
-                resources.append(
-                    LocalResource(
-                        tag=tag,
+                base.add_child(
+                    Resource(
                         title=title,
                         url=url,
-                        path=str(file_path),
-                        source="local",
+                        path=file_path,
                         mime_type=mime_type,
-                        type=type_,
-                        subtype=subtype,
-                        number=number,
-                        is_solution=is_solution,
-                        processing_method=processing_method,
-                        model=model,
-                        one_chunk_per_page=one_chunk_per_page,
-                        one_chunk_per_doc=one_chunk_per_doc,
                         from_=from_,
                         until=until,
                     )
                 )
 
-        return resources
+        return base

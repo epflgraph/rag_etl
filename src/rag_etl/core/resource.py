@@ -5,7 +5,6 @@ from __future__ import annotations
 import hashlib
 from collections.abc import Iterator
 from dataclasses import dataclass, field
-from datetime import date
 from pathlib import Path
 
 
@@ -32,6 +31,7 @@ class Resource:
 
     # identity
     path: Path | None = None       # where the content lives on disk; None for pure containers
+    url: str | None = None         # public url the resource is available at
     mime_type: str | None = None
 
     # lineage
@@ -43,12 +43,12 @@ class Resource:
     type: str | None = None        # theory / practice / ... (inferred by the judge)
     subtype: str | None = None     # lecture_slides / homework / ...
     cut: str | None = None         # whole_document | per_child | per_exercise | text (inferred by the judge)
-    number: int | None = None      # exercise number (per_exercise annotator)
-    sub_number: int | None = None  # exercise sub-number
+    number: str | None = None      # exercise number
+    subnumber: str | None = None   # exercise subnumber
     week: int | None = None        # lecture week (slides, recordings)
     is_solution: bool = False
-    from_: date | None = None      # release date (Moodle availability)
-    until: date | None = None      # close date
+    from_: str | None = None       # release date and time, ISO format
+    until: str | None = None       # close date and time
 
     # content (chunks only)
     text: str | None = None

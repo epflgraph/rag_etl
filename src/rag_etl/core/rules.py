@@ -32,7 +32,7 @@ class Rule:
     type: str | None = None       # theory / practice / ...
     subtype: str | None = None    # lecture_slides / homework / ...
     cut: str | None = None        # whole_document | per_child | per_exercise | text
-    number: int | None = None
+    number: str | None = None
     week: int | None = None
     is_solution: bool | None = None
 
@@ -81,7 +81,7 @@ def _attributes(resource: Resource) -> dict[str, str]:
         "subtype": resource.subtype or "",
         "cut": resource.cut or "",
         "number": "" if resource.number is None else str(resource.number),
-        "sub_number": "" if resource.sub_number is None else str(resource.sub_number),
+        "subnumber": "" if resource.subnumber is None else str(resource.subnumber),
         "week": "" if resource.week is None else str(resource.week),
         "is_solution": "true" if resource.is_solution else "false",
         "is_leaf": "true" if resource.is_leaf else "false",

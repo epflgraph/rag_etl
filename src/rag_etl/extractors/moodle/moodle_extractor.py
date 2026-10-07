@@ -1,24 +1,26 @@
 from __future__ import annotations
 
-from datetime import datetime
-
+import logging
+import re
 import shutil
+import json
+from collections.abc import Sequence
+from dataclasses import dataclass
+from datetime import date, datetime
 from pathlib import Path
+
 import requests
 
-import json
-
-
-import logging
-
-from rag_etl.resources import MoodleResource
-from rag_etl.extractors import BaseExtractor
-
 import rag_etl.utils.mime_types as mt
-from rag_etl.utils.tags import split_tag_number_text
-from rag_etl.utils.encoding import sanitize_for_filename
-
 from rag_etl.config import CONFIG
+from rag_etl.core import Resource
+from rag_etl.extractors.base_extractor import Extractor, SourceUnavailable
+from rag_etl.utils.encoding import sanitize_for_filename
+from rag_etl.utils.tags import split_tag_text
+
+
+# A module or file marked NO_BOT is not for the bots; everything else is extracted
+NO_BOT = re.compile(r"\[NO_BOT\]")
 
 
 def extract_url(module, module_contents):
@@ -38,7 +40,7 @@ def extract_url(module, module_contents):
     return url
 
 
-def extract_from_and_until(module):
+def extract_from_and_until(module) -> tuple[date | None, date | None]:
     # If not specified availability, return
     if not module["availability"]:
         return (None, None)
@@ -71,37 +73,22 @@ def extract_from_and_until(module):
     return from_, until
 
 
-class MoodleExtractor(BaseExtractor):
+@dataclass(frozen=True)
+class MoodleExtractor(Extractor):
     """
     Extractor for retrieving course materials from Moodle.
+
+    One container per section, one leaf per downloaded file. Leaves carry
+    facts only: title, url, path, mime type and the availability dates.
+    Everything not marked NO_BOT is extracted; the judge labels it later.
     """
 
-    def __init__(
-        self,
-        moodle_course_id: int,
-        moodle_base_path: str,
-        tag_metadata: dict | None = None,
-        mime_types: list[str] | None = None,
-    ) -> None:
-        self.moodle_course_id = moodle_course_id
-        self.moodle_base_path = Path(moodle_base_path)
+    course_id: int
+    mime_types: Sequence[str] = tuple(mt.DEFAULT_MIME_TYPES)
 
-        if tag_metadata:
-            self.tag_metadata = tag_metadata
-        else:
-            self.tag_metadata = {}
-
-        if mime_types is None:
-            self.mime_types = mt.DEFAULT_MIME_TYPES
-        else:
-            self.mime_types = mime_types
-
-    def extract(self) -> list[MoodleResource]:
+    def extract(self) -> Resource:
         """
-        Extract resources for this course from Moodle.
-
-        Returns:
-            List[MoodleResource]: List of raw Resources.
+        Extract the course's material into one container per section.
         """
 
         # Build Moodle endpoint and parameters
@@ -111,32 +98,43 @@ class MoodleExtractor(BaseExtractor):
             "wstoken": CONFIG["MOODLE_TOKEN"],
             "wsfunction": "core_course_get_contents",
             "moodlewsrestformat": "json",
-            "courseid": self.moodle_course_id,
+            "courseid": self.course_id,
         }
 
-        # Retrieve course contents from Moodle API
-        sections = requests.get(moodle_endpoint, params=params).json()
+        # Retrieve course contents from Moodle API, failing loud when unreachable
+        try:
+            sections = requests.get(moodle_endpoint, params=params).json()
+        except requests.RequestException as error:
+            raise SourceUnavailable(f"Moodle API unreachable: {error}") from error
 
-        # Empty moodle_base_path if it exists
-        if self.moodle_base_path.exists():
-            shutil.rmtree(self.moodle_base_path)
+        # An error (a bad token among them) arrives as an error object, not a list
+        if not isinstance(sections, list):
+            raise SourceUnavailable(f"Moodle API did not answer with course contents: {sections}")
+
+        # Empty dir if it exists
+        if self.dir.exists():
+            shutil.rmtree(self.dir)
 
         # Iterate over sections, modules and module contents
-        resources = []
         for section in sections:
+            section_node: Resource | None = None
             for module in section.get("modules", []):
                 # Skip if not a 'resource' (filter Forum modules, URL modules, etc.)
                 if module["modname"] not in ("resource", "folder"):
                     logging.debug(f"Skipping module {module['name']} because of modname {module['modname']}")
                     continue
 
-                # Extract module tag and number
-                module_tag, module_number, module_title = split_tag_number_text(module["name"])
+                if NO_BOT.search(module["name"]):
+                    logging.debug(f"Skipping module {module['name']} because it is marked NO_BOT")
+                    continue
+
+                module_title = display(module["name"])
+                from_, until = extract_from_and_until(module)
 
                 # Build module unique name
                 module_unique_name = f"{module['modplural'][:-1]}.{module['name'].replace(':', '')}.{module['id']}"
                 module_unique_name = sanitize_for_filename(module_unique_name)
-                module_path = self.moodle_base_path / module_unique_name / "content"
+                module_path = self.dir / module_unique_name / "content"
 
                 for module_contents in module.get("contents", []):
                     mime_type = module_contents["mimetype"]
@@ -152,38 +150,21 @@ class MoodleExtractor(BaseExtractor):
                     if mime_type not in self.mime_types:
                         continue
 
-                    # Extract module contents tag and number, default to module ones
-                    tag, number, title = split_tag_number_text(module_contents["filename"])
-                    if not tag:
-                        tag = module_tag
-                        number = module_number
-
-                    if number is not None:
-                        number = str(number)
-
-                    # Skip if no tag or unrecognised tag
-                    if not tag or tag not in self.tag_metadata:
+                    # A file marked NO_BOT is not for the bots
+                    if NO_BOT.search(module_contents["filename"]):
+                        logging.debug(f"Skipping file {module_contents['filename']} because it is marked NO_BOT")
                         continue
 
-                    # Extract metadata from tag
-                    type_ = self.tag_metadata.get(tag, {}).get("type")
-                    subtype = self.tag_metadata.get(tag, {}).get("subtype")
-                    is_solution = self.tag_metadata.get(tag, {}).get("is_solution", False)
-                    one_chunk_per_page = self.tag_metadata.get(tag, {}).get("one_chunk_per_page", False)
-                    one_chunk_per_doc = self.tag_metadata.get(tag, {}).get("one_chunk_per_doc", False)
+                    title = display(module_contents["filename"])
 
-                    # Download file from url
-                    url = f"{module_contents['fileurl']}&token={CONFIG['MOODLE_TOKEN']}"
-                    response = requests.get(url)
-
-                    # Skip file if download fails
+                    # Download file from url, failing loud when it fails
                     try:
-                        response.raise_for_status()  # Raises an error if download fails
-                    except requests.HTTPError:
-                        logging.debug(
-                            f"Download failed for file {module['name']} > {module_contents['filename']}. Ignoring..."
-                        )
-                        continue
+                        response = requests.get(f"{module_contents['fileurl']}&token={CONFIG['MOODLE_TOKEN']}")
+                        response.raise_for_status()
+                    except requests.RequestException as error:
+                        raise SourceUnavailable(
+                            f"Download failed for file {module['name']} > {module_contents['filename']}: {error}"
+                        ) from error
 
                     # Build download path for file
                     module_contents_path = (
@@ -200,42 +181,18 @@ class MoodleExtractor(BaseExtractor):
                     module_contents_path.parent.mkdir(parents=True, exist_ok=True)
                     module_contents_path.write_bytes(response.content)
 
-                    # Extract url
-                    url = extract_url(module, module_contents)
+                    if section_node is None:
+                        section_node = course.add_child(Resource(title=section.get("name")))
 
-                    # Extract availability date if specified
-                    from_, until = extract_from_and_until(module)
-
-                    # Processing method and model
-                    if mime_type == mt.PDF:
-                        processing_method = "rcp"
-                        model = CONFIG["RCP_VISION_MODEL"]
-                    else:
-                        processing_method = None
-                        model = None
-
-                    # Append resource
-                    resources.append(
-                        MoodleResource(
-                            section_title=section["name"],
-                            section_text=section["summary"],
-                            tag=tag,
+                    section_node.add_child(
+                        Resource(
                             title=f"{module_title} > {title}",
-                            url=url,
-                            path=str(module_contents_path),
-                            source="moodle",
+                            url=extract_url(module, module_contents),
+                            path=module_contents_path,
                             mime_type=mime_type,
-                            type=type_,
-                            subtype=subtype,
-                            number=number,
-                            is_solution=is_solution,
-                            processing_method=processing_method,
-                            model=model,
-                            one_chunk_per_page=one_chunk_per_page,
-                            one_chunk_per_doc=one_chunk_per_doc,
                             from_=from_,
                             until=until,
                         )
                     )
 
-        return resources
+        return course

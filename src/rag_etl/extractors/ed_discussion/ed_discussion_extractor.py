@@ -1,13 +1,14 @@
-from __future__ import annotations
-
 import json
 import logging
 from pathlib import Path
 
+from rag_etl.config import CONFIG
 from rag_etl.extractors import BaseExtractor
+from rag_etl.extractors.ed_discussion.catalogue import build_catalogue, find_entry, render_catalogue_entry
 from rag_etl.extractors.ed_discussion.utils import (
     MESSAGE_TYPES,
-    classify_thread_with_llm,
+    ThreadClassification,
+    classify_thread_with_cascade,
     extract_messages_from_thread,
     extract_qa_content,
     format_qa,
@@ -17,6 +18,10 @@ from rag_etl.resources.ed_discussion_resource import EdDiscussionResource
 
 logger = logging.getLogger(__name__)
 
+# Threads of these types are only useful tied to a specific document: without a catalogue entry they are
+# left out of the resources and reclassified at every update, in case the update added their document
+CATALOGUE_REQUIRED_TYPES = ("practice", "exam")
+
 
 class EdDiscussionExtractor(BaseExtractor):
     """Extractor for retrieving previously answered questions from Ed Discussion."""
@@ -25,51 +30,45 @@ class EdDiscussionExtractor(BaseExtractor):
         self,
         ed_discussion_base_path: str,
         academic_year: str,
-        tags: list[str],
-        tag_metadata: dict,
         categories: list[str],
         language: str,
         semester: int,
         include_student_endorsed: bool,
+        catalogue_sources: list[str] | None = None,
         force_regeneration: bool = False,
         mime_types: list[str] | None = None,
+        models: list[str] | None = None,
     ) -> None:
         self.ed_discussion_base_path = Path(ed_discussion_base_path)
         self.academic_year = academic_year
-        self.tags = tags
-        self.tag_metadata = tag_metadata
         self.categories = categories
         self.language = language
         self.semester = semester
         self.include_student_endorsed = include_student_endorsed
+        self.catalogue_sources = catalogue_sources
         self.force_regeneration = force_regeneration
+        self.models = models if models is not None else self.default_models()
         self.mime_types = mime_types
 
         self.exam_year = self.compute_exam_year()
-        self.subtype_options = self.build_subtype_options()
 
-    def build_subtype_options(self) -> str:
-        """Build subtype options string for LLM prompt from tag_metadata."""
+        metadata_dir = self.ed_discussion_base_path / "output" / "metadata"
+        self.catalogue = build_catalogue(metadata_dir, self.catalogue_sources)
+        logger.info(f"Built Ed Discussion catalogue with {len(self.catalogue)} entries from {metadata_dir}")
 
-        type_to_subtypes = {}
-        for tag in self.tags:
-            tag_config = self.tag_metadata.get(tag, {})
-            tag_type = tag_config.get("type")
-            tag_subtype = tag_config.get("subtype")
-            if tag_type and tag_subtype:
-                if tag_type not in type_to_subtypes:
-                    type_to_subtypes[tag_type] = []
-                if tag_subtype not in type_to_subtypes[tag_type]:
-                    type_to_subtypes[tag_type].append(tag_subtype)
+    @staticmethod
+    def default_models() -> list[str]:
+        """Build the juror model list from config: the required model plus any optional jurors."""
 
-        lines = []
-        for type_name, subtypes in type_to_subtypes.items():
-            subtypes_str = ", ".join(subtypes)
-            lines.append(f"- For {type_name}: {subtypes_str}")
-        return "\n".join(lines)
+        models = [CONFIG["RCP_EDSTEM_EXTRACTOR_MODEL"]]
+        for key in ("RCP_EDSTEM_EXTRACTOR_MODEL_2", "RCP_EDSTEM_EXTRACTOR_MODEL_3"):
+            extra_model = CONFIG.get(key)
+            if extra_model:
+                models.append(extra_model)
+        return models
 
     def compute_exam_year(self) -> str:
-        """Compute exam year based on academic_year and semester."""
+        """Compute exam year based on academic_year ("2025_2026") and semester."""
 
         years = self.academic_year.split("_")
 
@@ -80,6 +79,15 @@ class EdDiscussionExtractor(BaseExtractor):
 
     def extract(self) -> list[EdDiscussionResource]:
         """Extract resources for Ed Discussion Q&A threads."""
+
+        # The catalogue comes from the previous run's output, so a course's first run has none. Classifying
+        # against an empty catalogue would leave every practice/exam thread unmatched, so wait for the next run
+        if not self.catalogue:
+            logger.warning(
+                "Skipping Ed Discussion: no theory/practice/exam documents in the previous run's metadata. "
+                "This run writes them, the next one will classify the threads"
+            )
+            return []
 
         ed_dir = self.ed_discussion_base_path / "ed_discussion" / self.academic_year
 
@@ -127,6 +135,8 @@ class EdDiscussionExtractor(BaseExtractor):
 
         if needs_generation:
             self.generate_intermediate_jsons(ed_dir, processed_dir, images_dir)
+        else:
+            self.revisit_unmatched_threads(processed_dir)
 
         return intermediate_jsons
 
@@ -143,11 +153,16 @@ class EdDiscussionExtractor(BaseExtractor):
 
         categorized = {msg_type: [] for msg_type in MESSAGE_TYPES}
         failed_threads = []
+        disputed_threads = []
 
         for i, json_path in enumerate(input_files, 1):
             logger.info(f"Processing {i}/{len(input_files)}: {json_path.name}")
 
-            thread_record = self.process_single_thread(json_path, images_dir)
+            thread_record, disputed_entry = self.process_single_thread(json_path, images_dir)
+            if disputed_entry is not None:
+                disputed_threads.append(disputed_entry)
+                continue
+
             if thread_record is None:
                 # Append failed threads to the list
                 failed_threads.append({"filename": json_path.name, "reason": "processing_failed"})
@@ -179,27 +194,31 @@ class EdDiscussionExtractor(BaseExtractor):
                 json.dump(failed_threads, f, ensure_ascii=False, indent=2)
             logger.warning(f"Wrote {len(failed_threads)} failed threads to {failed_path}")
 
+        # Always write the disputed threads file, even when empty, so a run's outcome is explicit
+        disputed_path = processed_dir / "disputed_threads.json"
+        with open(disputed_path, "w", encoding="utf-8") as f:
+            json.dump(disputed_threads, f, ensure_ascii=False, indent=2)
+        if disputed_threads:
+            logger.warning(f"Wrote {len(disputed_threads)} disputed threads to {disputed_path}")
+
     def process_single_thread(
         self,
         json_path: Path,
         images_dir: Path,
-    ) -> dict | None:
-        """Process a single thread JSON file."""
+    ) -> tuple[dict | None, dict | None]:
+        """Process a single thread JSON file, returning (thread_record, disputed_entry)."""
 
         try:
             with open(json_path, "r", encoding="utf-8") as f:
                 data = json.load(f)
         except Exception as e:
             logger.warning(f"Failed to load {json_path}: {e}")
-            return None
+            return None, None
 
         thread = data.get("thread", {})
         users = data.get("users", [])
         user_roles = get_user_roles(users)
 
-        thread_id = thread.get("id")
-        thread_category = thread.get("category", "")
-        thread_subcategory = thread.get("subcategory", "")
         thread_title = thread.get("title", "")
 
         messages = extract_messages_from_thread(
@@ -212,34 +231,215 @@ class EdDiscussionExtractor(BaseExtractor):
 
         if len(messages) <= 1:
             logger.info(f"Skipping {json_path.name}: Thread without answers")
-            return None
+            return None, None
 
-        all_html = "\n---\n".join(e["content"] for e in messages)
-        classification = classify_thread_with_llm(
-            thread_category=thread_category,
-            thread_subcategory=thread_subcategory,
-            all_messages_html=all_html,
-            all_types=MESSAGE_TYPES,
-            subtype_options=self.subtype_options,
-        )
-
-        if classification is None:
-            logger.warning(f"Classification failed for {json_path.name}")
-            return None
-
-        return {
+        thread_info = {
             "filename": json_path.name,
-            "thread_id": thread_id,
+            "thread_id": thread.get("id"),
             "thread_title": thread_title,
-            "type": classification.get("type"),
-            "subtype": classification.get("subtype"),
-            "doc_number": classification.get("doc_number"),
-            "doc_subnumber": classification.get("doc_subnumber"),
-            "week": classification.get("week"),
-            "thread_category": thread_category,
-            "thread_subcategory": thread_subcategory,
+            "thread_category": thread.get("category", ""),
+            "thread_subcategory": thread.get("subcategory", ""),
             "messages": messages,
         }
+        thread_record, disputed_entry = self.classify_thread(thread_info)
+        return thread_record, disputed_entry
+
+    def classify_thread(self, thread_info: dict) -> tuple[dict | None, dict | None]:
+        """
+        Classify a thread, returning (thread_record, disputed_entry).
+
+        `thread_info` needs filename, thread_id, thread_title, thread_category, thread_subcategory and messages,
+        so a stored thread record can be passed back in to reclassify it.
+        """
+
+        filename = thread_info["filename"]
+        messages = thread_info["messages"]
+
+        contents = []
+        for message in messages:
+            contents.append(message["content"])
+        all_html = "\n---\n".join(contents)
+
+        winner, votes = classify_thread_with_cascade(
+            thread_title=thread_info["thread_title"],
+            thread_category=thread_info["thread_category"],
+            thread_subcategory=thread_info["thread_subcategory"],
+            all_messages_html=all_html,
+            catalogue=self.catalogue,
+            academic_year=self.academic_year.replace("_", "-"),
+            exam_year=self.exam_year,
+            models=self.models,
+        )
+
+        real_votes = []
+        for vote in votes:
+            if vote is not None:
+                real_votes.append(vote)
+
+        if winner is None and not real_votes:
+            logger.warning(f"Classification failed for {filename}")
+            return None, None
+
+        vote_dicts = self.votes_to_dicts(votes)
+
+        if winner is None:
+            logger.info(f"{filename}: disputed")
+            disputed_entry = {
+                "filename": filename,
+                "thread_id": thread_info["thread_id"],
+                "thread_title": thread_info["thread_title"],
+                "votes": vote_dicts,
+            }
+            return None, disputed_entry
+
+        self.log_cascade_outcome(filename, winner, votes)
+
+        subtype, doc_number, doc_subnumber, week = self.resolve_classification(winner)
+
+        thread_record = {
+            "filename": filename,
+            "thread_id": thread_info["thread_id"],
+            "thread_title": thread_info["thread_title"],
+            "type": winner.type,
+            "subtype": subtype,
+            "doc_number": doc_number,
+            "doc_subnumber": doc_subnumber,
+            "week": week,
+            "thread_category": thread_info["thread_category"],
+            "thread_subcategory": thread_info["thread_subcategory"],
+            "messages": messages,
+            "confidence": winner.confidence,
+            "reason": winner.reason,
+            "votes": vote_dicts,
+        }
+        return thread_record, None
+
+    def is_unmatched(self, thread: dict) -> bool:
+        """Whether a practice/exam thread record points at no entry of the current catalogue."""
+
+        if thread.get("type") not in CATALOGUE_REQUIRED_TYPES:
+            return False
+
+        entry = find_entry(
+            self.catalogue,
+            thread.get("type"),
+            thread.get("subtype"),
+            thread.get("doc_number"),
+            thread.get("doc_subnumber"),
+        )
+        has_no_entry = entry is None
+
+        return has_no_entry
+
+    def revisit_unmatched_threads(self, processed_dir: Path) -> None:
+        """Reclassify the unmatched practice/exam threads of the extracted categories against the current catalogue."""
+
+        threads_by_type = {}
+        for msg_type in MESSAGE_TYPES:
+            threads_by_type[msg_type] = load_threads(processed_dir / f"ed_discussion_{msg_type}.json")
+
+        # Unmatched threads of categories this course does not extract are never turned into resources,
+        # so reclassifying them would only cost LLM calls
+        unmatched_threads = []
+        for msg_type in CATALOGUE_REQUIRED_TYPES:
+            if msg_type not in self.categories:
+                continue
+
+            matched_threads = []
+            for thread in threads_by_type[msg_type]:
+                if self.is_unmatched(thread):
+                    unmatched_threads.append(thread)
+                else:
+                    matched_threads.append(thread)
+            threads_by_type[msg_type] = matched_threads
+
+        if not unmatched_threads:
+            return
+
+        logger.info(f"Revisiting {len(unmatched_threads)} threads with no catalogue entry")
+
+        resolved_count = 0
+        for i, thread in enumerate(unmatched_threads, 1):
+            logger.info(f"Revisiting {i}/{len(unmatched_threads)}: {thread['filename']}")
+
+            thread_record, _ = self.classify_thread(thread)
+
+            # A disputed or failed reclassification keeps the previous record, retried at the next update
+            if thread_record is None:
+                thread_record = thread
+            elif not self.is_unmatched(thread_record):
+                resolved_count += 1
+
+            threads_by_type[thread_record["type"]].append(thread_record)
+
+        for msg_type in MESSAGE_TYPES:
+            output_path = processed_dir / f"ed_discussion_{msg_type}.json"
+            with open(output_path, "w", encoding="utf-8") as f:
+                json.dump(threads_by_type[msg_type], f, ensure_ascii=False, indent=2)
+
+        logger.info(f"{resolved_count}/{len(unmatched_threads)} revisited threads now have a catalogue entry")
+
+    def votes_to_dicts(self, votes: list[ThreadClassification | None]) -> list[dict | None]:
+        """Render each cascade vote (or None for a failed juror) into a storable dict."""
+
+        vote_dicts = []
+        for model, vote in zip(self.models, votes):
+            vote_dicts.append(self.vote_to_dict(model, vote))
+        return vote_dicts
+
+    def vote_to_dict(self, model: str, vote: ThreadClassification | None) -> dict | None:
+        """Render one juror's vote into a storable dict, or None when the juror failed."""
+
+        if vote is None:
+            return None
+
+        catalogue_label = None
+        if vote.catalogue_id is not None and 0 <= vote.catalogue_id < len(self.catalogue):
+            catalogue_label = render_catalogue_entry(self.catalogue[vote.catalogue_id])
+
+        return {
+            "model": model,
+            "type": vote.type,
+            "catalogue_id": vote.catalogue_id,
+            "catalogue_label": catalogue_label,
+            "mentioned_number": vote.mentioned_number,
+            "week": vote.week,
+            "confidence": vote.confidence,
+            "reason": vote.reason,
+        }
+
+    def log_cascade_outcome(
+        self,
+        filename: str,
+        winner: ThreadClassification,
+        votes: list[ThreadClassification | None],
+    ) -> None:
+        """Log which cascade path produced the winning classification."""
+
+        if len(votes) == 1:
+            logger.info(f"{filename}: single juror")
+        elif len(votes) == 2:
+            if votes[1] is None:
+                logger.info(f"{filename}: juror 2 failed, kept first vote")
+            else:
+                logger.info(f"{filename}: juror 2 agreed")
+        elif winner is votes[0]:
+            logger.info(f"{filename}: juror 3 sided with 1")
+        else:
+            logger.info(f"{filename}: juror 3 sided with 2")
+
+    def resolve_classification(
+        self,
+        classification: ThreadClassification,
+    ) -> tuple[str | None, str | None, str | None, int | None]:
+        """Resolve a ThreadClassification into the (subtype, doc_number, doc_subnumber, week) to store."""
+
+        if classification.type in ("theory", "practice", "exam") and classification.catalogue_id is not None:
+            entry = self.catalogue[classification.catalogue_id]
+            week = entry.week if entry.week is not None else classification.week
+            return entry.subtype, entry.number, entry.sub_number, week
+
+        return None, None, None, classification.week
 
     def create_resources_from_jsons(
         self,
@@ -281,6 +481,10 @@ class EdDiscussionExtractor(BaseExtractor):
     ) -> EdDiscussionResource | None:
         """Create an EdDiscussionResource from a Ed Discussion thread."""
 
+        if self.is_unmatched(thread):
+            logger.info(f"Skipping {thread.get('filename')}: no catalogue entry yet, revisited at the next update")
+            return None
+
         messages = thread.get("messages", [])
         qa_data = extract_qa_content(messages)
 
@@ -307,8 +511,19 @@ class EdDiscussionExtractor(BaseExtractor):
         doc_subnumber = thread.get("doc_subnumber")
         week = thread.get("week")
 
-        if thread_type == "exam" and not doc_number:
-            doc_number = self.exam_year
+        entry = find_entry(self.catalogue, thread_type, subtype, doc_number, doc_subnumber)
+        if entry is not None:
+            from_ = entry.from_
+            until = entry.until
+            week = entry.week if entry.week is not None else week
+        else:
+            from_ = None
+            until = None
+            if thread_type in ("theory", "practice", "exam") and subtype is not None:
+                logger.warning(
+                    f"No catalogue entry for {thread.get('filename')} ('{thread_title}'): "
+                    f"type={thread_type}, subtype={subtype}, number={doc_number}, sub_number={doc_subnumber}"
+                )
 
         return EdDiscussionResource(
             title=thread_title,
@@ -325,10 +540,22 @@ class EdDiscussionExtractor(BaseExtractor):
             week=week,
             number=doc_number,
             sub_number=doc_subnumber,
-            from_=None,
-            until=None,
+            from_=from_,
+            until=until,
             one_chunk_per_page=False,
             one_chunk_per_doc=True,
             category=category,
             path_to_intermediate_json_file=str(json_path),
         )
+
+
+def load_threads(json_path: Path) -> list[dict]:
+    """Load the thread records of an intermediate JSON, or none when the file is missing."""
+
+    if not json_path.exists():
+        return []
+
+    with open(json_path, "r", encoding="utf-8") as f:
+        threads = json.load(f)
+
+    return threads

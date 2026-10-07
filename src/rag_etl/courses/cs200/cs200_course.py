@@ -3,7 +3,7 @@ from datetime import date
 import logging
 
 from rag_etl.courses import BaseCourse
-from rag_etl.extractors import BaseExtractor, MoodleExtractor, MediaspaceExtractor
+from rag_etl.extractors import BaseExtractor, MoodleExtractor, MediaspaceExtractor, EdDiscussionExtractor
 from rag_etl.transformers import (
     BaseTransformer,
     ExtractZipTransformer,
@@ -260,6 +260,8 @@ class CS200Course(BaseCourse):
 
     moodle_base_path = f"{course_path}/moodle"
 
+    mime_types = mt.DEFAULT_MIME_TYPES + mt.ASSEMBLY_SOURCES
+
     ################################################################
 
     @property
@@ -286,7 +288,7 @@ class CS200Course(BaseCourse):
                 moodle_course_id=self.moodle_course_id,
                 moodle_base_path=self.moodle_base_path,
                 tag_metadata=self.tag_metadata,
-                mime_types=mt.DEFAULT_MIME_TYPES + mt.ASSEMBLY_SOURCES,
+                mime_types=self.mime_types,
             ),
             MediaspaceExtractor(
                 playlist_or_channel_url=self.mediaspace_playlist_or_channel_url,
@@ -294,6 +296,19 @@ class CS200Course(BaseCourse):
                 tag_metadata=self.tag_metadata,
                 language=self.mediaspace_language,
                 created_after=self.mediaspace_created_after,
+            ),
+            EdDiscussionExtractor(
+                ed_discussion_base_path=self.course_path,
+                mime_types=self.mime_types,
+                academic_year="2025_2026",
+                categories=[
+                    "theory",
+                    "practice",
+                    "exam",
+                ],
+                language=self.course_info["course_language"],
+                semester=self.course_info["semester"],
+                include_student_endorsed=False,
             ),
         ]
 

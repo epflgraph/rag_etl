@@ -238,21 +238,20 @@ class CS112gProject(BaseProject):
                 tag_metadata=self.tag_metadata,
                 mime_types=self.mime_types,
             ),
-            # EdDiscussionExtractor(
-            #     ed_discussion_base_path=self.course_path,
-            #     tags=self.tag_metadata.keys(),
-            #     tag_metadata=self.tag_metadata,
-            #     mime_types=(mt.DEFAULT_MIME_TYPES),
-            #     academic_year="2024-2025",
-            #     categories=[
-            #         "theory",
-            #         "practice",
-            #         "exam",
-            #     ],
-            #     language=self.course_info["course_language"],
-            #     semester=self.course_info["semester"],
-            #     include_student_endorsed=True,
-            # ),
+            EdDiscussionExtractor(
+                ed_discussion_base_path=self.course_path,
+                mime_types=self.mime_types,
+                academic_year="2024_2025",
+                categories=[
+                    "theory",
+                    "practice",
+                    "exam",
+                ],
+                language=self.course_info["course_language"],
+                semester=self.course_info["semester"],
+                include_student_endorsed=True,
+                # catalogue_sources=["moodle"],
+            ),
         ]
 
     @property

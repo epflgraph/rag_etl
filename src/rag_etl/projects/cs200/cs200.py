@@ -3,7 +3,7 @@ from datetime import date
 import logging
 
 from rag_etl.projects import BaseProject
-from rag_etl.extractors import BaseExtractor, MoodleExtractor, MediaspaceExtractor
+from rag_etl.extractors import BaseExtractor, MoodleExtractor, MediaspaceExtractor, EdDiscussionExtractor
 from rag_etl.transformers import (
     BaseTransformer,
     ExtractZipTransformer,
@@ -296,6 +296,19 @@ class CS200Project(BaseProject):
                 tag_metadata=self.tag_metadata,
                 language=self.mediaspace_language,
                 created_after=self.mediaspace_created_after,
+            ),
+            EdDiscussionExtractor(
+                ed_discussion_base_path=self.course_path,
+                mime_types=self.mime_types,
+                academic_year="2025_2026",
+                categories=[
+                    "theory",
+                    "practice",
+                    "exam",
+                ],
+                language=self.course_info["course_language"],
+                semester=self.course_info["semester"],
+                include_student_endorsed=False,
             ),
         ]
 

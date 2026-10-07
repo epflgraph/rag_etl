@@ -41,6 +41,14 @@ LLM_PARAMS = {
             "chat_template_kwargs": {"enable_thinking": False},
         },
     },
+    # Reasoning models: "thinking" mode maps to reasoning_effort=high
+    ("deepseek-ai/DeepSeek-V4-Flash-0731", "thinking"): {"temperature": 1.0, "top_p": 0.95, "reasoning_effort": "high"},
+    # https://huggingface.co/zai-org/GLM-5.3-Flash
+    ("zai-org/GLM-5.3-Flash", "thinking"): {
+        "reasoning_effort": "high",
+        "temperature": 1.0,
+        "top_p": 0.95,
+    },
 }
 
 

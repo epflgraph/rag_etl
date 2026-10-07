@@ -123,10 +123,8 @@ class MICRO452Course(BaseCourse):
             ),
             # EdDiscussionExtractor(
             #     ed_discussion_base_path=self.course_path,
-            #     tags=self.tag_metadata.keys(),
-            #     tag_metadata=self.tag_metadata,
             #     mime_types=self.mime_types,
-            #     academic_year="2025-2026",
+            #     academic_year="2025_2026",
             #     categories=[
             #         "theory",
             #         "practice",
@@ -135,6 +133,7 @@ class MICRO452Course(BaseCourse):
             #     language=self.course_info["course_language"],
             #     semester=self.course_info["semester"],
             #     include_student_endorsed=True,
+            #     # catalogue_sources=["moodle"],
             # ),
         ]
 

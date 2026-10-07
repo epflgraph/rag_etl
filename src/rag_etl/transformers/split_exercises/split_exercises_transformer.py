@@ -45,6 +45,12 @@ class SplitExercisesTransformer(BaseTransformer):
                 transformed_resources.append(resource)
                 continue
 
+            # Skip Q&A resources (e.g. Ed Discussion threads): they share the type/subtype of the
+            # document they discuss but are not exercise sheets to split
+            if resource.is_qa:
+                transformed_resources.append(resource)
+                continue
+
             # Build paths of md file and exercises folder
             md_path = Path(resource.path)
             exercises_path = md_path.with_suffix("")

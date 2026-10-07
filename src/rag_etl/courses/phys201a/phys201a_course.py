@@ -5,7 +5,7 @@ from datetime import date
 import logging
 
 from rag_etl.courses import BaseCourse
-from rag_etl.extractors import BaseExtractor, MoodleExtractor, LocalFolderExtractor
+from rag_etl.extractors import BaseExtractor, EdDiscussionExtractor, LocalFolderExtractor, MoodleExtractor
 from rag_etl.transformers import (
     BaseTransformer,
     ExtractZipTransformer,
@@ -31,6 +31,7 @@ class PHYS201aCourse(BaseCourse):
         "course_title": "Physique générale : électromagnétisme",
         "course_id": "PHYS201a",
         "academic_course": "2026-2027",
+        "course_language": "fr",
         "semester": 1,
         "admin_info_link": "https://moodle.epfl.ch/course/view.php?id=14288",
         "coursebook_link": "https://edu.epfl.ch/coursebook/fr/physique-generale-electromagnetisme-PHYS-201-A",
@@ -182,21 +183,19 @@ class PHYS201aCourse(BaseCourse):
                 tag_metadata=self.tag_metadata,
                 mime_types=self.mime_types,
             ),
-            # EdDiscussionExtractor(
-            #     ed_discussion_base_path=self.course_path,
-            #     tags=self.tag_metadata.keys(),
-            #     tag_metadata=self.tag_metadata,
-            #     mime_types=self.mime_types,
-            #     academic_year="2025-2026",
-            #     categories=[
-            #         "theory",
-            #         "practice",
-            #         "exam",
-            #     ],
-            #     language=self.course_info["course_language"],
-            #     semester=self.course_info["semester"],
-            #     include_student_endorsed=True,
-            # ),
+            EdDiscussionExtractor(
+                ed_discussion_base_path=self.course_path,
+                mime_types=self.mime_types,
+                # Previous year's Q&A: dates are inherited from this year's documents via the catalogue
+                academic_year="2025_2026",
+                categories=[
+                    "theory",
+                    "exam",
+                ],
+                language=self.course_info["course_language"],
+                semester=self.course_info["semester"],
+                include_student_endorsed=False,
+            ),
         ]
 
     @property

@@ -4,6 +4,7 @@ CLASSIFY_THREAD_USER_PROMPT = """
 Classify this thread from an educational forum.
 
 Thread metadata:
+- Title: '{thread_title}'
 - Category: '{thread_category}'
 - Subcategory: '{thread_subcategory}'
 
@@ -22,14 +23,33 @@ Type descriptions:
 - **admin**: Course announcements or administrative messages.
 - **other**: Anything not covered above (gratitude, off-topic, general remarks).
 
-If the type is 'theory', 'practice', or 'exam', also choose a subtype from these options:
-{subtype_options}
+If the type is 'theory', 'practice', or 'exam', the thread is about one of the following course
+documents, each shown with its catalogue id in brackets:
 
-Extract document numbers if mentioned (e.g., "Homework 7" -> doc_number="7", "Exercise 3.a" -> doc_number="3", doc_subnumber="a").
-For exams, doc_number should be the year (e.g., "Exam 2021" -> doc_number="2021").
+{catalogue}
 
-Provide output as JSON with fields: type, subtype, doc_number, doc_subnumber, week
-Set fields to null if not applicable.
+If the type is theory, practice or exam, set catalogue_id to the id of the entry the thread is
+about. Pick the most specific entry (a specific exercise) when one is discussed; pick the
+document-level entry (no sub-number) when the thread is about the document as a whole; set
+catalogue_id to null when no entry applies. For any other type, catalogue_id must be null.
 
-{format_instructions}
+The number of an exam or midterm entry is the year assigned by the course staff and may differ
+from the year students use to refer to it. Match a thread's exam reference to the entry whose
+title (usually the file name, e.g. "Examen_2024_2025") covers that exam, not to the entry whose
+number merely equals the year mentioned.
+
+The thread was written during academic year {academic_year}. When it refers to a midterm or exam
+without naming a year (e.g. "test mi-semestre ex 1a"), it means the one of that academic year:
+prefer the entry numbered {exam_year}.
+
+Set mentioned_number to the document number the thread explicitly refers to (the exam year, e.g.
+"2020" for "examen 2020"; the series or homework number, e.g. "3" for "série 3"), even when no
+catalogue entry exists for it. Set it to null when the thread does not name any specific document.
+
+Also determine the course week the thread relates to, if it can be determined from the content;
+otherwise set week to null.
+
+In `reason`, give the evidence from the thread text that supports your chosen type and catalogue
+entry, in a sentence or two. In `confidence`, rate from 0 to 10 how sure you are that both the
+type and the catalogue entry you picked are correct.
 """

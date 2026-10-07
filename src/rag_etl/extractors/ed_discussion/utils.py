@@ -1,20 +1,19 @@
-from __future__ import annotations
-
-import json
 import logging
 import os
 import re
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 import requests
+from pydantic import BaseModel, Field
 
-from rag_etl.config import CONFIG
+from rag_etl.extractors.ed_discussion.catalogue import CatalogueEntry, render_catalogue
 from rag_etl.extractors.ed_discussion.prompts import (
     CLASSIFY_THREAD_SYSTEM_PROMPT,
     CLASSIFY_THREAD_USER_PROMPT,
 )
-from rag_etl.utils.llms import generate_alt_text, send_llm_request
+from rag_etl.transformers.image_to_md.utils import convert_image_to_md
+from rag_etl.utils.llms import send_llm_request
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +31,28 @@ MESSAGE_TYPES = [
     "exception_request",
     "other",
 ]
+
+
+class ThreadClassification(BaseModel):
+    type: Literal[
+        "theory",
+        "practice",
+        "exam",
+        "admin",
+        "logistics",
+        "bug_or_typo_report",
+        "exception_request",
+        "other",
+    ]
+    catalogue_id: int | None
+    # Number the thread explicitly names (exam year, series number...), even when no catalogue entry
+    # matches it, lets the extractor tell "asks about an unlisted exam" apart from "names no exam"
+    mentioned_number: str | None
+    week: int | None
+    # Evidence from the thread text supporting the chosen type and catalogue entry
+    reason: str
+    # Self-assessed confidence (0-10)
+    confidence: int = Field(ge=0, le=10)
 
 
 def get_user_roles(users: list[dict]) -> dict[int, str]:
@@ -122,7 +143,10 @@ def inject_alt_text_into_content(
         return content_html, document_text
 
     try:
-        alt_text = generate_alt_text(image_path)
+        md_path = Path(image_path).with_suffix(".md")
+        if not md_path.exists():
+            convert_image_to_md(Path(image_path), md_path)
+        alt_text = md_path.read_text(encoding="utf-8").strip()
     except Exception as e:
         logger.warning(f"Failed to generate alt text for {image_path}: {e}")
         return content_html, document_text
@@ -144,27 +168,27 @@ def inject_alt_text_into_content(
 
 
 def classify_thread_with_llm(
+    thread_title: str,
     thread_category: str,
     thread_subcategory: str,
     all_messages_html: str,
-    all_types: list[str],
-    subtype_options: str,
-) -> dict[str, Any] | None:
-    """Classify thread type using LLM from RCP."""
+    catalogue: list[CatalogueEntry],
+    academic_year: str,
+    exam_year: str,
+    model: str,
+) -> ThreadClassification | None:
+    """Classify thread type using LLM from RCP, choosing a catalogue entry from a closed set."""
 
     try:
-        format_instructions = (
-            'Output JSON with fields: "type", "subtype", "doc_number", '
-            '"doc_subnumber", "week". Use null for missing values.'
-        )
-
         user_content = CLASSIFY_THREAD_USER_PROMPT.format(
+            thread_title=thread_title,
             thread_category=thread_category,
             thread_subcategory=thread_subcategory,
             all_messages_html=all_messages_html,
-            all_types=", ".join(all_types),
-            subtype_options=subtype_options,
-            format_instructions=format_instructions,
+            all_types=", ".join(MESSAGE_TYPES),
+            catalogue=render_catalogue(catalogue),
+            academic_year=academic_year,
+            exam_year=exam_year,
         )
 
         messages = [
@@ -172,14 +196,101 @@ def classify_thread_with_llm(
             {"role": "user", "content": user_content},
         ]
 
-        model = CONFIG["RCP_VISION_MODEL"]
-        content = send_llm_request(model, messages, name="classify-thread")
+        classification = send_llm_request(
+            model,
+            messages,
+            response_format=ThreadClassification,
+            name=f"classify-thread/{model}",
+        )
 
-        return json.loads(content)
+        if classification is None:
+            return None
+
+        if classification.catalogue_id is not None and not (0 <= classification.catalogue_id < len(catalogue)):
+            logger.warning(f"Catalogue id {classification.catalogue_id} out of range, discarding")
+            classification = classification.model_copy(update={"catalogue_id": None})
+
+        return classification
 
     except Exception as e:
         logger.warning(f"Thread classification failed: {e}")
         return None
+
+
+def same_answer(a: ThreadClassification, b: ThreadClassification) -> bool:
+    """Compare two classifications on (type, catalogue_id) only - the fields jurors vote on."""
+
+    return a.type == b.type and a.catalogue_id == b.catalogue_id
+
+
+# Simplified "LLM as jury": the second juror always votes, a third is only consulted to break a disagreement,
+# and jurors are judged only on (type, catalogue_id) agreement.
+def classify_thread_with_cascade(
+    thread_title: str,
+    thread_category: str,
+    thread_subcategory: str,
+    all_messages_html: str,
+    catalogue: list[CatalogueEntry],
+    academic_year: str,
+    exam_year: str,
+    models: list[str],
+) -> tuple[ThreadClassification | None, list[ThreadClassification | None]]:
+    """Classify a thread with a second juror, escalating to a third when the first two disagree."""
+
+    vote1 = classify_thread_with_llm(
+        thread_title,
+        thread_category,
+        thread_subcategory,
+        all_messages_html,
+        catalogue,
+        academic_year,
+        exam_year,
+        models[0],
+    )
+    if vote1 is None:
+        return None, [None]
+
+    if len(models) == 1:
+        return vote1, [vote1]
+
+    vote2 = classify_thread_with_llm(
+        thread_title,
+        thread_category,
+        thread_subcategory,
+        all_messages_html,
+        catalogue,
+        academic_year,
+        exam_year,
+        models[1],
+    )
+    votes = [vote1, vote2]
+    if vote2 is None:
+        logger.warning("Second juror failed to classify, falling back to first juror's vote")
+        return vote1, votes
+
+    if same_answer(vote1, vote2):
+        return vote1, votes
+
+    if len(models) == 2:
+        return None, votes
+
+    vote3 = classify_thread_with_llm(
+        thread_title,
+        thread_category,
+        thread_subcategory,
+        all_messages_html,
+        catalogue,
+        academic_year,
+        exam_year,
+        models[2],
+    )
+    votes = [vote1, vote2, vote3]
+    if vote3 is not None and same_answer(vote3, vote1):
+        return vote1, votes
+    if vote3 is not None and same_answer(vote3, vote2):
+        return vote2, votes
+
+    return None, votes
 
 
 def extract_messages_from_thread(

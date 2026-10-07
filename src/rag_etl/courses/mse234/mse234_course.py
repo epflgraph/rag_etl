@@ -5,7 +5,7 @@ from datetime import date
 import logging
 
 from rag_etl.courses import BaseCourse
-from rag_etl.extractors import BaseExtractor, MoodleExtractor, MediaspaceExtractor
+from rag_etl.extractors import BaseExtractor, MoodleExtractor, MediaspaceExtractor, EdDiscussionExtractor
 from rag_etl.transformers import (
     BaseTransformer,
     ExtractZipTransformer,
@@ -169,6 +169,19 @@ class MSE234Course(BaseCourse):
                 tag_metadata=self.tag_metadata,
                 language=self.mediaspace_language,
                 created_after=self.mediaspace_created_after,
+            ),
+            EdDiscussionExtractor(
+                ed_discussion_base_path=self.course_path,
+                mime_types=mt.DEFAULT_MIME_TYPES,
+                # Previous year's Q&A: dates are inherited from this year's documents via the catalogue
+                academic_year="2025_2026",
+                categories=[
+                    "theory",
+                    "exam",
+                ],
+                language=self.course_info["course_language"],
+                semester=self.course_info["semester"],
+                include_student_endorsed=False,
             ),
         ]
 

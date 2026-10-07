@@ -15,6 +15,9 @@ IPYNB = "application/x-ipynb+json"
 MP4 = "video/mp4"
 JSON = "application/json"
 
+GZIP = "application/gzip"
+TAR = "application/x-tar"
+
 # What Moodle's API reports for file extensions it does not recognise
 MOODLE_UNKNOWN = "document/unknown"
 

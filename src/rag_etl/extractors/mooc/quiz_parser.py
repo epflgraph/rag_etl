@@ -8,7 +8,7 @@ from typing import Any
 
 from lxml.etree import _Element
 
-import rag_etl.utils.mime_types as mt
+import ragtools.mime_types as mt
 from rag_etl.core import Resource
 from rag_etl.extractors.mooc.utils import (
     extract_number,

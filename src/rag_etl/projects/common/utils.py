@@ -5,7 +5,7 @@ import re
 from typing import Tuple, Optional
 
 from rag_etl.resources import BaseResource, MoodleResource
-import rag_etl.utils.mime_types as mt
+import ragtools.mime_types as mt
 
 from rag_etl.config import CONFIG
 

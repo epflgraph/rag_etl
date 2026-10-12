@@ -19,10 +19,9 @@ from langfuse import get_client
 from openai import OpenAI
 from pydantic import BaseModel
 
-import rag_etl.utils.mime_types as mt
+import ragtools.mime_types as mt
 
-from rag_etl.config import CONFIG
-from rag_etl.llm.defaults import DEFAULT_LLM_PARAMS
+from ragtools.llm.defaults import DEFAULT_LLM_PARAMS
 
 ModelT = TypeVar("ModelT", bound=BaseModel)
 
@@ -39,15 +38,15 @@ class RCPClient:
     leaving a silent gap in the index.
     """
 
-    base_url: str | None = None
-    api_key: str | None = None
+    base_url: str
+    api_key: str
     max_retries: int = 3
     timeout: int = 600
 
     def _client(self) -> OpenAI:
         return OpenAI(
-            base_url=self.base_url or CONFIG["RCP_BASE_URL"],
-            api_key=self.api_key or CONFIG["RCP_API_KEY"],
+            base_url=self.base_url,
+            api_key=self.api_key,
             timeout=self.timeout,
             max_retries=self.max_retries,
         )
@@ -58,16 +57,19 @@ class RCPClient:
         messages: list[dict[str, Any]],
         *,
         response_format: type[BaseModel] | None = None,
+        system: str | None = None,
         name: str,
         enable_thinking: bool = True,
         params: dict[str, Any] | None = None,
     ) -> str:
+        if system:
+            messages = [{"role": "system", "content": system}, *messages]
         mode = "thinking" if enable_thinking else "instruct"
         try:
             call_params = dict(DEFAULT_LLM_PARAMS[(model, mode)])
         except KeyError as e:
             raise ValueError(
-                f"No recommended parameters for model {model} in mode {mode}: add them to rag_etl/llm/defaults.py"
+                f"No recommended parameters for model {model} in mode {mode}: add them to ragtools/llm/defaults.py"
             ) from e
         if params:
             call_params.update(params)
@@ -92,7 +94,7 @@ class RCPClient:
                     messages=messages,
                     response_format=response_format_schema,
                     **call_params,
-                )
+                )  # type: ignore[call-overload]
             except Exception as e:
                 raise RuntimeError(f"RCP request '{name}' with model {model} failed: {e}") from e
 
@@ -122,13 +124,14 @@ class RCPClient:
         prompt: str,
         *,
         model: str,
+        system: str | None = None,
         name: str = "llm-request",
         enable_thinking: bool = True,
         params: dict[str, Any] | None = None,
     ) -> str:
         """Send a plain text prompt and return the model's answer."""
         messages: list[dict[str, Any]] = [{"role": "user", "content": prompt}]
-        return self._send(model, messages, name=name, enable_thinking=enable_thinking, params=params)
+        return self._send(model, messages, system=system, name=name, enable_thinking=enable_thinking, params=params)
 
     def vision(
         self,
@@ -136,6 +139,8 @@ class RCPClient:
         images: Sequence[str | Path],
         *,
         model: str,
+        system: str | None = None,
+        detail: str | None = None,
         name: str = "vision-request",
         enable_thinking: bool = True,
         params: dict[str, Any] | None = None,
@@ -148,10 +153,13 @@ class RCPClient:
             if mime_type is None:
                 raise ValueError(f"Could not determine MIME type for {image}")
             b64 = base64.b64encode(image.read_bytes()).decode("utf-8")
-            content.append({"type": "image_url", "image_url": {"url": f"data:{mime_type};base64,{b64}"}})
+            image_url: dict[str, Any] = {"url": f"data:{mime_type};base64,{b64}"}
+            if detail:
+                image_url["detail"] = detail
+            content.append({"type": "image_url", "image_url": image_url})
 
         messages: list[dict[str, Any]] = [{"role": "user", "content": content}]
-        return self._send(model, messages, name=name, enable_thinking=enable_thinking, params=params)
+        return self._send(model, messages, system=system, name=name, enable_thinking=enable_thinking, params=params)
 
     def structured(
         self,

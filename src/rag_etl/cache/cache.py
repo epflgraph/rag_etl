@@ -14,7 +14,7 @@ import shutil
 
 from pathlib import Path
 
-from rag_etl.config import CONFIG
+from rag_etl.config import config_value
 
 
 class Cache:
@@ -24,7 +24,7 @@ class Cache:
         self.transform = transform
         self.refresh = refresh
 
-        cache_path = Path(CONFIG["CACHE_DIR"])
+        cache_path = Path(config_value("CACHE_DIR"))
         if not cache_path.exists():
             raise ValueError(f"Cache path {cache_path} does not exist.")
         self.cache_path = cache_path / transform
@@ -53,8 +53,15 @@ class Cache:
         return True
 
     def set(self, content_hash: str, value: Path) -> None:
-        """Store the output produced for `content_hash` in the cache."""
+        """Store the output produced for `content_hash` in the cache.
+
+        A path that was never produced (e.g. no frames extracted) is not
+        cached: the next run recomputes it.
+        """
         value = Path(value)
+        if not value.exists():
+            return
+
         entry = self._entry_path(content_hash, value)
 
         if value.is_dir():

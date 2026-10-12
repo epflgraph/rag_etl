@@ -5,7 +5,7 @@ import re
 
 from pydantic import BaseModel, Field
 
-from rag_etl.utils.encoding import sanitize_for_filename
+from ragtools.encoding import sanitize_for_filename
 from rag_etl.utils.llms import send_llm_request
 
 from rag_etl.config import CONFIG

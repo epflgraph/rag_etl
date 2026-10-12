@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from datetime import date, datetime
 from pathlib import Path
 
-from rag_etl.config import CONFIG
+from rag_etl.config import config_value
 from rag_etl.core import Resource
 from rag_etl.extractors.base_extractor import Extractor, SourceUnavailable
 from rag_etl.extractors.mediaspace.utils import (
@@ -26,17 +26,9 @@ from rag_etl.utils.kaltura import (
     list_channel_entries,
     list_playlist_entries,
 )
-import rag_etl.utils.mime_types as mt
+import ragtools.mime_types as mt
 
 logger = logging.getLogger(__name__)
-
-
-def config_value(key: str) -> str:
-    """Return a required config value, failing loud when it is missing."""
-    value = CONFIG.get(key)
-    if not value:
-        raise SourceUnavailable(f"Missing required config value: {key}")
-    return value
 
 
 @dataclass(frozen=True)

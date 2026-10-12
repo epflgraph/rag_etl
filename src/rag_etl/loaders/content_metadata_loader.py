@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import shutil
 
-from rag_etl.utils.encoding import ensure_utf8
+from ragtools.encoding import ensure_utf8
 from pathlib import Path
 
 import json

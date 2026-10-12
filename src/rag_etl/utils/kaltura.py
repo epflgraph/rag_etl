@@ -9,7 +9,7 @@ from KalturaClient.exceptions import KalturaException
 from KalturaClient.Plugins.Caption import KalturaCaptionAssetFilter, KalturaCaptionAssetStatus, KalturaCaptionType
 
 from rag_etl.config import CONFIG
-import rag_etl.utils.mime_types as mt
+import ragtools.mime_types as mt
 from KalturaClient.Plugins.Core import (
     KalturaBaseEntryFilter,
     KalturaFilterPager,

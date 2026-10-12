@@ -9,7 +9,7 @@ import re
 from rag_etl.transformers import BaseTransformer
 from rag_etl.resources import BaseResource
 
-import rag_etl.utils.mime_types as mt
+import ragtools.mime_types as mt
 
 
 PAGE_MARKER_PATTERN = re.compile(r"<!-- page (\d+) -->\s*")

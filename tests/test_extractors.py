@@ -9,7 +9,7 @@ from types import SimpleNamespace
 import pytest
 import requests
 
-import rag_etl.utils.mime_types as mt
+import ragtools.mime_types as mt
 from rag_etl.extractors.base_extractor import Extractor, SourceUnavailable
 from rag_etl.extractors.ed_discussion.ed_discussion_extractor import EdDiscussionExtractor
 from rag_etl.extractors.ed_discussion.utils import ThreadClassification

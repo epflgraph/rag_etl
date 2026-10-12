@@ -12,7 +12,7 @@ from rag_etl.transformers.video_to_frames.utils import (
 )
 from rag_etl.utils.graphai import GraphAIError, detect_slides, get_access_token, retrieve_video
 from rag_etl.utils.kaltura import build_entry_url, create_kaltura_session, find_slides_entry_id, get_video_download_url
-import rag_etl.utils.mime_types as mt
+import ragtools.mime_types as mt
 
 logger = logging.getLogger(__name__)
 

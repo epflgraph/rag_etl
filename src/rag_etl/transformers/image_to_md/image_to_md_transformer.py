@@ -5,7 +5,7 @@ from pathlib import Path
 from rag_etl.resources import BaseResource
 from rag_etl.transformers.base_transformer import BaseTransformer
 from rag_etl.transformers.image_to_md.utils import convert_image_to_md
-import rag_etl.utils.mime_types as mt
+import ragtools.mime_types as mt
 
 logger = logging.getLogger(__name__)
 

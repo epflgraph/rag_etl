@@ -26,7 +26,7 @@ from rag_etl.extractors.mooc.utils import (
 from rag_etl.utils.tags import split_tag_number_text, split_tag_text
 from rag_etl.utils import sanitize_for_filename
 
-import rag_etl.utils.mime_types as mt
+import ragtools.mime_types as mt
 
 
 logger = logging.getLogger(__name__)

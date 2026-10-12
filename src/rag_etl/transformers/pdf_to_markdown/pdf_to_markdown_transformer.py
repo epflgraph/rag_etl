@@ -10,7 +10,7 @@ from rag_etl.resources import BaseResource
 
 from rag_etl.transformers.pdf_to_markdown.utils import convert_pdf_to_md
 
-import rag_etl.utils.mime_types as mt
+import ragtools.mime_types as mt
 
 
 class PDFToMarkdownTransformer(BaseTransformer):

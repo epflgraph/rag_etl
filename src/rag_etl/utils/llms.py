@@ -3,13 +3,13 @@ import base64
 from langfuse import get_client
 from openai import OpenAI
 
-import rag_etl.utils.mime_types as mt
+import ragtools.mime_types as mt
 
 from rag_etl.config import CONFIG
 import logging
 
 # Recommended params for each model and mode (shared with the new pipeline's llm client)
-from rag_etl.llm.defaults import DEFAULT_LLM_PARAMS as LLM_PARAMS
+from ragtools.llm.defaults import DEFAULT_LLM_PARAMS as LLM_PARAMS
 
 logger = logging.getLogger(__name__)
 

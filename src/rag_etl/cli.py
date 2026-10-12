@@ -2,7 +2,8 @@ import argparse
 import logging
 import sys
 
-from rag_etl.projects import BaseProject
+from rag_etl.projects import from_code
+from rag_etl.pipeline import run_pipeline
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -34,11 +35,11 @@ def main(argv: list[str] | None = None) -> None:
         logging.info(f"Run configuration: project={args.project}, dry={args.dry}, refresh={args.refresh or 'none'}")
 
         try:
-            project = BaseProject.from_code(args.project)
+            spec = from_code(args.project)
         except ValueError as e:
             parser.error(str(e))
 
-        project.run()
+        run_pipeline(spec, dry=args.dry, refresh=args.refresh)
 
 
 if __name__ == "__main__":

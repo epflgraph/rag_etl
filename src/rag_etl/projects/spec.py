@@ -6,19 +6,16 @@ from dataclasses import dataclass, field
 from typing import Any, Mapping
 
 from rag_etl.core.rules import Rule
-
-
-@dataclass(frozen=True)
-class SourceConfig:
-    """Configuration for one source an extractor reads (Phase 2 fixes the shape)."""
-
-    kind: str  # moodle | mooc | mediaspace | local_folder | ed_discussion | git
-    params: Mapping[str, Any] = field(default_factory=dict)
+from rag_etl.extractors import Extractor
 
 
 @dataclass(frozen=True)
 class ModelConfig:
-    """One model invocation config (Phase 3 fixes the shape)."""
+    """One model invocation config: the model and its parameter overrides.
+
+    The recommended parameters for the model come from
+    ``ragtools.llm.defaults``; ``params`` overrides them per call.
+    """
 
     model: str
     params: Mapping[str, Any] = field(default_factory=dict)
@@ -28,21 +25,23 @@ class ModelConfig:
 class ModelConfigs:
     """Model + parameters per concern; every model invocation takes these from the spec."""
 
-    ocr: ModelConfig | None = None
-    judge: ModelConfig | None = None
-    annotator: ModelConfig | None = None
-    embedding: ModelConfig | None = None
+    ocr: ModelConfig | None = None        # vision reads: PDF pages, frames, images (materialize)
+    judge: ModelConfig | None = None      # type/subtype/is_solution/cut inference (Phase 4)
+    annotator: ModelConfig | None = None  # exercise number + is-solution per chunk (Phase 4)
+    embedding: ModelConfig | None = None  # chunk embeddings (Phase 4)
 
 
 @dataclass(frozen=True)
 class ProjectSpec:
     """The declarative spec of one project.
 
-    The judge infers type/subtype/is_solution/cut per resource; exceptions
+    Sources are extractor instances, each configured for its source; the
+    judge infers type/subtype/is_solution/cut per resource; exceptions
     correct specific resources that would otherwise be mislabelled.
     """
 
     id: str                                  # lowercase, e.g. "com202"; names the index/alias rag_{id}
+    language: str | None = None              # the project's language (materialize slide detection)
     exceptions: tuple[Rule, ...] = ()        # manual corrections for resources the judge would mislabel
-    sources: tuple[SourceConfig, ...] = ()   # extractor configs (Phase 2)
-    models: ModelConfigs = ModelConfigs()    # OCR, judge, annotator, embedding (Phase 3)
+    sources: tuple[Extractor, ...] = ()      # extractor instances, one per source
+    models: ModelConfigs = ModelConfigs()    # OCR, judge, annotator, embedding

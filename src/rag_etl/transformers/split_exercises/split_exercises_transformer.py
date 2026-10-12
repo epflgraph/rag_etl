@@ -11,7 +11,7 @@ from rag_etl.resources import BaseResource
 
 from rag_etl.transformers.split_exercises.utils import split_md_into_exercises
 
-import rag_etl.utils.mime_types as mt
+import ragtools.mime_types as mt
 
 
 class SplitExercisesTransformer(BaseTransformer):

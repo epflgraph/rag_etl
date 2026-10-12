@@ -5,7 +5,7 @@ from pathlib import Path
 from rag_etl.config import CONFIG
 from rag_etl.transformers.image_to_md.prompts import SYSTEM_PROMPT, USER_PROMPT
 from rag_etl.utils.llms import send_llm_request
-import rag_etl.utils.mime_types as mt
+import ragtools.mime_types as mt
 
 logger = logging.getLogger(__name__)
 

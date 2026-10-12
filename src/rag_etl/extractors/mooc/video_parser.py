@@ -8,7 +8,7 @@ import logging
 
 from rag_etl.core import Resource
 from rag_etl.extractors.mooc.utils import load_root_elem_from_mooc_xml, cut_from_flags
-import rag_etl.utils.mime_types as mt
+import ragtools.mime_types as mt
 
 logger = logging.getLogger(__name__)
 

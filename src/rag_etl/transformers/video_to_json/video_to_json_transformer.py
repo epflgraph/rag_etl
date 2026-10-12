@@ -8,7 +8,7 @@ from collections.abc import Sequence
 from rag_etl.transformers.video_to_json.utils import process_video_from_url
 
 
-import rag_etl.utils.mime_types as mt
+import ragtools.mime_types as mt
 
 from rag_etl.config import CONFIG
 

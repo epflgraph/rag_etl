@@ -10,7 +10,7 @@ import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
-import rag_etl.utils.mime_types as mt
+import ragtools.mime_types as mt
 from rag_etl.core import Resource
 from rag_etl.extractors.base_extractor import Extractor, SourceUnavailable
 

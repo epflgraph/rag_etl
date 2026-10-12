@@ -14,7 +14,7 @@ from rag_etl.transformers import (
 
 from rag_etl.loaders import BaseLoader, ContentMetadataLoader
 
-import rag_etl.utils.mime_types as mt
+import ragtools.mime_types as mt
 
 from rag_etl.config import CONFIG
 

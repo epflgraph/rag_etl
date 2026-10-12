@@ -7,7 +7,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
-from rag_etl.utils.mime_types import DEFAULT_MIME_TYPES, guess_mime_type
+from ragtools.mime_types import DEFAULT_MIME_TYPES, guess_mime_type
 from rag_etl.core import Resource
 from rag_etl.extractors.base_extractor import Extractor, SourceUnavailable
 

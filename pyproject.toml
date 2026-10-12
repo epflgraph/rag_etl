@@ -71,9 +71,17 @@ ignore_missing_imports = true
 # As a phase rewrites a module, remove its entry here so mypy gates it.
 [[tool.mypy.overrides]]
 module = [
-    "rag_etl.config",
     "rag_etl.loaders.*",
-    "rag_etl.transformers.*",
+    "rag_etl.transformers.base_transformer",
+    "rag_etl.transformers.extract_zip.*",
+    "rag_etl.transformers.image_to_md.*",
+    "rag_etl.transformers.jupyter_to_markdown.*",
+    "rag_etl.transformers.merge_slide_transcript.*",
+    "rag_etl.transformers.pdf_to_markdown.*",
+    "rag_etl.transformers.split_exercises.*",
+    "rag_etl.transformers.split_pages.*",
+    "rag_etl.transformers.video_to_frames.*",
+    "rag_etl.transformers.video_to_json.*",
     "rag_etl.utils.*",
     "rag_etl.projects.*.*",
     "rag_etl.resources.*",

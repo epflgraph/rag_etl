@@ -10,9 +10,9 @@ import zipfile
 
 from rag_etl.transformers import BaseTransformer
 from rag_etl.resources import BaseResource
-from rag_etl.utils.encoding import ensure_utf8, zip_entry_filename
+from ragtools.encoding import ensure_utf8, zip_entry_filename
 
-import rag_etl.utils.mime_types as mt
+import ragtools.mime_types as mt
 
 
 def unzip_file(zip_path):

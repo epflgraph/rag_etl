@@ -8,13 +8,19 @@ Resolved after auditing both codebases (`rag-prepipeline` and `chatbotpipelines`
 
 - **No translation.** The current pipeline translates every chunk to EN+FR via GraphAI (`content.en`/`content.fr` in the ES mapping, embedding computed on the English text). This was a legacy oddity, never mentioned in the consensus. LLMs handle the original language; translation adds processing time and potential bugs for no real improvement. The new ES mapping carries a single-language `content` field. Consumers that rely on `content.en`/`content.fr` are updated during the cutover (see Phase 5).
 - **No MCP generation on the pipeline side.** The SVG's steps 7–11 (question generation, tool config generation/eval/refinement/promotion loop) belong to the MCP server, which autodiscovers and autogenerates the tools it serves from the pipeline's two artifacts (ES indices + the metadata file/record). `rag-etl` implements steps 1–6 only: extract → normalize → materialize → judge → cut → embed + load.
-- **Ed Discussion ports as a source.** The extractor is fully implemented (though disabled in every course today); it is adapted to the `Resource` model and the rule mechanism and stays inactive until a project spec lists it as a source.
-- **COM202 pilots the rollout.** Moodle + MOOC (heaviest realistic input), currently indexed and consumed by bots. Parallel-run it against the old pipeline, then cut over project by project into the weekly cron.
+- **Ed Discussion ports as a source.** The extractor is fully implemented (though disabled in every course today); it is adapted to the `Resource` model and the rule mechanism and stays inactive until a project spec lists it as a source. MICRO-303 activates it (Javier's merge added the LLM-as-jury cascade and the catalogue built from the previous run's output metadata).
+- **MICRO-303 pilots the rollout** (chosen over COM202 as the more recent course with a MOOC): Moodle 19283 + MOOC export + local folder + Ed Discussion, all reachable. Parallel-run it against the old pipeline, then cut over project by project into the weekly cron.
 - **Scheduling: timers, no Airflow.** Airflow was never actually used in production (Ramtin's effort was never switched on). We keep what has been working: timers that trigger services. Instead of running `main` from each course, `rag-etl` gets a unified entry point (CLI with a `--project` parameter); whether the timer then loops over projects or one timer per project is an implementation detail we will settle when wiring the cron.
 - **Embeddings: Qwen3-Embedding-8B on RCP, bypassing GraphAI.** Embedding moves to the RCP client (model + parameters from the project/run spec, per §4 of the consensus). This impacts the current GraphAI `/rag/retrieve` endpoint (which embeds queries on the consumer side) — addressed separately from this repo, not a blocker for the ETL.
-- **Slide-change detection: keep GraphAI `detect_slides` for now.** It is the only working implementation. We may develop a better algorithm later and replace it both in the pipeline and on GraphAI; the pipeline will call it behind a small interface so the swap is local.
+- **Slide-change detection: keep GraphAI `detect_slides` for now.** It is the only working implementation. We may develop a better algorithm later and replace it both in the pipeline and on GraphAI; the pipeline calls it behind a small interface so the swap is local.
 - **ES mapping details (dense/sparse, analyzer set, embedding dims): decided in Phase 5**, from the resource model and the field-name reconciliation with the consumer repos.
 - **Moodle assignments are known-unfetchable** (no API access) — accepted limitation, documented.
+- **Business logic and plumbing split: `ragtools`.** The file-prep logic (OCR, conversions, archives, video handling) and the unified RCP client live in their own top-level package `src/ragtools/` that never imports `rag_etl`; the pipeline packages (`rag_etl`) depend on it, never the other way. Colleagues pip install the distribution and use `ragtools` for OCR or their own file prep; a true standalone distribution splits off in Phase 7 if demand appears. Prompts are business logic and are kept verbatim.
+- **Model calls: standard retry, then the run stops loud.** Every LLM call goes through the unified `RCPClient`, retried a few times by the underlying client and then raised — a page that cannot be read stops the run rather than leaving a silent gap.
+- **Cache semantics: content-only keys, no eviction.** The cache is keyed by content hash only (the model is not part of the key; a model change is handled manually with `--refresh TRANSFORM`), scoped `(transform, content-hash)` and shared across projects, with full output directories as values.
+- **Videos: one uniform Kaltura path.** Mediaspace and MOOC videos both go through the Kaltura slides flow (entry id from the video descriptor or the playManifest url); YouTube videos, with no Kaltura entry, keep only their captions. The Gemini video path is gone.
+- **Stitching is kept, only where files are actually merged** (see Phase 4): not for slides — each slide is its own chunk — but for polycopiés and exercises; deterministic-first, LLM only as fallback.
+- **The real run waits until all the code is ready.** The Phase 2/3 real-extraction gates are deferred: the MICRO303 directory structure and the MOOC export are not on disk yet. Unit tests with synthetic fixtures and stubbed models carry the verification until then.
 
 ## 1. Grounding (audit summary)
 
@@ -54,20 +60,37 @@ What the audit of the two repos found, for reference while implementing.
 ## 3. Target layout (sketch)
 
 ```
-src/rag_etl/
-├── core/                     # Resource dataclass, pipeline-state helpers, where-matcher, Rule + resolution
-├── projects/                 # ProjectSpec dataclass, registry, one thin spec file per project
-├── pipeline.py               # the fixed sequence orchestrator
-├── cache/                    # content-hash disk cache facade (refresh flag, (transform, hash) scoping)
-├── llm/                      # RCP client (vision/text/structured/embeddings), judge, per-exercise annotator
-├── extractors/               # moodle, mooc/, mediaspace, local_folder, ed_discussion, git (new)
-├── transforms/               # normalize/, materialize/, cuts/ (cut registry)
-├── embed/                    # RCP embedder, per chunk, cache-aware
-├── loaders/                  # record (manifest), elasticsearch
-└── cli.py                    # rag-etl run --project X [--dry] [--refresh TRANSFORM]
+src/
+├── ragtools/                    # pure file-prep library; never imports rag_etl
+│   ├── llm/                     # unified RCP client (rcp.py) + recommended params (defaults.py)
+│   ├── archives.py              # zip/tar.gz → files (NFC, UTF-8 fixes)
+│   ├── encoding.py              # UTF-8 fixing, archive name decoding, filename sanitisation
+│   ├── images.py                # image → text by a vision model (slide prompts, ALT texts)
+│   ├── mime_types.py            # mime constants and guessing
+│   ├── notebooks.py             # ipynb → md (ALT texts via a vision model)
+│   ├── pdf.py                   # deterministic PyMuPDF page render (prompts kept here too)
+│   └── video.py                 # ffmpeg frames, SRT parsing/merging, SlideDetector interface
+└── rag_etl/
+    ├── core/                    # resource.py (Resource + hashing), rules.py (Rule + matcher)
+    ├── extractors/              # base_extractor.py (Extractor, SourceUnavailable) + moodle/, mooc/,
+    │                            #   mediaspace/, local_folder/, ed_discussion/, git/
+    ├── transformers/            # base.py (Transformer ABC); normalize/, materialize/ (thin adapters
+    │                            #   over ragtools; materialize/videos.py = Kaltura/GraphAI plumbing);
+    │                            #   legacy subpackages kept, mypy-suppressed, die at cutover
+    ├── cache/                   # content-hash disk cache (refresh flag, (transform, hash) scoping)
+    ├── pipeline.py              # the fixed sequence orchestrator
+    ├── projects/                # spec.py (ProjectSpec, ModelConfig, ModelConfigs) + from_code discovery;
+    │                            #   semester_2627_autumn/ with one thin spec file per project;
+    │                            #   legacy course class folders kept, mypy-suppressed, die at cutover
+    ├── config.py                # .env CONFIG + shared config_value (required values, fail loud)
+    ├── loaders/                 # legacy (record + content metadata); Phase 5 rewrites
+    ├── utils/                   # legacy but alive: llms.py (Ed's cascade), graphai.py, kaltura.py, tags.py;
+    │                            #   dead: cache.py (replaced by cache/)
+    ├── resources/               # legacy BaseResource subclasses; mypy-suppressed, die at cutover
+    └── cli.py                   # rag-etl run --project X [--dry] [--refresh TRANSFORM]
 ```
 
-Module names are indicative; Phase 0 finalizes the shapes.
+Specs are discovered by convention (`from_code` in `projects/__init__.py` scans the `semester_*` folders — e.g. `projects/semester_2627_autumn/micro303.py`), not by a registry.
 
 ## 4. Phases
 
@@ -94,19 +117,22 @@ Each phase ends with a verification gate; no phase starts before the previous ga
 
 **Gate:** unit tests; one real extraction per source (MICRO-303 Moodle first; MOOC, Mediaspace, Ed and git wait for their inputs); a temporarily unreachable source fails the run loud (SourceUnavailable) rather than indexing half of it.
 
-### Phase 3 — Pipeline + cache + normalize + materialize
-- Fixed-sequence orchestrator.
-- Cache rewrite: content-only keys, `(transform, content-hash)` scope shared across projects, per-run `--refresh` flag; no GraphAI cache-DB.
-- Normalize: zip/tar.gz → files, notebook → md, per-mime size limit (oversized → dropped).
-- Materialize: PDF → per-page deterministic render + RCP vision OCR per page; video → slide-change detection (GraphAI `detect_slides`, behind a swappable interface) + captions (Kaltura SRT) upstream, then frame OCR; image → text via RCP.
-- Unified RCP client: vision, text, structured output, embeddings — every model invocation (OCR, judge, annotator, embeddings) takes model + parameters from the project/run spec.
+### Phase 3 — Pipeline + cache + normalize + materialize *(done, real run deferred)*
+- Fixed-sequence orchestrator (`pipeline.py`), fail-loud.
+- Cache rewrite (`src/rag_etl/cache/`): content-only keys, `(transform, content-hash)` scope shared across projects, per-run `--refresh` flag; full output directories as values; no GraphAI cache-DB.
+- Normalize (`transformers/normalize/`): zip/tar.gz → files, notebook → md, per-mime size limits (PDF 50 MB, images 10 MB, text 5 MB; oversized dropped).
+- Materialize (`transformers/materialize/`): PDF → per-page deterministic render (PyMuPDF, ~72 DPI) + RCP vision OCR per page (page children); video → one uniform Kaltura path (entry id from descriptor or playManifest url; slide changes via GraphAI `detect_slides` behind the swappable `SlideDetector`; ffmpeg frames; captions quoted into slides); image → text via RCP.
+- Unified RCP client (`ragtools/llm/`): vision, text, structured output, embeddings — every model invocation takes the model from the spec, recommended parameters from `ragtools.llm.defaults`, per-call overrides from the spec; standard retry, then the run stops loud.
+- **Business logic split into `ragtools`** (see §0): the colleague-facing library; transformers are thin adapters.
+- Project spec final shape (`ProjectSpec`, `ModelConfig(s)`) + specs in semester folders, discovered by convention (`from_code`); CLI switched to spec + orchestrator; MICRO-303 the first real spec.
 
-**Gate:** unit tests; COM202 dry run with cache reuse vs `--refresh` (per-resource cost flags correct; one-comma-in-200-pages re-OCRs one page).
+**Gate:** unit tests (68, incl. one-comma-in-200-pages re-OCRs one page — with stubbed models); the real dry run (MICRO-303) **waits until all the code is ready** (§0): the MICRO303 directory structure and the MOOC export are not on disk yet.
 
 ### Phase 4 — Judge + cuts + embeddings
 - Judge transformer (after materialize, before cut): a stub for Javier's inference, filling `type`/`subtype`/`is_solution` and the `cut` per resource (or dropping the resource); exceptions correct on top of judge output.
 - `per_exercise` annotator: exercise number + is-solution (chunk-level), separate concern from the judge, shared model infrastructure; nothing annotated unless rules ask for it.
 - Cuts registry: `whole_document` (size guard), `per_child`, `per_exercise` (annotate + stitch ordered sibling pages + cut at markers), `text` (header-aware chunking with size guard). New cuts join via PR, never course-local code.
+- **Stitching lands here, at cut time** (see DESIGN.md): deterministic-first stitching where files are actually merged (polycopiés, exercises — never slides); the old 10-page-batch LLM stitching is replaced, LLM only as a per-document fallback behind the same interface.
 - RCP embeddings per chunk (Qwen3-Embedding-8B), cache-aware (see §5 open items for cache interaction).
 
 **Gate:** unit tests on cuts with synthetic docs; judge + annotator spot-checks on real COM202 pages; exceptions change labels on rerun.
@@ -135,8 +161,9 @@ Each phase ends with a verification gate; no phase starts before the previous ga
 
 ## 5. Open items carried into implementation
 
-- **Embeddings × cache:** which embedding model/parameters interplay with content-only cache keys + the `--refresh` flag (fresh embeddings land after an explicit cache refresh, per CONSENSUS §4/§6). Settle in Phase 3/4; dims flow into the Phase 5 mapping.
+- **Embeddings × cache:** settled (§0): content-only keys, no eviction, model changes handled manually with `--refresh TRANSFORM`. Dims flow into the Phase 5 mapping.
 - **GraphAI `/rag/retrieve` impact:** consumers embed queries via GraphAI today; switching embeddings to RCP (Qwen3-Embedding-8B) breaks that pairing. Consumer-side work, tracked separately; the ETL's part is only model/parameter configurability.
 - **Cron wiring:** one timer looping over all projects vs one timer per project calling the CLI. Settle when enrolling the first project (Phase 6).
 - **MCP server handoff:** metadata-file contract documented by the end of Phase 5; MCP server work (tool autodiscovery, steps 7–11) tracked in its own repo.
-- **MOOC extractor usage:** confirm during Phase 2 whether it is still actively used (COM202/ENV342/CS112g/CS119d/ME326/MGT645/MICRO303 reference it); do not drop it until confirmed.
+- **MOOC extractor usage:** confirmed (Phase 2) — actively used, kept and adapted; MOOC videos join the uniform Kaltura path.
+- **Stitching details:** which documents stitch and where deterministic fixes are enough — settle during Phase 4 on real polycopiés; the design direction is in DESIGN.md.

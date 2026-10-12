@@ -51,12 +51,8 @@ def test_unknown_project_errors(capsys):
 def test_known_project_runs(monkeypatch):
     ran = []
 
-    class FakeProject:
-        def run(self):
-            ran.append(True)
+    monkeypatch.setattr("rag_etl.cli.run_pipeline", lambda spec, dry=False, refresh=None: ran.append(spec.id))
 
-    monkeypatch.setattr("rag_etl.cli.BaseProject", type("FakeBase", (), {"from_code": classmethod(lambda cls, code: FakeProject())}))
+    main(["run", "--project", "MICRO303"])
 
-    main(["run", "--project", "COM202"])
-
-    assert ran == [True]
+    assert ran == ["micro303"]

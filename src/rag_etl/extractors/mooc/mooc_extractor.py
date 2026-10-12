@@ -6,7 +6,7 @@ from typing import Any
 from rag_etl.core import Resource
 from rag_etl.extractors.base_extractor import Extractor
 
-import rag_etl.utils.mime_types as mt
+import ragtools.mime_types as mt
 from rag_etl.extractors.mooc.course_parser import CourseParser
 from rag_etl.extractors.mooc.utils import UntaggedDocuments, asset_base_url_from_course_url
 

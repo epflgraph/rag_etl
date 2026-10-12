@@ -111,9 +111,23 @@ Status markers:
 
 ## 11. Open topics
 
-- **GraphAI.** What survives its responsibilities now that OCR goes to RCP: subtitle extraction, slide-change detection, captions; its cache-DB schema and connector are being dropped. Candidate for its remaining role: things RCP cannot do.
-- **Source side in detail.** What extractors owe the new resource model; a temporarily unreachable source fails the run loud (no half-indexing); the MOOC extractor (the largest) is confirmed actively used and was adapted, not dropped. Moodle assignments are known-unfetchable (no API access) — accepted limitation.
-- **Embeddings.** Which model, dense/sparse mapping details, and how embedding caching interacts with the content-only cache key plus the refresh flag. The retrieval-quality/latency experiments with newer RCP embedding models (e.g. Qwen3-Embedding-8B) are consumer-side work that will especially drive the MCP server; the ETL's part is only model/parameter configurability (section 4).
+- **GraphAI.** What survives its responsibilities now that OCR goes to RCP: subtitle extraction, slide-change detection, captions; its cache-DB schema and connector are being dropped. Candidate for its remaining role: things RCP cannot do. *Direction settled: OCR goes to RCP through the unified client; `detect_slides` stays behind a swappable interface.*
+- **Source side in detail.** What extractors owe the new resource model; a temporarily unreachable source fails the run loud (no half-indexing); the MOOC extractor (the largest) is confirmed actively used and was adapted, not dropped. Moodle assignments are known-unfetchable (no API access) — accepted limitation. *Settled in Phases 2–3.*
+- **Embeddings.** Which model, dense/sparse mapping details, and how embedding caching interacts with the content-only cache key plus the refresh flag. The retrieval-quality/latency experiments with newer RCP embedding models (e.g. Qwen3-Embedding-8B) are consumer-side work that will especially drive the MCP server; the ETL's part is only model/parameter configurability (section 4). *Cache interaction settled: content-only keys, model changes handled with `--refresh`.*
 - **Reranking (consumer-side).** Query-time rerankers (e.g. Qwen3-Reranker-8B, bge-reranker-v2-m3) are outside `rag-etl` scope; whether the pipeline owes anything for them is undecided — probably nothing beyond what the metadata file already exposes.
-- **Packaging and best practices.** Pip-installable parts colleagues can run individually (OCR, notebook conversion), tests (directory currently empty), CI, docs; module/directory renames (`courses/` currently holds non-courses such as `plasma`, and course files are named `*_course.py`).
+- **Packaging and best practices.** Pip-installable parts colleagues can run individually (OCR, notebook conversion), tests (directory currently empty), CI, docs; module/directory renames (`courses/` currently holds non-courses such as `plasma`, and course files are named `*_course.py`). *Partially settled: the file-prep logic is its own package (`ragtools`); tests exist.*
 - **ES schema.** The concrete mapping, to be written from the resource model once the dataclass shapes settle.
+
+## 12. Settled during implementation
+
+Decisions taken while implementing, binding the phases (details in DESIGN.md and IMPLEMENTATION.md §0):
+
+- **Business logic vs plumbing: two top-level packages.** Pure file preparation lives in `ragtools` (archives, notebooks, PDFs, images, videos, the unified RCP client and its parameter defaults) and never imports `rag_etl`; the pipeline (`rag_etl`) depends on it. Colleagues use `ragtools` for OCR or their own file prep; a standalone distribution splits off in Phase 7 if demand appears. Prompts are business logic, kept verbatim.
+- **Transformers follow an explicit-inheritance contract** (`Transformer`, frozen dataclass, like `Extractor`), reshaping resource trees in place: normalize (archives, notebooks, size limits) and materialize (per-page PDF OCR, image OCR, one uniform Kaltura video path with captions quoted into slides).
+- **Model calls: standard retry, then the run stops loud.** One unified `RCPClient`; the model travels with each call from the spec; recommended parameters per model in one defaults file.
+- **Cache: content-only keys, no eviction.** Scoped `(transform, content-hash)`, shared across projects; `--refresh TRANSFORM` handles model changes manually.
+- **Size limits (normalize):** PDF 50 MB, images 10 MB, text 5 MB, as module constants.
+- **Videos: one uniform Kaltura path** for Mediaspace and MOOC videos (entry id from the video descriptor or the playManifest url); YouTube videos keep only their captions. The Gemini video path is gone.
+- **Stitching is kept, only where files are actually merged** (never for slides): polycopiés and exercises stitch ordered sibling pages before being cut. It lands at cut time (Phase 4), deterministic-first, LLM only as a per-document fallback; the old 10-page-batch LLM stitching is replaced.
+- **Specs live in semester folders** (e.g. `projects/semester_2627_autumn/micro303.py`), one thin file per project, discovered by convention (`from_code`) with no registry.
+- **MICRO-303 pilots the rollout** (over COM202, more recent); the real run waits until all the code is ready.

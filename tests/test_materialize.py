@@ -177,3 +177,29 @@ def test_video_with_no_frames_dropped(tmp_path, transformer):
     one_timestamp.transform([root])
 
     assert root.children == []
+
+
+def test_changed_video_leaves_no_stale_frames(tmp_path, transformer):
+    """A video that changed detects fewer frames: the old ones must not survive as slides."""
+    descriptor_path = tmp_path / "0_abc.json"
+    descriptor_path.write_text('{"entry_id": "0_abc"}', encoding="utf-8")
+    video = Resource(title="lecture 1", url="https://mediaspace.epfl.ch/watch/0_abc", path=descriptor_path, mime_type=mt.MP4)
+    root = Resource(title="root", children=[video])
+
+    transformer.transform([root])
+    assert len(root.children[0].children) == 2
+
+    # The video changed: same path, new content, so the cache misses
+    descriptor_path.write_text('{"entry_id": "0_abc", "version": 2}', encoding="utf-8")
+    shorter = MaterializeTransformer(
+        cache=transformer.cache,
+        llm=transformer.llm,
+        vision_model="fake",
+        detector=SimpleNamespace(detect=lambda *args, **kwargs: [0]),
+    )
+    root = Resource(title="root", children=[Resource(title="lecture 1", url="https://mediaspace.epfl.ch/watch/0_abc", path=descriptor_path, mime_type=mt.MP4)])
+
+    shorter.transform([root])
+
+    # No new frames detected: nothing must be left over from the old video
+    assert root.children == []

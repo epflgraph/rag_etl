@@ -13,11 +13,11 @@ is read again, a page that did not is not.
 from __future__ import annotations
 
 import logging
+import shutil
 
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
 
 import ragtools.mime_types as mt
 from ragtools.images import SLIDE_SYSTEM_PROMPT, SLIDE_USER_PROMPT, ocr_image
@@ -26,7 +26,7 @@ from ragtools.pdf import PDF_SYSTEM_PROMPT, PDF_USER_PROMPT, save_pdf_pages
 from ragtools.video import SlideDetector, extract_frame, filter_close_timestamps, frame_time, parse_srt, text_between
 
 from rag_etl.cache import Cache
-from rag_etl.core import Resource
+from rag_etl.core import Resource, child_inheriting
 from rag_etl.core.resource import hash_bytes
 from rag_etl.transformers.base import Transformer
 from rag_etl.transformers.materialize.videos import KalturaVideoResolver, entry_id_of
@@ -41,22 +41,6 @@ TRANSCRIPT_PREFIX = "> "
 # Page and frame reads run bounded: twenty concurrent calls is what kept
 # the old pipeline well behaved against RCP
 MAX_CONCURRENT_OCR = 20
-
-
-def child_inheriting(node: Resource, **overrides: Any) -> Resource:
-    """One child of a node, carrying the parent's descriptive metadata."""
-    fields: dict[str, Any] = {
-        "type": node.type,
-        "subtype": node.subtype,
-        "number": node.number,
-        "subnumber": node.subnumber,
-        "week": node.week,
-        "is_solution": node.is_solution,
-        "from_": node.from_,
-        "until": node.until,
-    }
-    fields.update(overrides)
-    return Resource(**fields)
 
 
 @dataclass(frozen=True)
@@ -167,6 +151,10 @@ class MaterializeTransformer(Transformer):
             return
         frames_path = node.path.with_suffix("")
         content_hash = node.content_hash
+
+        # A changed video reuses the same frames folder: stale frames from
+        # the previous content must not survive into the new slides
+        shutil.rmtree(frames_path, ignore_errors=True)
 
         if not self.cache.get(content_hash, frames_path):
             video_url = resolver.url(entry_id)

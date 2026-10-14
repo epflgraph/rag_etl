@@ -9,7 +9,7 @@ import ragtools.mime_types as mt
 from rag_etl.cache import Cache
 from rag_etl.core import Resource
 from rag_etl.core.models import ModelConfig
-from rag_etl.transformers.cut.annotate import ExerciseSnippet
+from rag_etl.transformers.cut.annotate import Exercise, ExerciseList, ExerciseSnippet, annotate
 from rag_etl.transformers.cut.cut_transformer import CutTransformer
 from rag_etl.transformers.cut.headings import MAX_SECTION_LINES
 from rag_etl.transformers.cut.stitch import deterministic_stitch
@@ -85,6 +85,17 @@ def test_per_child_reads_each_readable_child(tmp_path, transformer):
 
     assert [child.text for child in doc.children] == ["page 1", "page 2"]
     assert all(child.cut is None for child in doc.children)
+
+
+def test_per_child_dropping_one_child_keeps_the_next(tmp_path, transformer):
+    root = Resource(title="root")
+    doc = root.add_child(Resource(title="doc", cut="per_child"))
+    doc.add_child(Resource(title="doc > empty", path=write_page(tmp_path, "empty.md", "   "), mime_type=mt.MARKDOWN))
+    doc.add_child(Resource(title="doc > good", path=write_page(tmp_path, "good.md", "good text"), mime_type=mt.MARKDOWN))
+
+    transformer.transform([root])
+
+    assert [child.text for child in doc.children] == ["good text"]
 
 
 def test_per_child_keeps_children_with_their_own_cut(tmp_path, transformer):
@@ -206,3 +217,20 @@ def test_stitch_keeps_markers_between_pages():
     text = deterministic_stitch(pages)
 
     assert "<!-- page 1 -->" in text and "<!-- page 2 -->" in text
+
+
+def test_annotate_merges_duplicate_exercises_on_separate_lines():
+    """An exercise cut across sections reassembles in order, parts on separate lines."""
+
+    class FakeLLM:
+        def structured(self, prompt, schema, **kwargs):
+            return ExerciseList(exercises=[Exercise(start_line=1, end_line=2, number="1", is_solution=False)])
+
+    # A first section too big to merge into the second: both get annotated
+    filler = "\n".join(f"line {i}" for i in range(MAX_SECTION_LINES))
+    text = f"# A\n{filler}\n\n# B\nbeta"
+
+    snippets = annotate(text, FakeLLM(), "fake-model")
+
+    assert len(snippets) == 1
+    assert snippets[0].text == "# A\nline 0\n# B\nbeta"

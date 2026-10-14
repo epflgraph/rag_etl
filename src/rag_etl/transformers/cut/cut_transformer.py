@@ -18,14 +18,13 @@ from dataclasses import asdict, dataclass
 from ragtools.llm import RCPClient
 
 from rag_etl.cache import Cache
-from rag_etl.core import Resource
+from rag_etl.core import Resource, child_inheriting, is_text_node
 from rag_etl.core.models import ModelConfig
 from rag_etl.core.resource import hash_text
 from rag_etl.transformers.base import Transformer
 from rag_etl.transformers.cut.annotate import ExerciseSnippet, annotate
 from rag_etl.transformers.cut.headings import MAX_SECTION_LINES, merge_up_to_max_lines, split_by_most_common_heading
 from rag_etl.transformers.cut.stitch import stitch
-from rag_etl.transformers.materialize.materialize_transformer import child_inheriting
 
 logger = logging.getLogger(__name__)
 
@@ -36,11 +35,6 @@ EXERCISES_FILE = "exercises.json"
 PAGE_MARKER = re.compile(r"<!-- page (\d+) -->")
 
 CutFunction = Callable[["CutTransformer", Resource], None]
-
-
-def is_text_node(node: Resource) -> bool:
-    """Whether a node's content is text the cuts can read."""
-    return node.mime_type == "text/markdown" or (node.mime_type is not None and node.mime_type.startswith("text/"))
 
 
 def document_texts(node: Resource) -> list[str]:
@@ -101,7 +95,7 @@ def per_child(transformer: "CutTransformer", node: Resource) -> None:
     Children carrying their own different cut keep it — an exception inside
     a folder cut per child still applies.
     """
-    for child in node.children:
+    for child in list(node.children):
         if child.cut not in (None, "per_child"):
             continue
         if not is_text_node(child) or child.path is None:

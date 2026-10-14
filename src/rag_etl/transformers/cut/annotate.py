@@ -101,7 +101,11 @@ def annotate(
 
             snippet = "\n".join(lines[exercise.start_line - 1 : exercise.end_line])
             key = (exercise.number, exercise.is_solution)
-            snippets[key] = snippets.get(key, "") + snippet
+            # An exercise cut across sections reassembles in order, parts on separate lines
+            if key in snippets:
+                snippets[key] += "\n" + snippet
+            else:
+                snippets[key] = snippet
 
     return [
         ExerciseSnippet(number=number, is_solution=is_solution, text=snippet)

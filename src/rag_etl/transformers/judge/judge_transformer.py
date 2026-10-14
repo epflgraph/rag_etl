@@ -12,10 +12,9 @@ from dataclasses import dataclass
 
 import ragtools.mime_types as mt
 
-from rag_etl.core import Resource
+from rag_etl.core import Resource, is_text_node
 from rag_etl.core.rules import Rule, apply
 from rag_etl.transformers.base import Transformer
-from rag_etl.transformers.cut.cut_transformer import is_text_node
 
 
 @dataclass(frozen=True)

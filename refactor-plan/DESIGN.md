@@ -7,7 +7,7 @@ Short note fixing the core shapes that Phases 1–5 implement, updated as the ph
 extract (plain documents) → normalize → materialize (OCR etc.) → judge → cut → embed + load
 
 - Extractors return plain documents — whatever is includable (Moodle: everything not marked NO_BOT). Whatever per-source labels a source itself infers (MOOC export tags, Ed Discussion's jury) stays in its extractor; the judge fills everything else.
-- The **judge** (a stub we build, replaced by Javier's inference) fills `type`/`subtype`/`is_solution` and the `cut` per resource — or drops the resource. It sits after materialize and before cut, because the cut depends on it. There is **no type/subtype → cut mapping in this codebase**: how the judge decides is Javier's business.
+- The **judge** fills `type`/`subtype`/`is_solution` and the `cut` per resource — or drops the resource. It sits after materialize and before cut, because the cut depends on it. There is **no type/subtype → cut mapping in this codebase**: how the judge decides is Javier's business. The built stub (`transformers/judge/`) applies the exceptions and fills the default cuts — readable leaves cut whole, containers of text cut per child, roots never cut — leaving `type`/`subtype`/`is_solution` unlabelled until his inference replaces it.
 - Exceptions (below) correct specific resources the judge would mislabel.
 
 ## Two packages: `ragtools` and `rag_etl` (Phase 3)
@@ -95,9 +95,9 @@ class ModelConfig:
 @dataclass(frozen=True)
 class ModelConfigs:
     ocr: ModelConfig | None = None          # vision reads: PDF pages, frames, images (materialize)
-    judge: ModelConfig | None = None        # type/subtype/is_solution/cut inference (Phase 4)
-    annotator: ModelConfig | None = None    # exercise number + is-solution per chunk (Phase 4)
-    embedding: ModelConfig | None = None    # chunk embeddings (Phase 4)
+    judge: ModelConfig | None = None        # type/subtype/is_solution/cut inference (judge)
+    annotator: ModelConfig | None = None    # exercise number + is-solution per chunk (per_exercise)
+    embedding: ModelConfig | None = None    # chunk embeddings (embed)
 
 @dataclass(frozen=True)
 class ProjectSpec:
@@ -117,14 +117,25 @@ Specs live in **semester folders** (e.g. `projects/semester_2627_autumn/micro303
 - Model calls (OCR, ALT texts) go through the unified `RCPClient`: standard retry, then the run stops loud — a page that cannot be read is not silently skipped.
 - GraphAI failing on one video drops that video rather than the run (old behavior, kept).
 
+## Cuts + embed (Phase 4, `src/rag_etl/transformers/cut/`, `embed/`)
+
+- The **cuts registry** (`CUTS`): one entry per kind of cut, mapping a resource's `cut` label to its cut function; new cuts join via PR, never course-local code. An unknown label fails loud.
+- A cut consumes the node it applies to, top-down: the node is replaced by chunk leaves (a chunk is a leaf with text) and its subtree never needs a second cut. Roots are never cut whole.
+  - `whole_document`: the node becomes one chunk — its own file, or its ordered page children stitched (children consumed). Over the size guard (2000 lines) the chunk is dropped with a loud warning; fixable with a rule.
+  - `per_child`: each readable child becomes a chunk in place, text read from its file. Children carrying their own different cut keep it (an exception inside a folder cut per child still applies).
+  - `per_exercise`: the node's pages are stitched, then annotated — one LLM pass returning exercises as line ranges with number + is-solution (prompts kept as documents in `cut/prompts/`, cached by the stitched text's hash) — then cut at the annotated markers: one chunk per exercise, deep-linking into the pdf page its text starts on. Nothing is annotated unless the cut asks for it.
+  - `text`: header-aware chunking (split at the most common heading level, adjacent parts merged up to the guard).
+- **Embed** (`embed/embed.py`): RCP embeddings per chunk (`Qwen/Qwen3-Embedding-8B`, model + params from the spec), batched, cache-aware — one JSON file per chunk under `{CACHE_DIR}/embed/{text hash}/`, via the cache's `read`/`write` text API. Output: `(chunk, embedding)` pairs for the Phase 5 loader; embeddings are not on the node.
+- `run_pipeline` returns nothing content-wise: loaders run inside the pipeline and publish the index; failures propagate loud.
+
 ## Stitching (Phase 4, at cut time)
 
 Page-by-page OCR leaves pages that sometimes need merging: headings at different levels, formulas or tables cut at page boundaries. Stitching is **kept, but only where files are actually merged**: not for slides (each slide is its own chunk), but for course notes (polycopié) and exercises, where ordered sibling pages are merged before being cut into chunks. It therefore belongs to the cuts (Phase 4), not to materialize — materialize always keeps per-page children.
 
 Direction (replacing the old 10-page-batch LLM stitching, ~20 LLM calls per long PDF):
 
-- **Deterministic first**: heading-level normalization (one document title, consistent levels), joining tables and display equations split across pages, fixing soft hyphenation — all deterministic post-processing over the ordered page children, zero LLM calls.
-- **LLM stitch as a fallback, per document in a single call**, behind the same stitch interface, off by default — only where deterministic fixes leave problems.
+- **Deterministic first** (implemented, `transformers/cut/stitch.py`): page boundary markers, tables and display equations cut across consecutive pages joined (no marker between the joined sides — it would break the block), soft-hyphenated words put back together (heuristic: the continuation starts in lowercase). Heading-level normalization is deliberately not deterministic — too risky without document context; the LLM fallback covers it.
+- **LLM stitch as a fallback, per document in a single call**, behind the same stitch interface, off by default — the old prompt, kept as a document in `transformers/cut/prompts/`.
 
 ## What this kills
 

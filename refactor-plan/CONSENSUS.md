@@ -131,3 +131,13 @@ Decisions taken while implementing, binding the phases (details in DESIGN.md and
 - **Stitching is kept, only where files are actually merged** (never for slides): polycopiés and exercises stitch ordered sibling pages before being cut. It lands at cut time (Phase 4), deterministic-first, LLM only as a per-document fallback; the old 10-page-batch LLM stitching is replaced.
 - **Specs live in semester folders** (e.g. `projects/semester_2627_autumn/micro303.py`), one thin file per project, discovered by convention (`from_code`) with no registry.
 - **MICRO-303 pilots the rollout** (over COM202, more recent); the real run waits until all the code is ready.
+
+Phase 4 (judge, cuts, embeddings):
+
+- **The judge stub is deterministic**: it applies the spec's exceptions and fills the default cuts (readable leaves cut whole, containers of text cut per child, roots never cut); `type`/`subtype`/`is_solution` stay unlabelled until Javier's inference lands.
+- **A cut consumes the node it applies to**, top-down: the labelled node is replaced by chunk leaves and its subtree never needs a second cut. `per_child` only consumes readable children whose cut is `None` or `per_child` — a child carrying its own different cut (an exception inside a folder) keeps it. Unknown labels fail loud.
+- **`whole_document` size guard: drop + warn** (2000 lines, the old batching bound); fixable with a rule. Prevents one huge doc from killing the embedding step.
+- **Prompts are documents**: the annotator and stitch prompts migrated verbatim (via `ast`) to md files in `cut/prompts/`, shipped as package data — hand-editable, never transcribed by hand.
+- **Chunk vectors: one JSON file per chunk** under `{CACHE_DIR}/embed/{text hash}/embedding.json`, via new `Cache.read`/`write` (text values read in memory); same content-only-key + no-eviction policy as every other transform.
+- **`ModelConfig(s)` moved to `rag_etl/core/models.py`** (next to `Resource` and `Rule`): the cut reads the annotator model without dragging in `rag_etl.projects`, whose init eagerly loads every legacy project — a circular import, fixed at the root instead of a `TYPE_CHECKING` workaround.
+- **`run_pipeline` returns nothing content-wise**: loaders run inside the pipeline (Phase 5) and publish the index; the embed step computes `(chunk, embedding)` pairs internally.

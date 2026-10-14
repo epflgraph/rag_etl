@@ -70,3 +70,19 @@ def test_scopes_are_shared_by_transform_name(cache_dir, tmp_path):
 
     other = Cache("materialize")
     assert other.get("hash1", tmp_path / "sub" / "out.md") is True
+
+
+def test_text_roundtrip(cache_dir):
+    cache = Cache("embed")
+    cache.write("hash1", "embedding.json", "[0.1, 0.2]")
+
+    assert cache.read("hash1", "embedding.json") == "[0.1, 0.2]"
+
+
+def test_text_read_misses_and_respects_refresh(cache_dir):
+    cache = Cache("embed")
+    assert cache.read("unknown-hash", "embedding.json") is None
+
+    cache.write("hash1", "embedding.json", "[0.1]")
+    refreshed = Cache("embed", refresh=True)
+    assert refreshed.read("hash1", "embedding.json") is None

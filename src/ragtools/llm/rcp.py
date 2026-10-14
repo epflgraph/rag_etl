@@ -10,7 +10,7 @@ the run completes or it stops loud.
 from __future__ import annotations
 
 import base64
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, TypeVar
@@ -60,7 +60,7 @@ class RCPClient:
         system: str | None = None,
         name: str,
         enable_thinking: bool = True,
-        params: dict[str, Any] | None = None,
+        params: Mapping[str, Any] | None = None,
     ) -> str:
         if system:
             messages = [{"role": "system", "content": system}, *messages]
@@ -127,7 +127,7 @@ class RCPClient:
         system: str | None = None,
         name: str = "llm-request",
         enable_thinking: bool = True,
-        params: dict[str, Any] | None = None,
+        params: Mapping[str, Any] | None = None,
     ) -> str:
         """Send a plain text prompt and return the model's answer."""
         messages: list[dict[str, Any]] = [{"role": "user", "content": prompt}]
@@ -143,7 +143,7 @@ class RCPClient:
         detail: str | None = None,
         name: str = "vision-request",
         enable_thinking: bool = True,
-        params: dict[str, Any] | None = None,
+        params: Mapping[str, Any] | None = None,
     ) -> str:
         """Send a prompt with one or more images (paths) and return the model's answer."""
         content: list[dict[str, Any]] = [{"type": "text", "text": prompt}]
@@ -167,13 +167,16 @@ class RCPClient:
         schema: type[ModelT],
         *,
         model: str,
+        system: str | None = None,
         name: str = "structured-request",
         enable_thinking: bool = True,
-        params: dict[str, Any] | None = None,
+        params: Mapping[str, Any] | None = None,
     ) -> ModelT:
         """Send a prompt and parse the answer into the given pydantic schema."""
         messages: list[dict[str, Any]] = [{"role": "user", "content": prompt}]
-        content = self._send(model, messages, response_format=schema, name=name, enable_thinking=enable_thinking, params=params)
+        content = self._send(
+            model, messages, response_format=schema, system=system, name=name, enable_thinking=enable_thinking, params=params
+        )
         return schema.model_validate_json(content)
 
     def embeddings(self, texts: Sequence[str], *, model: str) -> list[list[float]]:

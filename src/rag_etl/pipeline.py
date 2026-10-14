@@ -15,6 +15,9 @@ from rag_etl.core import Resource
 from rag_etl.extractors import Extractor
 from rag_etl.projects.spec import ProjectSpec
 from rag_etl.transformers.base import Transformer
+from rag_etl.transformers.cut.cut_transformer import CutTransformer
+from rag_etl.transformers.embed.embed import chunks_of, embed
+from rag_etl.transformers.judge.judge_transformer import JudgeTransformer
 from rag_etl.transformers.materialize.materialize_transformer import MaterializeTransformer
 from rag_etl.transformers.materialize.videos import GraphAISlideDetector
 from rag_etl.transformers.normalize.normalize_transformer import NormalizeTransformer
@@ -23,17 +26,21 @@ from ragtools import RCPClient
 logger = logging.getLogger(__name__)
 
 
-def run_pipeline(spec: ProjectSpec, dry: bool = False, refresh: str | None = None) -> list[Resource]:
-    """Run the fixed sequence over one project's sources and return the trees.
+def run_pipeline(spec: ProjectSpec, dry: bool = False, refresh: str | None = None) -> None:
+    """Run the fixed sequence over one project's sources.
 
-    Judge → cut → embed + load land in Phases 4 and 5; until then the
-    sequence runs extract, normalize and materialize. A dry run publishes
-    nothing (loaders arrive in Phase 5).
+    The loaders run inside the pipeline (Phase 5) and publish the index;
+    nothing content-wise comes back — failures propagate loud. A dry run
+    publishes nothing.
     """
+    llm = RCPClient(base_url=config_value("RCP_BASE_URL"), api_key=config_value("RCP_API_KEY"))
 
     roots = extract(spec.sources)
-    roots = transform(roots, spec, refresh)
-    return roots
+    roots = transform(roots, spec, refresh, llm)
+
+    pairs = embed(chunks_of(roots), llm, embedding_model_of(spec), Cache("embed", refresh=refresh == "embed"))
+    logger.info(f"{spec.id}: {len(pairs)} chunks embedded")
+    # The loaders consume the pairs in Phase 5
 
 
 def extract(sources: tuple[Extractor, ...]) -> list[Resource]:
@@ -47,10 +54,16 @@ def extract(sources: tuple[Extractor, ...]) -> list[Resource]:
     return roots
 
 
-def transform(roots: list[Resource], spec: ProjectSpec, refresh: str | None = None) -> list[Resource]:
+def transform(
+    roots: list[Resource],
+    spec: ProjectSpec,
+    refresh: str | None = None,
+    llm: RCPClient | None = None,
+) -> list[Resource]:
     """Run the fixed transform sequence over the trees."""
 
-    llm = RCPClient(base_url=config_value("RCP_BASE_URL"), api_key=config_value("RCP_API_KEY"))
+    if llm is None:
+        llm = RCPClient(base_url=config_value("RCP_BASE_URL"), api_key=config_value("RCP_API_KEY"))
     ocr_model = ocr_model_of(spec)
 
     normalize = NormalizeTransformer(
@@ -66,9 +79,14 @@ def transform(roots: list[Resource], spec: ProjectSpec, refresh: str | None = No
         mediaspace_url=CONFIG.get("DEFAULT_MEDIASPACE_BASE_URL"),
         language=spec.language,
     )
+    judge = JudgeTransformer(exceptions=spec.exceptions)
+    cut = CutTransformer(
+        cache=Cache("cut", refresh=refresh == "cut"),
+        llm=llm,
+        annotator=spec.models.annotator,
+    )
 
-    sequence: list[Transformer] = [normalize, materialize]
-    # judge → cut → embed + load land in Phases 4 and 5
+    sequence: list[Transformer] = [normalize, materialize, judge, cut]
 
     for step in sequence:
         name = type(step).__name__
@@ -83,3 +101,10 @@ def ocr_model_of(spec: ProjectSpec) -> str:
     if spec.models.ocr is None:
         raise ValueError(f"The spec of {spec.id} declares no OCR model; set models.ocr")
     return spec.models.ocr.model
+
+
+def embedding_model_of(spec: ProjectSpec) -> str:
+    """Return the embedding model the spec declares, failing loud when it has none."""
+    if spec.models.embedding is None:
+        raise ValueError(f"The spec of {spec.id} declares no embedding model; set models.embedding")
+    return spec.models.embedding.model

@@ -128,14 +128,16 @@ Each phase ends with a verification gate; no phase starts before the previous ga
 
 **Gate:** unit tests (68, incl. one-comma-in-200-pages re-OCRs one page — with stubbed models); the real dry run (MICRO-303) **waits until all the code is ready** (§0): the MICRO303 directory structure and the MOOC export are not on disk yet.
 
-### Phase 4 — Judge + cuts + embeddings
-- Judge transformer (after materialize, before cut): a stub for Javier's inference, filling `type`/`subtype`/`is_solution` and the `cut` per resource (or dropping the resource); exceptions correct on top of judge output.
-- `per_exercise` annotator: exercise number + is-solution (chunk-level), separate concern from the judge, shared model infrastructure; nothing annotated unless rules ask for it.
-- Cuts registry: `whole_document` (size guard), `per_child`, `per_exercise` (annotate + stitch ordered sibling pages + cut at markers), `text` (header-aware chunking with size guard). New cuts join via PR, never course-local code.
-- **Stitching lands here, at cut time** (see DESIGN.md): deterministic-first stitching where files are actually merged (polycopiés, exercises — never slides); the old 10-page-batch LLM stitching is replaced, LLM only as a per-document fallback behind the same interface.
-- RCP embeddings per chunk (Qwen3-Embedding-8B), cache-aware (see §5 open items for cache interaction).
+### Phase 4 — Judge + cuts + embeddings *(done, real spot-checks deferred with the real run)*
+- Judge transformer (after materialize, before cut): a deterministic stub for Javier's inference — it applies the spec's exceptions and fills the default cuts (readable leaves cut whole, containers of text cut per child, roots never cut), leaving `type`/`subtype`/`is_solution` unlabelled until his inference replaces it.
+- Cuts registry (`transformers/cut/cut_transformer.py`, one `CUTS` dict): `whole_document` (stitch multi-page children, size guard drops over-limit chunks loudly), `per_child` (readable children chunk in place; children with their own different cut keep it), `per_exercise` (stitch + cached annotation + cut at markers, deep links from page markers), `text` (header-aware chunking with the guard). Unknown labels fail loud. A cut consumes the node it applies to, top-down.
+- `per_exercise` annotator (`transformers/cut/annotate.py`): exercise number + is-solution (chunk-level), separate concern from the judge, shared model infrastructure; nothing annotated unless the cut asks for it. The old prompt and call name kept verbatim, migrated to documents (`cut/prompts/*.md`, shipped as package data).
+- **Stitching landed here, at cut time** (see DESIGN.md): deterministic-first (page markers, split tables/equations joined, hyphenation heuristic — zero LLM calls; heading normalization left to the fallback); the old 10-page-batch LLM stitching is replaced, LLM only as a per-document fallback behind the same `stitch` interface, off by default.
+- RCP embeddings per chunk (Qwen/Qwen3-Embedding-8B), batched, cache-aware: one JSON file per chunk under `{CACHE_DIR}/embed/{text hash}/` via new `Cache.read`/`write`; output `(chunk, embedding)` pairs for the Phase 5 loader.
+- `ModelConfig(s)` moved to `rag_etl/core/models.py` (the declarative data model, next to `Resource` and `Rule`): the cut reads the annotator model without dragging in `rag_etl.projects` (whose init eagerly loads every legacy project) — a circular import, fixed at the root.
+- `run_pipeline` returns nothing content-wise: the embed step computes pairs inside the pipeline; Phase 5 loaders are called inside `run_pipeline` and publish the index.
 
-**Gate:** unit tests on cuts with synthetic docs; judge + annotator spot-checks on real COM202 pages; exceptions change labels on rerun.
+**Gate:** unit tests on the cuts with synthetic docs (98 total, annotator stubbed); judge + annotator spot-checks on real pages **wait for the real run** (§0); exceptions change labels on rerun (judge test).
 
 ### Phase 5 — Loaders: record + Elasticsearch
 - Record/manifest loader: header (run timestamp, `dry` flag, project id, index name + alias, pipeline version, schema snapshot) + resource-tree body; metadata-only with content-hash pointers (no text, no embeddings); dry records land separately from real-run records.

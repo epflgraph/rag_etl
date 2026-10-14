@@ -70,3 +70,24 @@ class Cache:
         else:
             entry.parent.mkdir(parents=True, exist_ok=True)
             shutil.copyfile(value, entry)
+
+    def read(self, content_hash: str, name: str) -> str | None:
+        """Return the cached text value for `content_hash`, or None on miss or refresh.
+
+        A text value is read in memory rather than copied to a path, for
+        outputs that live nowhere on disk (e.g. the vector of one chunk).
+        """
+        if self.refresh:
+            return None
+
+        entry = self.cache_path / content_hash / name
+        if not entry.is_file():
+            return None
+
+        return entry.read_text(encoding="utf-8")
+
+    def write(self, content_hash: str, name: str, text: str) -> None:
+        """Store a text value for `content_hash` in the cache."""
+        entry = self.cache_path / content_hash / name
+        entry.parent.mkdir(parents=True, exist_ok=True)
+        entry.write_text(text, encoding="utf-8")

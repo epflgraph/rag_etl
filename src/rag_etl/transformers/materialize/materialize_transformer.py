@@ -45,17 +45,18 @@ MAX_CONCURRENT_OCR = 20
 
 def child_inheriting(node: Resource, **overrides: Any) -> Resource:
     """One child of a node, carrying the parent's descriptive metadata."""
-    return Resource(
-        type=node.type,
-        subtype=node.subtype,
-        number=node.number,
-        subnumber=node.subnumber,
-        week=node.week,
-        is_solution=node.is_solution,
-        from_=node.from_,
-        until=node.until,
-        **overrides,
-    )
+    fields: dict[str, Any] = {
+        "type": node.type,
+        "subtype": node.subtype,
+        "number": node.number,
+        "subnumber": node.subnumber,
+        "week": node.week,
+        "is_solution": node.is_solution,
+        "from_": node.from_,
+        "until": node.until,
+    }
+    fields.update(overrides)
+    return Resource(**fields)
 
 
 @dataclass(frozen=True)

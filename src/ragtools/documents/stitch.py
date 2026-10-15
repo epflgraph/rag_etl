@@ -4,14 +4,15 @@ Page-by-page OCR leaves pages that sometimes need merging: tables or
 display equations cut at page boundaries, words split by hyphenation. The
 fixes here are deterministic post-processing over the ordered page texts,
 zero LLM calls. The LLM stitch runs as a per-document fallback, off by
-default, only where deterministic fixes leave problems.
+default: when a caller asks for it, it rewrites the whole joined document
+in a single call on top of the deterministic result.
 """
 
 from __future__ import annotations
 
 from pathlib import Path
 
-from ragtools.llm import RCPClient
+from ragtools.llm import get_model
 
 # Page boundary markers, one per page, in strict page order
 PAGE_MARKER = "<!-- page {position} -->"
@@ -21,23 +22,7 @@ PAGE_MARKER = "<!-- page {position} -->"
 STITCH_SYSTEM_PROMPT = (Path(__file__).parent / "prompts" / "stitch_markdown_pages.md").read_text(encoding="utf-8")
 
 
-def stitch(pages: list[str], *, llm: RCPClient | None = None, model: str | None = None) -> str:
-    """Join ordered page texts into one Markdown document.
-
-    Deterministic fixes run first: page boundary markers, tables and
-    display equations split across pages joined, soft hyphenation fixed.
-    Passing both `llm` and `model` enables the LLM stitch fallback, which
-    rewrites the joined document in a single call.
-    """
-    text = deterministic_stitch(pages)
-
-    if llm is not None and model is not None:
-        text = llm_stitch(text, llm, model) or text
-
-    return text
-
-
-def deterministic_stitch(pages: list[str]) -> str:
+def stitch(pages: list[str]) -> str:
     """Join the pages in order, fixing what page-by-page processing broke.
 
     Tables and display equations cut by the page boundary are joined so
@@ -67,9 +52,7 @@ def deterministic_stitch(pages: list[str]) -> str:
 
 def _boundary_join(previous: str, page: str) -> str | None:
     """The two texts joined directly when a block continues across them, None otherwise."""
-    if _ends_mid_table(previous) and _starts_mid_table(page):
-        return f"{previous}\n{page}"
-    if _ends_mid_equation(previous) and _starts_mid_equation(page):
+    if (_ends_mid_table(previous) and _starts_mid_table(page)) or _odd_dollars(previous) and _odd_dollars(page):
         return f"{previous}\n{page}"
     if previous.endswith("-") and page[:1].islower():
         return f"{previous[:-1]}{page}"
@@ -88,23 +71,22 @@ def _starts_mid_table(text: str) -> bool:
     return bool(lines) and lines[0].lstrip().startswith("|")
 
 
-def _ends_mid_equation(text: str) -> bool:
-    """Whether a display equation opened and never closed: an odd count of $$ delimiters."""
+def _odd_dollars(text: str) -> bool:
+    """Whether a display equation opened without closing: an odd count of $$ delimiters.
+
+    On the previous side this means the text ends mid-equation; on the
+    page side, that it starts inside one.
+    """
     return text.count("$$") % 2 == 1
 
 
-def _starts_mid_equation(text: str) -> bool:
-    """Whether a display equation continues and never opens: an odd count of $$ delimiters."""
-    return text.count("$$") % 2 == 1
-
-
-def llm_stitch(text: str, llm: RCPClient, model: str) -> str | None:
+def llm_stitch(text: str) -> str | None:
     """Rewrite the joined document with one LLM call, per document, as a fallback.
 
     Returns None when the model answers with nothing, so the deterministic
     result stands.
     """
-    md_text = "\n\n".join(["```\n" + text + "\n```"])
+    md_text = f"```\n{text}\n```"
 
     user_prompt = f"""
     Stitch the following page-level Markdown snippets into one cohesive GitHub-Flavored Markdown document.
@@ -116,5 +98,5 @@ def llm_stitch(text: str, llm: RCPClient, model: str) -> str | None:
     {md_text}
     """
 
-    stitched = llm.text(user_prompt, model=model, system=STITCH_SYSTEM_PROMPT, name="stitch-markdown-pages", enable_thinking=False)
+    stitched = get_model("stitch").text(user_prompt, system=STITCH_SYSTEM_PROMPT, name="stitch-markdown-pages")
     return stitched.strip() or None

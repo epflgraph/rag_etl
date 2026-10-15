@@ -6,9 +6,8 @@ from types import SimpleNamespace
 import pytest
 
 from rag_etl.core import Resource
-from rag_etl.core.models import ModelConfig, ModelConfigs
 from rag_etl.extractors.base_extractor import Extractor, SourceUnavailable
-from rag_etl.pipeline import embedding_model_of, extract, ocr_model_of, transform
+from rag_etl.pipeline import extract, transform
 from rag_etl.projects.spec import ProjectSpec
 
 
@@ -26,7 +25,6 @@ def make_spec(**kwargs) -> ProjectSpec:
     defaults = {
         "id": "fake",
         "sources": (FakeExtractor(dir=Path("/tmp/fake")),),
-        "models": ModelConfigs(ocr=ModelConfig(model="fake-ocr")),
     }
     return ProjectSpec(**{**defaults, **kwargs})
 
@@ -59,18 +57,6 @@ def test_transform_runs_the_sequence(tmp_path, monkeypatch):
     transform(roots, make_spec())
 
     assert ran == ["FakeStep", "FakeStep"]
-
-
-def test_ocr_model_of_fails_loud():
-    spec = make_spec(models=ModelConfigs())
-    with pytest.raises(ValueError):
-        ocr_model_of(spec)
-
-
-def test_embedding_model_of_fails_loud():
-    spec = make_spec(models=ModelConfigs())
-    with pytest.raises(ValueError):
-        embedding_model_of(spec)
 
 
 def test_transform_bypasses_only_the_refreshed_cache(tmp_path, monkeypatch):

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from rag_etl.core.models import ModelConfigs
 from rag_etl.core.rules import Rule
 from rag_etl.extractors import Extractor
 
@@ -22,4 +21,3 @@ class ProjectSpec:
     language: str | None = None              # the project's language (materialize slide detection)
     exceptions: tuple[Rule, ...] = ()        # manual corrections for resources the judge would mislabel
     sources: tuple[Extractor, ...] = ()      # extractor instances, one per source
-    models: ModelConfigs = ModelConfigs()    # OCR, judge, annotator, embedding

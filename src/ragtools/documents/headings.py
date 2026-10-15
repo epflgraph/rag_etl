@@ -42,9 +42,13 @@ def split_by_most_common_heading(text: str) -> list[str]:
 def merge_up_to_max_lines(sections: list[str], max_lines: int = MAX_SECTION_LINES) -> list[str]:
     """Merge adjacent sections while they fit within max_lines together."""
     merged: list[str] = []
+    merged_lines = 0
     for section in sections:
-        if merged and len(merged[-1].splitlines()) + len(section.splitlines()) <= max_lines:
+        section_lines = len(section.splitlines())
+        if merged and merged_lines + section_lines <= max_lines:
             merged[-1] = f"{merged[-1]}\n{section}"
+            merged_lines += section_lines
         else:
             merged.append(section)
+            merged_lines = section_lines
     return merged

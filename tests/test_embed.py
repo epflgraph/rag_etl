@@ -16,48 +16,52 @@ def cache(tmp_path, monkeypatch):
     return Cache("embed")
 
 
-def fake_llm(calls: list):
-    def embed_texts(texts, *, model):
+def fake_llm(monkeypatch, calls: list):
+    def embed_texts(texts):
         calls.append(list(texts))
         return [[1.0, 0.0] for _ in texts]
 
-    return SimpleNamespace(embeddings=embed_texts)
+    monkeypatch.setattr("rag_etl.transformers.embed.embed.get_model", lambda task: SimpleNamespace(embeddings=embed_texts))
 
 
-def test_one_vector_per_chunk_in_order(cache):
+def test_one_vector_per_chunk_in_order(cache, monkeypatch):
     calls: list = []
+    fake_llm(monkeypatch, calls)
     chunks = [Resource(title=f"chunk {i}", text=f"text {i}") for i in range(3)]
 
-    pairs = embed(chunks, fake_llm(calls), "fake", cache)
+    pairs = embed(chunks, cache)
 
     assert [pair[0] for pair in pairs] == chunks
     assert all(pair[1] == [1.0, 0.0] for pair in pairs)
 
 
-def test_second_run_reads_from_cache(cache):
+def test_second_run_reads_from_cache(cache, monkeypatch):
     calls: list = []
+    fake_llm(monkeypatch, calls)
     chunks = [Resource(title="chunk", text="the same text")]
 
-    embed(chunks, fake_llm(calls), "fake", cache)
-    embed(chunks, fake_llm(calls), "fake", cache)
+    embed(chunks, cache)
+    embed(chunks, cache)
 
     # The second run embeds nothing: same content, cached vector
     assert len(calls) == 1
 
 
-def test_changed_chunks_embed_again(cache):
+def test_changed_chunks_embed_again(cache, monkeypatch):
     calls: list = []
-    embed([Resource(title="chunk", text="before")], fake_llm(calls), "fake", cache)
-    embed([Resource(title="chunk", text="after")], fake_llm(calls), "fake", cache)
+    fake_llm(monkeypatch, calls)
+    embed([Resource(title="chunk", text="before")], cache)
+    embed([Resource(title="chunk", text="after")], cache)
 
     assert len(calls) == 2
 
 
-def test_calls_are_batched(cache):
+def test_calls_are_batched(cache, monkeypatch):
     calls: list = []
+    fake_llm(monkeypatch, calls)
     chunks = [Resource(title=f"chunk {i}", text=f"text {i}") for i in range(BATCH_SIZE + 1)]
 
-    embed(chunks, fake_llm(calls), "fake", cache)
+    embed(chunks, cache)
 
     assert [len(call) for call in calls] == [BATCH_SIZE, 1]
 

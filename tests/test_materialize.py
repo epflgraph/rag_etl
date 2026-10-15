@@ -26,9 +26,7 @@ class FakeResolver:
 def transformer(tmp_path, monkeypatch):
     monkeypatch.setattr("rag_etl.config.CONFIG", {"CACHE_DIR": str(tmp_path / "cache")}, raising=False)
     (tmp_path / "cache").mkdir()
-
-    llm = SimpleNamespace(vision=lambda *args, **kwargs: "slide text")
-    detector = SimpleNamespace(detect=lambda *args, **kwargs: [0, 40, 80])
+    monkeypatch.setattr("ragtools.llm.RCPClient.vision", lambda self, prompt, images, **kwargs: "slide text")
 
     fake_resolver = FakeResolver()
     monkeypatch.setattr(
@@ -38,7 +36,9 @@ def transformer(tmp_path, monkeypatch):
         "rag_etl.transformers.materialize.materialize_transformer.extract_frame", fake_extract_frame
     )
 
-    return MaterializeTransformer(cache=Cache("materialize"), llm=llm, vision_model="fake", detector=detector)
+    detector = SimpleNamespace(detect=lambda *args, **kwargs: [0, 40, 80])
+
+    return MaterializeTransformer(cache=Cache("materialize"), detector=detector)
 
 
 def fake_extract_frame(video_url: str, seconds: int, output_path: Path) -> bool:
@@ -83,8 +83,11 @@ def test_pdf_one_changed_page_reOCRs_one_page(tmp_path, transformer, monkeypatch
     transformer.transform([root])
 
     calls = []
-    counting_llm = SimpleNamespace(vision=lambda *args, **kwargs: calls.append(kwargs.get("name")) or "slide text")
-    counting = MaterializeTransformer(cache=Cache("materialize"), llm=counting_llm, vision_model="fake", detector=transformer.detector)
+    monkeypatch.setattr(
+        "ragtools.llm.RCPClient.vision",
+        lambda self, prompt, images, **kwargs: calls.append(kwargs.get("name")) or "slide text",
+    )
+    counting = MaterializeTransformer(cache=Cache("materialize"), detector=transformer.detector)
 
     make_pdf(pdf_path, ["alpha", "beta, slightly changed"])
     root = Resource(title="root", children=[Resource(title="lecture", path=pdf_path, mime_type=mt.PDF)])
@@ -105,18 +108,13 @@ def test_image_read_in_place(tmp_path, transformer):
     assert slide.path == image_path.with_suffix(".md")
 
 
-def test_unreadable_image_dropped(tmp_path, transformer):
-    empty = MaterializeTransformer(
-        cache=transformer.cache,
-        llm=SimpleNamespace(vision=lambda *args, **kwargs: ""),
-        vision_model="fake",
-        detector=transformer.detector,
-    )
+def test_unreadable_image_dropped(tmp_path, transformer, monkeypatch):
+    monkeypatch.setattr("ragtools.llm.RCPClient.vision", lambda self, prompt, images, **kwargs: "")
     image_path = tmp_path / "slide.png"
     image_path.write_bytes(b"png fake")
     root = Resource(title="root", children=[Resource(title="slide", path=image_path, mime_type=mt.PNG)])
 
-    empty.transform([root])
+    transformer.transform([root])
 
     assert root.children == []
 
@@ -165,8 +163,6 @@ def test_youtube_video_left_untouched(tmp_path, transformer):
 def test_video_with_no_frames_dropped(tmp_path, transformer):
     one_timestamp = MaterializeTransformer(
         cache=transformer.cache,
-        llm=transformer.llm,
-        vision_model="fake",
         detector=SimpleNamespace(detect=lambda *args, **kwargs: [0]),
     )
     descriptor_path = tmp_path / "0_abc.json"
@@ -193,8 +189,6 @@ def test_changed_video_leaves_no_stale_frames(tmp_path, transformer):
     descriptor_path.write_text('{"entry_id": "0_abc", "version": 2}', encoding="utf-8")
     shorter = MaterializeTransformer(
         cache=transformer.cache,
-        llm=transformer.llm,
-        vision_model="fake",
         detector=SimpleNamespace(detect=lambda *args, **kwargs: [0]),
     )
     root = Resource(title="root", children=[Resource(title="lecture 1", url="https://mediaspace.epfl.ch/watch/0_abc", path=descriptor_path, mime_type=mt.MP4)])

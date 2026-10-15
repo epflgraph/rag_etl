@@ -1,10 +1,9 @@
-"""The per_exercise annotator: exercise number + is-solution, chunk-level.
+"""Exercise splitting: a stitched document cut into exercise snippets, chunk-level.
 
-One LLM pass over the stitched document: the text is split into
-heading-bounded sections, each annotated with line numbers, and the model
-returns the exercises as line ranges with their number and whether the
-chunk holds a solution. Nothing is annotated unless the per_exercise cut
-asks for it.
+One LLM pass over the document: the text is split into heading-bounded
+sections, each annotated with line numbers, and the model returns the
+exercises as line ranges with their number and whether the chunk holds a
+solution. Nothing is split unless a per_exercise cut asks for it.
 """
 
 from __future__ import annotations
@@ -13,18 +12,17 @@ import logging
 
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Mapping
 
 from pydantic import BaseModel, Field
 
-from ragtools.llm import RCPClient
+from ragtools.llm import get_model
 
-from rag_etl.transformers.cut.headings import MAX_SECTION_LINES, merge_up_to_max_lines, split_by_most_common_heading
+from ragtools.documents.headings import MAX_SECTION_LINES, merge_up_to_max_lines, split_by_most_common_heading
 
 logger = logging.getLogger(__name__)
 
-# The annotator's system prompt, kept as a document next to this module
-EXERCISE_SYSTEM_PROMPT = (Path(__file__).parent / "prompts" / "annotate_exercises.md").read_text(encoding="utf-8")
+# The splitting system prompt, kept as a document next to this module
+EXERCISE_SYSTEM_PROMPT = (Path(__file__).parent / "prompts" / "split_exercises.md").read_text(encoding="utf-8")
 
 # How the model is asked to split a document into exercises
 ANNOTATOR_NAME = "split-exercises"
@@ -60,13 +58,8 @@ class ExerciseList(BaseModel):
     exercises: list[Exercise]
 
 
-def annotate(
-    text: str,
-    llm: RCPClient,
-    model: str,
-    params: Mapping[str, Any] | None = None,
-) -> list[ExerciseSnippet]:
-    """Annotate a stitched document, one (number, is-solution, text) per exercise.
+def split_exercises(text: str) -> list[ExerciseSnippet]:
+    """Split a document into exercises, one (number, is-solution, text) per exercise.
 
     The document is split into heading-bounded sections so one call never
     sees more than MAX_SECTION_LINES lines. Exercises appearing more than
@@ -81,13 +74,11 @@ def annotate(
         # Annotate the section with line numbers (ensuring empty line at the end)
         annotated = "\n".join([f"[L{i}] {line}" for i, line in enumerate(lines, start=1)] + [""])
 
-        exercise_list = llm.structured(
+        exercise_list = get_model("split_exercises").structured(
             annotated,
             ExerciseList,
-            model=model,
             system=EXERCISE_SYSTEM_PROMPT,
             name=ANNOTATOR_NAME,
-            params=params,
         )
 
         for exercise in exercise_list.exercises:

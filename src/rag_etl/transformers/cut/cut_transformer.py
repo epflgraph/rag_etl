@@ -10,29 +10,33 @@ from __future__ import annotations
 
 import json
 import logging
-
 import re
+
 from collections.abc import Callable
 from dataclasses import asdict, dataclass
 
-from ragtools.llm import RCPClient
-
 from rag_etl.cache import Cache
 from rag_etl.core import Resource, child_inheriting, is_text_node
-from rag_etl.core.models import ModelConfig
 from rag_etl.core.resource import hash_text
 from rag_etl.transformers.base import Transformer
-from rag_etl.transformers.cut.annotate import ExerciseSnippet, annotate
-from rag_etl.transformers.cut.headings import MAX_SECTION_LINES, merge_up_to_max_lines, split_by_most_common_heading
-from rag_etl.transformers.cut.stitch import stitch
+from ragtools.documents import (
+    MAX_SECTION_LINES,
+    PAGE_MARKER,
+    ExerciseSnippet,
+    llm_stitch,
+    merge_up_to_max_lines,
+    split_by_most_common_heading,
+    split_exercises,
+    stitch,
+)
 
 logger = logging.getLogger(__name__)
 
 # The exercises of one stitched document, cached by the document's content hash
 EXERCISES_FILE = "exercises.json"
 
-# Deep links into a pdf page, read back from the page markers the stitch left
-PAGE_MARKER = re.compile(r"<!-- page (\d+) -->")
+# Deep links into a pdf page, read back from the markers the stitch left
+PAGE_MARKER_RE = re.compile(PAGE_MARKER.format(position=r"(\d+)"))
 
 CutFunction = Callable[["CutTransformer", Resource], None]
 
@@ -57,6 +61,27 @@ def _drop(node: Resource) -> None:
         node.parent.children.remove(node)
 
 
+def exercises(cache: Cache, text: str) -> list[ExerciseSnippet]:
+    """A document split into exercises, cached by the document's content hash."""
+    content_hash = hash_text(text)
+
+    cached = cache.read(content_hash, EXERCISES_FILE)
+    if cached is not None:
+        return [ExerciseSnippet(**exercise) for exercise in json.loads(cached)]
+
+    found = split_exercises(text)
+    cache.write(content_hash, EXERCISES_FILE, json.dumps([asdict(ex) for ex in found]))
+    return found
+
+
+def _stitch_pages(transformer: "CutTransformer", pages: list[str]) -> str:
+    """The pages stitched, the LLM fallback enabled only when asked for."""
+    text = stitch(pages)
+    if transformer.stitch_fallback:
+        text = llm_stitch(text) or text
+    return text
+
+
 def whole_document(transformer: "CutTransformer", node: Resource) -> None:
     """The node becomes one chunk: its pages stitched, or its own file read."""
     pages = document_texts(node)
@@ -69,11 +94,7 @@ def whole_document(transformer: "CutTransformer", node: Resource) -> None:
     if len(pages) == 1:
         text = pages[0]
     else:
-        text = stitch(
-            pages,
-            llm=transformer.llm if transformer.stitch_model else None,
-            model=transformer.stitch_model.model if transformer.stitch_model else None,
-        )
+        text = _stitch_pages(transformer, pages)
 
     if not text.strip():
         logger.warning(f"Dropping {node.title}: no readable content")
@@ -117,29 +138,22 @@ def per_exercise(transformer: "CutTransformer", node: Resource) -> None:
     One chunk per exercise, carrying its number and whether it holds a
     solution; a chunk whose text starts on a pdf page deep-links into it.
     """
-    if transformer.annotator is None:
-        raise ValueError("The per_exercise cut needs an annotator model: set models.annotator in the spec")
-
     pages = document_texts(node)
     if not pages:
         logger.warning(f"Dropping {node.title}: nothing to annotate")
         _drop(node)
         return
 
-    stitched = stitch(
-        pages,
-        llm=transformer.llm if transformer.stitch_model else None,
-        model=transformer.stitch_model.model if transformer.stitch_model else None,
-    )
+    stitched = _stitch_pages(transformer, pages)
 
-    exercises = transformer._annotated(stitched, transformer.annotator)
-    if not exercises:
+    found = exercises(transformer.cache, stitched)
+    if not found:
         logger.warning(f"Dropping {node.title}: no exercises annotated in it")
         _drop(node)
         return
 
     node.children = []
-    for exercise in exercises:
+    for exercise in found:
         chunk = child_inheriting(
             node,
             title=f"{node.title} > Exercise {exercise.number}{' (solution)' if exercise.is_solution else ''}",
@@ -149,7 +163,7 @@ def per_exercise(transformer: "CutTransformer", node: Resource) -> None:
             cut=None,
         )
 
-        page = PAGE_MARKER.search(exercise.text)
+        page = PAGE_MARKER_RE.search(exercise.text)
         if page and node.url:
             chunk.url = f"{node.url}#page={page.group(1)}"
 
@@ -197,9 +211,7 @@ class CutTransformer(Transformer):
     """Cuts the labelled trees into chunk leaves, one registry entry per kind of cut."""
 
     cache: Cache
-    llm: RCPClient
-    annotator: ModelConfig | None = None     # the per_exercise annotator: model + params from the spec
-    stitch_model: ModelConfig | None = None  # the LLM stitch fallback, off by default
+    stitch_fallback: bool = False  # the LLM stitch fallback, off by default
 
     def transform(self, roots: list[Resource]) -> list[Resource]:
         for root in roots:
@@ -219,15 +231,3 @@ class CutTransformer(Transformer):
         # done; its subtree never needs a second cut
         for child in list(node.children):
             self._cut(child)
-
-    def _annotated(self, stitched: str, annotator: ModelConfig) -> list[ExerciseSnippet]:
-        """Annotate a stitched document, cached by the document's content hash."""
-        content_hash = hash_text(stitched)
-
-        cached = self.cache.read(content_hash, EXERCISES_FILE)
-        if cached is not None:
-            return [ExerciseSnippet(**exercise) for exercise in json.loads(cached)]
-
-        exercises = annotate(stitched, self.llm, annotator.model, annotator.params)
-        self.cache.write(content_hash, EXERCISES_FILE, json.dumps([asdict(exercise) for exercise in exercises]))
-        return exercises

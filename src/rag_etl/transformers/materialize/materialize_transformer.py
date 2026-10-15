@@ -21,7 +21,6 @@ from pathlib import Path
 
 import ragtools.mime_types as mt
 from ragtools.images import SLIDE_SYSTEM_PROMPT, SLIDE_USER_PROMPT, ocr_image
-from ragtools.llm import RCPClient
 from ragtools.pdf import PDF_SYSTEM_PROMPT, PDF_USER_PROMPT, save_pdf_pages
 from ragtools.video import SlideDetector, extract_frame, filter_close_timestamps, frame_time, parse_srt, text_between
 
@@ -30,8 +29,8 @@ from rag_etl.core import Resource, child_inheriting
 from rag_etl.core.resource import hash_bytes
 from rag_etl.transformers.base import Transformer
 from rag_etl.transformers.materialize.videos import KalturaVideoResolver, entry_id_of
-from rag_etl.utils.kaltura import build_entry_url
-from rag_etl.utils.graphai import GraphAIError
+from ragtools.graphai import GraphAIError
+from ragtools.kaltura import build_entry_url
 
 logger = logging.getLogger(__name__)
 
@@ -53,8 +52,6 @@ class MaterializeTransformer(Transformer):
     """
 
     cache: Cache
-    llm: RCPClient
-    vision_model: str
     detector: SlideDetector
     mediaspace_url: str | None = None
     min_slide_seconds: int = 40
@@ -115,7 +112,7 @@ class MaterializeTransformer(Transformer):
         content_hash = hash_bytes(image_path.read_bytes())
 
         if not self.cache.get(content_hash, md_path):
-            text = ocr_image(image_path, self.llm, self.vision_model, system=system, user=user)
+            text = ocr_image(image_path, system=system, user=user)
             md_path.parent.mkdir(parents=True, exist_ok=True)
             md_path.write_text(text, encoding="utf-8")
             self.cache.set(content_hash, md_path)

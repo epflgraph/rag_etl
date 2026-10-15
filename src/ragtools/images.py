@@ -1,16 +1,17 @@
 """Images: one image turned into Markdown text by a vision model.
 
-The model and the prompt travel with each call, handed over by the
-caller; the text comes back, and whoever asked writes it wherever it
-belongs. Slides, figures and rendered PDF pages are all read this way,
-each with the prompt that suits it.
+The prompt travels with each call, handed over by the caller; the model
+is the settled one for vision reads, the endpoint comes from the config.
+The text comes back, and whoever asked writes it wherever it belongs.
+Slides, figures and rendered PDF pages are all read this way, each with
+the prompt that suits it.
 """
 
 from __future__ import annotations
 
 from pathlib import Path
 
-from ragtools.llm import RCPClient
+from ragtools.llm import get_model
 
 # Slide and figure prompt: written for recorded lectures, where the
 # lecturer writes on the slide while speaking and every slide carries
@@ -115,27 +116,26 @@ def strip_code_fence(markdown: str) -> str:
 
 def ocr_image(
     image_path: str | Path,
-    llm: RCPClient,
-    model: str,
     *,
     system: str = SLIDE_SYSTEM_PROMPT,
     user: str = SLIDE_USER_PROMPT,
 ) -> str:
-    """
-    Read one image with a vision model and return its Markdown text.
+    """Read one image with a vision model and return its Markdown text.
 
-    Thinking is disabled: a fraction of the tokens with comparable results.
     An empty answer stands for a blank slide and comes back as such.
     """
 
-    markdown = llm.vision(
+    markdown = get_model("ocr").vision(
         user,
         [image_path],
-        model=model,
         system=system,
         detail="high",
         name="image-to-markdown",
-        enable_thinking=False,
     )
 
     return strip_code_fence(markdown)
+
+
+def alt_text(image_path: str | Path) -> str:
+    """Generate the ALT text of one image, for documents that reference it."""
+    return get_model("ocr").vision(ALT_TEXT_PROMPT, [str(image_path)], name="generate-alt-text")

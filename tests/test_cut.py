@@ -1,18 +1,14 @@
-"""Unit tests for the cuts: synthetic docs, the annotator stubbed."""
+"""Unit tests for the cuts: synthetic docs, the splitter stubbed."""
 
 from pathlib import Path
-from types import SimpleNamespace
 
 import pytest
 
 import ragtools.mime_types as mt
 from rag_etl.cache import Cache
 from rag_etl.core import Resource
-from rag_etl.core.models import ModelConfig
-from rag_etl.transformers.cut.annotate import Exercise, ExerciseList, ExerciseSnippet, annotate
 from rag_etl.transformers.cut.cut_transformer import CutTransformer
-from rag_etl.transformers.cut.headings import MAX_SECTION_LINES
-from rag_etl.transformers.cut.stitch import deterministic_stitch
+from ragtools.documents import MAX_SECTION_LINES, Exercise, ExerciseList, ExerciseSnippet, split_exercises, stitch
 
 
 @pytest.fixture
@@ -20,9 +16,7 @@ def transformer(tmp_path, monkeypatch):
     monkeypatch.setattr("rag_etl.config.CONFIG", {"CACHE_DIR": str(tmp_path / "cache")}, raising=False)
     (tmp_path / "cache").mkdir()
 
-    llm = SimpleNamespace(structured=lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("no LLM call expected")))
-
-    return CutTransformer(cache=Cache("cut"), llm=llm, annotator=ModelConfig(model="fake-annotator"))
+    return CutTransformer(cache=Cache("cut"))
 
 
 def write_page(tmp_path: Path, name: str, content: str) -> Path:
@@ -116,7 +110,7 @@ def test_per_exercise_cuts_at_markers(tmp_path, transformer, monkeypatch):
         ExerciseSnippet(number="1", is_solution=False, text="<!-- page 1 -->\nExercise 1"),
         ExerciseSnippet(number="1", is_solution=True, text="<!-- page 1 -->\nSolution 1"),
     ]
-    monkeypatch.setattr("rag_etl.transformers.cut.cut_transformer.annotate", lambda *args, **kwargs: snippets)
+    monkeypatch.setattr("rag_etl.transformers.cut.cut_transformer.split_exercises", lambda *args, **kwargs: snippets)
 
     root = Resource(title="root")
     doc = root.add_child(Resource(title="sheet", cut="per_exercise", url="https://moodle/x.pdf"))
@@ -130,7 +124,7 @@ def test_per_exercise_cuts_at_markers(tmp_path, transformer, monkeypatch):
 
 
 def test_per_exercise_drops_when_no_exercises(tmp_path, transformer, monkeypatch):
-    monkeypatch.setattr("rag_etl.transformers.cut.cut_transformer.annotate", lambda *args, **kwargs: [])
+    monkeypatch.setattr("rag_etl.transformers.cut.cut_transformer.split_exercises", lambda *args, **kwargs: [])
 
     root = Resource(title="root")
     doc = root.add_child(Resource(title="sheet", cut="per_exercise"))
@@ -139,19 +133,6 @@ def test_per_exercise_drops_when_no_exercises(tmp_path, transformer, monkeypatch
     transformer.transform([root])
 
     assert doc not in root.children
-
-
-def test_per_exercise_needs_an_annotator(tmp_path, monkeypatch):
-    monkeypatch.setattr("rag_etl.config.CONFIG", {"CACHE_DIR": str(tmp_path / "cache")}, raising=False)
-    (tmp_path / "cache").mkdir()
-    transformer = CutTransformer(cache=Cache("cut"), llm=SimpleNamespace())
-
-    root = Resource(title="root")
-    doc = root.add_child(Resource(title="sheet", cut="per_exercise"))
-    doc.add_child(Resource(title="sheet > page 1", path=write_page(tmp_path, "page_1.md", "Exercise 1"), mime_type=mt.MARKDOWN))
-
-    with pytest.raises(ValueError):
-        transformer.transform([root])
 
 
 def test_text_cut_chunks_by_headings(tmp_path, transformer):
@@ -189,7 +170,7 @@ def test_unknown_cut_fails_loud(transformer):
 def test_stitch_joins_split_tables():
     pages = ["| a | b |\n| 1 | 2 |", "| 3 | 4 |"]
 
-    text = deterministic_stitch(pages)
+    text = stitch(pages)
 
     # No marker between the joined rows: it would break the table
     assert "| 2 |\n| 3 |" in text
@@ -198,7 +179,7 @@ def test_stitch_joins_split_tables():
 def test_stitch_joins_split_equations():
     pages = ["$$\nx = 1", "= y\n$$"]
 
-    text = deterministic_stitch(pages)
+    text = stitch(pages)
 
     assert "$$\nx = 1\n= y\n$$" in text
 
@@ -206,7 +187,7 @@ def test_stitch_joins_split_equations():
 def test_stitch_joins_hyphenated_words():
     pages = ["the contin-", "uation of the text"]
 
-    text = deterministic_stitch(pages)
+    text = stitch(pages)
 
     assert "continuation of the text" in text
 
@@ -214,23 +195,25 @@ def test_stitch_joins_hyphenated_words():
 def test_stitch_keeps_markers_between_pages():
     pages = ["first page", "second page"]
 
-    text = deterministic_stitch(pages)
+    text = stitch(pages)
 
     assert "<!-- page 1 -->" in text and "<!-- page 2 -->" in text
 
 
-def test_annotate_merges_duplicate_exercises_on_separate_lines():
+def test_split_exercises_merges_duplicate_exercises_on_separate_lines(monkeypatch):
     """An exercise cut across sections reassembles in order, parts on separate lines."""
 
     class FakeLLM:
         def structured(self, prompt, schema, **kwargs):
             return ExerciseList(exercises=[Exercise(start_line=1, end_line=2, number="1", is_solution=False)])
 
+    monkeypatch.setattr("ragtools.documents.exercises.get_model", lambda task: FakeLLM())
+
     # A first section too big to merge into the second: both get annotated
     filler = "\n".join(f"line {i}" for i in range(MAX_SECTION_LINES))
     text = f"# A\n{filler}\n\n# B\nbeta"
 
-    snippets = annotate(text, FakeLLM(), "fake-model")
+    snippets = split_exercises(text)
 
     assert len(snippets) == 1
     assert snippets[0].text == "# A\nline 0\n# B\nbeta"

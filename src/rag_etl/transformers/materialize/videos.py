@@ -12,8 +12,8 @@ import logging
 
 from rag_etl.config import config_value
 from rag_etl.core import Resource
-from rag_etl.utils.graphai import GraphAIError, detect_slides, get_access_token, retrieve_video
-from rag_etl.utils.kaltura import (
+from ragtools.graphai import GraphAIError, detect_slides, get_access_token, retrieve_video
+from ragtools.kaltura import (
     create_kaltura_session,
     extract_entry_id_from_url,
     find_slides_entry_id,

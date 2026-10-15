@@ -8,7 +8,7 @@ from KalturaClient import KalturaClient, KalturaConfiguration
 from KalturaClient.exceptions import KalturaException
 from KalturaClient.Plugins.Caption import KalturaCaptionAssetFilter, KalturaCaptionAssetStatus, KalturaCaptionType
 
-from rag_etl.config import CONFIG
+from ragtools.config import required
 import ragtools.mime_types as mt
 from KalturaClient.Plugins.Core import (
     KalturaBaseEntryFilter,
@@ -182,7 +182,7 @@ def build_entry_url(entry_id: str, base_url: str | None = None, start_seconds: i
     if parsed.scheme and parsed.netloc:
         instance_url = f"{parsed.scheme}://{parsed.netloc}"
     else:
-        instance_url = CONFIG["DEFAULT_MEDIASPACE_BASE_URL"]
+        instance_url = required("DEFAULT_MEDIASPACE_BASE_URL")
 
     url = f"{instance_url}/media/t/{entry_id}"
 
@@ -316,7 +316,7 @@ def list_channel_entries(client: KalturaClient, category_id: str) -> list:
     same way as the playlist helper for consistency.
     """
 
-    entries = []
+    entries: list = []
     page_index = 1
 
     while True:

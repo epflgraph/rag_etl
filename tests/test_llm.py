@@ -6,7 +6,7 @@ from types import SimpleNamespace
 import pytest
 from pydantic import BaseModel
 
-from ragtools.llm import RCPClient
+from ragtools.llm import RCPClient, get_model
 
 
 class Answer(BaseModel):
@@ -40,6 +40,15 @@ class FakeOpenAI:
         self.embeddings = SimpleNamespace(create=lambda **kwargs: SimpleNamespace(data=[SimpleNamespace(embedding=[1.0, 2.0]) for _ in kwargs["input"]]))
 
 
+@pytest.fixture(autouse=True)
+def fresh_underlying_client():
+    """Each test patches OpenAI with a fresh fake: the cached client must not leak."""
+    from ragtools.llm.rcp import openai_client
+
+    openai_client.cache_clear()
+    yield
+
+
 @pytest.fixture
 def stubbed(monkeypatch):
     fake = FakeOpenAI()
@@ -48,23 +57,45 @@ def stubbed(monkeypatch):
     return fake
 
 
-def test_unknown_model_fails_loud_before_any_request(stubbed):
-    client = RCPClient(base_url="https://rcp", api_key="k")
+def test_unknown_task_fails_loud():
     with pytest.raises(ValueError):
-        client.text("hello", model="does-not-exist")
+        get_model("does-not-exist")
 
 
 def test_text_strips_and_returns(stubbed):
-    client = RCPClient(base_url="https://rcp", api_key="k")
-    assert client.text("hello", model="Qwen/Qwen3.6-35B-A3B", enable_thinking=False) == "answer"
+    client = RCPClient(model="fake-model", base_url="https://rcp", api_key="k")
+    assert client.text("hello") == "answer"
 
 
 def test_structured_parses_the_schema(stubbed):
     stubbed.chat.completions.content = '{"text": "hello"}'
-    client = RCPClient(base_url="https://rcp", api_key="k")
-    assert client.structured("hi", Answer, model="Qwen/Qwen3.6-35B-A3B", enable_thinking=False) == Answer(text="hello")
+    client = RCPClient(model="fake-model", base_url="https://rcp", api_key="k")
+    assert client.structured("hi", Answer) == Answer(text="hello")
 
 
 def test_embeddings_one_vector_per_text(stubbed):
-    client = RCPClient(base_url="https://rcp", api_key="k")
-    assert client.embeddings(["a", "b"], model="fake-embedding") == [[1.0, 2.0], [1.0, 2.0]]
+    client = RCPClient(model="fake-embedding", base_url="https://rcp", api_key="k")
+    assert client.embeddings(["a", "b"]) == [[1.0, 2.0], [1.0, 2.0]]
+
+
+def test_one_underlying_client_across_calls(monkeypatch):
+    constructions = []
+    fake = FakeOpenAI()
+    monkeypatch.setattr("ragtools.llm.rcp.OpenAI", lambda **kwargs: constructions.append(1) or fake)
+    monkeypatch.setattr("ragtools.llm.rcp.get_client", lambda: SimpleNamespace(start_as_current_observation=fake_observation))
+
+    client = RCPClient(model="fake-model", base_url="https://rcp", api_key="k")
+    client.text("a")
+    client.text("b")
+
+    assert len(constructions) == 1
+
+
+def test_client_without_endpoint_fails_loud_at_use(monkeypatch):
+    fake = FakeOpenAI()
+    monkeypatch.setattr("ragtools.llm.rcp.OpenAI", lambda **kwargs: fake)
+    monkeypatch.setattr("ragtools.llm.rcp.get_client", lambda: SimpleNamespace(start_as_current_observation=fake_observation))
+
+    client = RCPClient(model="fake-model", base_url="", api_key="")
+    with pytest.raises(ValueError):
+        client.text("hello")

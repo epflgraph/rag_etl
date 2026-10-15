@@ -43,7 +43,7 @@ where = ["src"]
 
 # The prompts are documents, not code: they ship with the package
 [tool.setuptools.package-data]
-"rag_etl.transformers.cut" = ["prompts/*.md"]
+"ragtools.documents" = ["prompts/*.md"]
 
 [project.optional-dependencies]
 dev = [

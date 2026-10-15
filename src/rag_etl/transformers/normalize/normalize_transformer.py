@@ -10,7 +10,6 @@ from dataclasses import dataclass, field
 import ragtools.mime_types as mt
 from ragtools.archives import iter_files, untar_file, unzip_file
 from ragtools.encoding import ensure_utf8
-from ragtools.llm import RCPClient
 from ragtools.notebooks import convert_ipynb_to_md
 
 from rag_etl.cache import Cache
@@ -61,8 +60,6 @@ class NormalizeTransformer(Transformer):
     """
 
     cache: Cache
-    llm: RCPClient
-    vision_model: str
     mime_types: Sequence[str] = field(default_factory=lambda: list(mt.DEFAULT_MIME_TYPES))
 
     def transform(self, roots: list[Resource]) -> list[Resource]:
@@ -120,7 +117,7 @@ class NormalizeTransformer(Transformer):
 
             if not self.cache.get(content_hash, md_path):
                 logger.info(f"Converting notebook {node.title}")
-                convert_ipynb_to_md(node.path, md_path, self.llm, self.vision_model)
+                convert_ipynb_to_md(node.path, md_path)
                 self.cache.set(content_hash, md_path)
 
             node.path = md_path

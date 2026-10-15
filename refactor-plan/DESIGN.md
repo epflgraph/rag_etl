@@ -12,7 +12,7 @@ extract (plain documents) → normalize → materialize (OCR etc.) → judge →
 
 ## Two packages: `ragtools` and `rag_etl` (Phase 3)
 
-**`src/ragtools/`** — pure file preparation, the colleague-facing library: archives (zip/tar.gz → files, NFC + UTF-8 fixes), notebooks (ipynb → md, ALT texts via a vision model), PDFs (deterministic PyMuPDF page render), images (→ text by a vision model), videos (ffmpeg frame extraction, SRT parsing/merging, the `SlideDetector` interface) and the unified RCP client (`llm/`) with the recommended parameters per model. It takes plain paths and hands files and text back; it **never imports `rag_etl`** — model clients are constructed by the caller and handed over. A colleague pip installs the distribution and uses `ragtools` for OCR or their own file prep; the true standalone distribution (own pyproject, light deps only) splits off in Phase 7.
+**`src/ragtools/`** — pure file preparation, the colleague-facing library: archives (zip/tar.gz → files, NFC + UTF-8 fixes), notebooks (ipynb → md, ALT texts via a vision model), PDFs (deterministic PyMuPDF page render), images (→ text by a vision model), documents (heading-aware splitting, page stitching, exercise splitting, `documents/`), videos (ffmpeg frame extraction, SRT parsing/merging, the `SlideDetector` interface), the GraphAI and Kaltura plumbing, and the RCP client (`llm/`) with the settled model catalog (`defaults.py`: `MODELS` keyed `(model, mode)`, `get_model(task)` for the concerns — ocr, judge, split_exercises, stitch, embedding). It takes plain paths and hands files and text back; it **never imports `rag_etl`** (enforced by `tests/test_layering.py`) — capabilities build their own clients from the catalog and the `.env` endpoint (`config.py`), so the pipeline constructs none. A colleague pip installs the distribution and uses `ragtools` for OCR, splitting or their own file prep; the true standalone distribution (own pyproject, light deps only) splits off in Phase 7.
 
 **`src/rag_etl/`** — the pipeline plumbing: the `Resource` tree, extractors, transformers (thin adapters: walk the tree, call `ragtools` per file, handle caching and node bookkeeping), the cache, the orchestrator, project specs, loaders and the CLI. Transformers follow the explicit-inheritance contract of `Transformer` (`src/rag_etl/transformers/base.py`): frozen dataclasses with `transform(roots) -> roots`, reshaping trees in place.
 
@@ -84,28 +84,15 @@ class Rule:
 
 ## `ProjectSpec` (Phase 3, `src/rag_etl/projects/spec.py`)
 
-One thin, declarative spec per project. Sources are **extractor instances**, each configured for its source (frozen dataclasses with typed fields); the judge labels everything else.
+One thin, declarative spec per project. Sources are **extractor instances**, each configured for its source (frozen dataclasses with typed fields); the judge labels everything else. Models are not in the spec: they are settled pairings in the `ragtools.llm.defaults` catalog, pinned per concern by the capabilities themselves.
 
 ```python
-@dataclass(frozen=True)
-class ModelConfig:
-    model: str                              # the model; recommended params come from ragtools.llm.defaults
-    params: Mapping[str, Any] = {}          # per-call overrides of those defaults
-
-@dataclass(frozen=True)
-class ModelConfigs:
-    ocr: ModelConfig | None = None          # vision reads: PDF pages, frames, images (materialize)
-    judge: ModelConfig | None = None        # type/subtype/is_solution/cut inference (judge)
-    annotator: ModelConfig | None = None    # exercise number + is-solution per chunk (per_exercise)
-    embedding: ModelConfig | None = None    # chunk embeddings (embed)
-
 @dataclass(frozen=True)
 class ProjectSpec:
     id: str                                  # lowercase, e.g. "com202"; names the index/alias rag_{id}
     language: str | None = None              # the project's language (materialize slide detection)
     exceptions: tuple[Rule, ...] = ()        # manual corrections for resources the judge would mislabel
     sources: tuple[Extractor, ...] = ()      # extractor instances, one per source
-    models: ModelConfigs = ModelConfigs()    # OCR, judge, annotator, embedding
 ```
 
 Specs live in **semester folders** (e.g. `projects/semester_2627_autumn/micro303.py`), one thin file per project, named after the project in lowercase and defining the spec under the project code in uppercase. There is no registry: `from_code` discovers a spec by convention (scans the semester folders; a file that exists is a project) and errors loudly when there is none.
@@ -123,9 +110,9 @@ Specs live in **semester folders** (e.g. `projects/semester_2627_autumn/micro303
 - A cut consumes the node it applies to, top-down: the node is replaced by chunk leaves (a chunk is a leaf with text) and its subtree never needs a second cut. Roots are never cut whole.
   - `whole_document`: the node becomes one chunk — its own file, or its ordered page children stitched (children consumed). Over the size guard (2000 lines) the chunk is dropped with a loud warning; fixable with a rule.
   - `per_child`: each readable child becomes a chunk in place, text read from its file. Children carrying their own different cut keep it (an exception inside a folder cut per child still applies).
-  - `per_exercise`: the node's pages are stitched, then annotated — one LLM pass returning exercises as line ranges with number + is-solution (prompts kept as documents in `cut/prompts/`, cached by the stitched text's hash) — then cut at the annotated markers: one chunk per exercise, deep-linking into the pdf page its text starts on. Nothing is annotated unless the cut asks for it.
+  - `per_exercise`: the node's pages are stitched, then split — one LLM pass returning exercises as line ranges with number + is-solution (prompts kept as documents in `ragtools/documents/prompts/`, cached by the stitched text's hash) — then cut at the annotated markers: one chunk per exercise, deep-linking into the pdf page its text starts on. Nothing is split unless the cut asks for it.
   - `text`: header-aware chunking (split at the most common heading level, adjacent parts merged up to the guard).
-- **Embed** (`embed/embed.py`): RCP embeddings per chunk (`Qwen/Qwen3-Embedding-8B`, model + params from the spec), batched, cache-aware — one JSON file per chunk under `{CACHE_DIR}/embed/{text hash}/`, via the cache's `read`/`write` text API. Output: `(chunk, embedding)` pairs for the Phase 5 loader; embeddings are not on the node.
+- **Embed** (`embed/embed.py`): RCP embeddings per chunk (`Qwen/Qwen3-Embedding-8B`, pinned in the catalog), batched, cache-aware — one JSON file per chunk under `{CACHE_DIR}/embed/{text hash}/`, via the cache's `read`/`write` text API. Output: `(chunk, embedding)` pairs for the Phase 5 loader; embeddings are not on the node.
 - `run_pipeline` returns nothing content-wise: loaders run inside the pipeline and publish the index; failures propagate loud.
 
 ## Stitching (Phase 4, at cut time)
@@ -134,8 +121,8 @@ Page-by-page OCR leaves pages that sometimes need merging: headings at different
 
 Direction (replacing the old 10-page-batch LLM stitching, ~20 LLM calls per long PDF):
 
-- **Deterministic first** (implemented, `transformers/cut/stitch.py`): page boundary markers, tables and display equations cut across consecutive pages joined (no marker between the joined sides — it would break the block), soft-hyphenated words put back together (heuristic: the continuation starts in lowercase). Heading-level normalization is deliberately not deterministic — too risky without document context; the LLM fallback covers it.
-- **LLM stitch as a fallback, per document in a single call**, behind the same stitch interface, off by default — the old prompt, kept as a document in `transformers/cut/prompts/`.
+- **Deterministic first** (implemented, `ragtools/documents/stitch.py`): page boundary markers, tables and display equations cut across consecutive pages joined (no marker between the joined sides — it would break the block), soft-hyphenated words put back together (heuristic: the continuation starts in lowercase). Heading-level normalization is deliberately not deterministic — too risky without document context; the LLM fallback covers it.
+- **LLM stitch as a fallback, per document in a single call**, behind the same stitch interface, off by default — the old prompt, kept as a document in `ragtools/documents/prompts/`.
 
 ## What this kills
 

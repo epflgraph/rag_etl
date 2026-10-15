@@ -7,7 +7,6 @@ from pathlib import Path
 import ragtools.mime_types as mt
 
 from rag_etl.config import config_value
-from rag_etl.core.models import ModelConfig, ModelConfigs
 from rag_etl.extractors import EdDiscussionExtractor, LocalFolderExtractor, MOOCExtractor, MoodleExtractor
 from rag_etl.projects.spec import ProjectSpec
 
@@ -62,13 +61,5 @@ MICRO303 = ProjectSpec(
             semester=1,
             include_student_endorsed=False,
         ),
-    ),
-    models=ModelConfigs(
-        ocr=ModelConfig(model=config_value("RCP_VISION_MODEL")),
-        # The stub judge calls no model yet; this is what the real
-        # inference will read when it lands
-        judge=ModelConfig(model=config_value("RCP_THINKING_MODEL")),
-        annotator=ModelConfig(model=config_value("RCP_BASE_MODEL")),
-        embedding=ModelConfig(model=config_value("RCP_EMBEDDING_MODEL")),
     ),
 )

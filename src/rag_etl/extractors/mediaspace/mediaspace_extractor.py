@@ -14,7 +14,7 @@ from rag_etl.extractors.mediaspace.utils import (
     entry_created_after,
     safe_filename,
 )
-from rag_etl.utils.kaltura import (
+from ragtools.kaltura import (
     build_entry_url,
     caption_mime_type,
     create_kaltura_session,

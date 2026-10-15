@@ -13,7 +13,7 @@ import logging
 
 from collections.abc import Sequence
 
-from ragtools.llm import RCPClient
+from ragtools.llm import get_model
 
 from rag_etl.cache import Cache
 from rag_etl.core import Resource
@@ -32,7 +32,7 @@ def chunks_of(roots: list[Resource]) -> list[Resource]:
     return [node for root in roots for node in root.walk() if node.text is not None]
 
 
-def embed(chunks: Sequence[Resource], llm: RCPClient, model: str, cache: Cache) -> list[tuple[Resource, list[float]]]:
+def embed(chunks: Sequence[Resource], cache: Cache) -> list[tuple[Resource, list[float]]]:
     """Embed every chunk, one vector per chunk, cached by content.
 
     The pairs go to the loader as they are.
@@ -51,7 +51,7 @@ def embed(chunks: Sequence[Resource], llm: RCPClient, model: str, cache: Cache) 
 
     for position in range(0, len(missing), BATCH_SIZE):
         batch = missing[position : position + BATCH_SIZE]
-        vectors = llm.embeddings([chunk.text or "" for chunk in batch], model=model)
+        vectors = get_model("embedding").embeddings([chunk.text or "" for chunk in batch])
 
         for chunk, vector in zip(batch, vectors):
             cache.write(chunk.content_hash, EMBEDDING_FILE, json.dumps(vector))

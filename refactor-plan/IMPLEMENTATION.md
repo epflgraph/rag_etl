@@ -13,7 +13,7 @@ Resolved after auditing both codebases (`rag-prepipeline` and `chatbotpipelines`
 - **Scheduling: timers, no Airflow.** Airflow was never actually used in production (Ramtin's effort was never switched on). We keep what has been working: timers that trigger services. Instead of running `main` from each course, `rag-etl` gets a unified entry point (CLI with a `--project` parameter); whether the timer then loops over projects or one timer per project is an implementation detail we will settle when wiring the cron.
 - **Models: a settled catalog, not per-project config.** Embeddings are Qwen3-Embedding-8B on RCP, bypassing GraphAI. Every model invocation goes through a `RCPClient` whose model + parameters are baked in — `ragtools/llm/defaults.py` holds a catalog (`MODELS`, keyed `(model, mode)`, each entry a client built from the `.env` endpoint), and each capability pins its concern's model internally via `get_model(task)` (ocr, judge, split_exercises, stitch, embedding). Per-project model configs and per-call overrides were dropped: the pairings are settled by us, not data; a model change is a one-line edit in the catalog (or a `--refresh TRANSFORM` for the cache). This still impacts the current GraphAI `/rag/retrieve` endpoint (which embeds queries on the consumer side) — addressed separately from this repo, not a blocker for the ETL.
 - **Slide-change detection: keep GraphAI `detect_slides` for now.** It is the only working implementation. We may develop a better algorithm later and replace it both in the pipeline and on GraphAI; the pipeline calls it behind a small interface so the swap is local.
-- **ES mapping details (dense/sparse, analyzer set, embedding dims): decided in Phase 5**, from the resource model and the field-name reconciliation with the consumer repos.
+- **ES mapping: decided (Phase 5).** One frozen 13-field document schema, the create-index body shipped verbatim as package data (`index_settings.json`); details in Phase 5.
 - **Moodle assignments are known-unfetchable** (no API access) — accepted limitation, documented.
 - **Business logic and plumbing split: `ragtools`.** The file-prep capabilities (OCR, conversions, archives, video handling, document splitting/stitching) and the unified RCP client + model catalog live in their own top-level package `src/ragtools/` that never imports `rag_etl` (enforced by `tests/test_layering.py`); the pipeline packages (`rag_etl`) depend on it, never the other way. The GraphAI and Kaltura plumbing joined it too (they serve document processing, not the pipeline). Colleagues pip install the distribution and use `ragtools` for OCR, splitting or their own file prep; a true standalone distribution splits off in Phase 7 if demand appears. Prompts are business logic and are kept verbatim.
 - **Model calls: standard retry, then the run stops loud.** Every LLM call goes through the unified `RCPClient`, retried a few times by the underlying client and then raised — a page that cannot be read stops the run rather than leaving a silent gap.
@@ -54,7 +54,7 @@ What the audit of the two repos found, for reference while implementing.
 | `<!-- page N -->` markers, 2 parallel video paths, Gemini video JSON | PDF → container + page children (OCR each, RCP); video → segments + captions (GraphAI `detect_slides` + Kaltura SRT); cuts: `whole_document`, `per_child`, `per_exercise`, `text` |
 | Disk cache keyed per-course-scope, no eviction, no refresh | Content-only keys, scope `(transform, content-hash)` shared across projects, per-run `--refresh` flag |
 | GraphAI embed + chunk + bilingual translate | RCP embeddings (Qwen3-Embedding-8B, pinned in the catalog), local header-aware chunking, **no translation** |
-| Record loader → `chatbot-pipelines` contract | Record/manifest loader (content-hash pointers, `dry` flag, schema snapshot) + **new ES loader** (fresh index `rag_{project}`, atomic alias shift) |
+| Record loader → `chatbot-pipelines` contract | `ManifestLoader` (one JSON manifest per run: header + nested summary + metadata-only tree with content-hash pointers; `{timestamp}_manifest[_dry].json` in `{dir}/output/`) + **new ES loader** (fresh date-named index, bulk, one atomic alias shift) |
 | Ed Discussion disabled, no git source, no entry points, no tests | Ed Discussion ports as source, **new git extractor** (repo/branch URL → container), CLI entry point `rag-etl run --project X [--dry] [--refresh T]`, pytest + CI |
 
 ## 3. Target layout (sketch)
@@ -85,17 +85,19 @@ src/
     │                            #   legacy subpackages kept, mypy-suppressed, die at cutover
     ├── cache/                   # content-hash disk cache (refresh flag, (transform, hash) scoping)
     ├── pipeline.py              # the fixed sequence orchestrator
-    ├── projects/                # spec.py (ProjectSpec: exceptions + extractor configs, no models) +
+    ├── projects/                # spec.py (ProjectSpec: id, language, exceptions, sources, dir — no models) +
     │                            #   from_code discovery; semester_2627_autumn/ with one thin spec file
     │                            #   per project; legacy course class folders kept, mypy-suppressed, die at cutover
     ├── config.py                # .env CONFIG + shared config_value (required values, fail loud)
-    ├── loaders/                 # legacy (record + content metadata); Phase 5 rewrites
+    ├── loaders/                 # manifest.py (ManifestLoader) + elasticsearch.py (ElasticsearchLoader,
+    │                            #   index_settings.json shipped verbatim); legacy loaders kept,
+    │                            #   mypy-suppressed, die at cutover
     ├── utils/                   # legacy but alive: llms.py (Ed's cascade), tags.py; dead: cache.py
     ├── resources/               # legacy BaseResource subclasses; mypy-suppressed, die at cutover
     └── cli.py                   # rag-etl run --project X [--dry] [--refresh TRANSFORM]
 ```
 
-Specs are discovered by convention (`from_code` in `projects/__init__.py` scans the `semester_*` folders — e.g. `projects/semester_2627_autumn/micro303.py`), not by a registry.
+Specs are discovered by convention (`from_code` in `projects/__init__.py` scans the `semester_*` folders — e.g. `projects/semester_2627_autumn/micro303test.py`, MICRO-303 running under the test id until cutover), not by a registry.
 
 ## 4. Phases
 
@@ -138,18 +140,24 @@ Each phase ends with a verification gate; no phase starts before the previous ga
 - Cuts registry (`transformers/cut/cut_transformer.py`, one `CUTS` dict): `whole_document` (stitch multi-page children, size guard drops over-limit chunks loudly), `per_child` (readable children chunk in place; children with their own different cut keep it), `per_exercise` (stitch + cached annotation + cut at markers, deep links from page markers), `text` (header-aware chunking with the guard). Unknown labels fail loud. A cut consumes the node it applies to, top-down.
 - `per_exercise` annotator (`ragtools/documents/exercises.py`, `split_exercises`): exercise number + is-solution (chunk-level), separate concern from the judge; nothing split unless the cut asks for it. The old prompt and call name kept verbatim, migrated to documents (`ragtools/documents/prompts/*.md`, shipped as package data).
 - **Stitching landed here, at cut time** (see DESIGN.md): deterministic-first (page markers, split tables/equations joined, hyphenation heuristic — zero LLM calls; heading normalization left to the fallback); the old 10-page-batch LLM stitching is replaced, LLM only as a per-document fallback behind the same `stitch` interface, off by default.
-- RCP embeddings per chunk (Qwen/Qwen3-Embedding-8B), batched, cache-aware: one JSON file per chunk under `{CACHE_DIR}/embed/{text hash}/` via new `Cache.read`/`write`; output `(chunk, embedding)` pairs for the Phase 5 loader.
+- RCP embeddings per chunk (Qwen/Qwen3-Embedding-8B), batched, cache-aware: one JSON file per chunk under `{CACHE_DIR}/embed/{text hash}/` via new `Cache.read`/`write`; vectors annotate the chunk nodes (`Resource.embedding`).
 - `ModelConfig(s)` dropped entirely (they existed to make models configurable per project): the model pairings are settled in the `ragtools.llm.defaults` catalog, the cuts call `ragtools.documents` capabilities that pin their own model — no circular import to fix, because no cut needs a model.
-- `run_pipeline` returns nothing content-wise: the embed step computes pairs inside the pipeline; Phase 5 loaders are called inside `run_pipeline` and publish the index.
+- `run_pipeline` returns nothing content-wise: embed is the fifth transform (it annotates the chunks); Phase 5 loaders are called inside `run_pipeline` and publish the index.
 
 **Gate:** unit tests on the cuts with synthetic docs (98 total, annotator stubbed); judge + annotator spot-checks on real pages **wait for the real run** (§0); exceptions change labels on rerun (judge test).
 
-### Phase 5 — Loaders: record + Elasticsearch
-- Record/manifest loader: header (run timestamp, `dry` flag, project id, index name + alias, pipeline version, schema snapshot) + resource-tree body; metadata-only with content-hash pointers (no text, no embeddings); dry records land separately from real-run records.
-- ES loader: common mapping template → per-project mapping; fresh index + atomic alias shift (mirroring the `create_and_write_to_index` flow, minus MySQL). **Decide here, with the resource model settled:** concrete mapping (single-language `content` field + analyzer set, `type`/`subtype`, `number`/`sub_number`, `week`, `is_solution`, `from`/`until`, lineage + deep links, text, embedding — nothing project-level per chunk; project id travels via the index/alias).
-- **Field-name reconciliation:** inventory what the AI-tutor repos query on the old mapping (`content.en/fr`, `from/until`, filters) and reconcile with the new field names before freezing the mapping; consumer updates are part of the Phase 6 cutover.
+### Phase 5 — Loaders: manifest + Elasticsearch *(code done; real ES gate pending)*
+- **Loaders take trees.** The pipeline contract is uniform: extractors produce trees, transformers take and return trees, loaders take trees (`load(roots)`) and are configured by constructor args — no intermediate run object.
+- **Embed joined the sequence** as the fifth transform (`EmbedTransformer`): it annotates every chunk with its vector in place (`Resource.embedding`), same batching and content-hash cache as settled in Phase 4.
+- **`ManifestLoader`** — one JSON manifest per run, written for human inspection; nothing reads it. Header (project, dry, timestamp, index, alias, pipeline version); summary (sources, chunks, without_url + a nested drill-down counting chunks/without_url/is_solution per source → type → subtype → number, `unknown` buckets, None last); tree (metadata-only, no text, no embeddings: content-hash pointers, `chunk` flag, the `cut` decision). All manifests land in `{dir}/output/` as `{timestamp}_manifest[_dry].json` — name-sorted, dry distinguished by suffix.
+- **`ElasticsearchLoader`** — doc ids `{epoch_ms}-{content_hash}` with within-run content dedupe (first occurrence wins, warned); lineage breadcrumb per node (title → url → `"unknown"`, root→leaf); url always present (own → nearest ancestor's → `"<redacted>"`, redaction is pipeline policy, e.g. Moodle hidden resources); flow: recreate the date-named index (delete + create on same-day collision, Ramtin's `recreate_index` behavior) → bulk → refresh → **one atomic** `update_aliases` (remove old + add new; add-only on first run). A failed run never touches the alias.
+- **Frozen document schema (13 fields)** — `index_settings.json` shipped verbatim as package data, `content.analyzer` patched per project language at creation: `id`, `content` (text, `base_en`/`base_fr`), `embedding` (dense_vector 4096, dot_product, int8_hnsw), `lineage` (keyword array), `url`, `type`, `subtype`, `number`, `subnumber` (keyword), `week` (integer), `is_solution` (boolean), `from`/`until` (date, ES default ISO). Dropped vs the old mapping: `content.en/fr` (no translation), `description.en/fr`, `raw`/`sayt`/`trigram` subfields + their analyzers and filters, synonyms, `dd/MM/yyyy` formats, 384 dims.
+- **Connection**: flat env keys `ES_HOST`/`ES_PORT`/`ES_USERNAME`/`ES_PASSWORD`/`ES_CAFILE`, proper TLS verification via `ca_certs` (the `verify_certs=False` shortcut is gone); `elasticsearch>=8,<9` dependency.
+- **`ProjectSpec.dir`**: the project's material folder; manifests land in `dir/output` (fallback `BASE_PATH/{id}`). No `RECORDS_DIR` env var.
+- **Field-name reconciliation** (with Aitor): search stays **hybrid** (embeddings + Elasticsearch text); consumers filter on `from`/`until` (automatic), `type`/`subtype`/`is_solution`; returned fields and index routing are the MCP's concern. Carried into Phase 6: GraphAI's `/rag/retrieve` must embed queries with Qwen3-Embedding-8B (4096 dims) and query `content`.
+- **Gate shakedown fixes**: RCP endpoint/key resolve from the environment at call time (the model catalog is built at import, which could precede the `.env` load); the Moodle extractor logs per file with an end summary and takes a `sections` limiter for tests; Langfuse media-upload errors (non-fatal observability noise) are filtered from the logs.
 
-**Gate:** ES loader against a local/test ES instance; record inspected by Aitor/Javier; Anna's dashboard needs confirmed against the new format.
+**Gate:** dry manifest inspected (Aitor) on the `micro303test` project (Moodle-only, first section); real ES write against the shared instance under the `rag_micro303test` alias **pending**; Anna's dashboard needs confirmed against the new format.
 
 ### Phase 6 — COM202 pilot + cutover
 - Dry run → review record → record fixes as overrides → first real run.
@@ -168,8 +176,8 @@ Each phase ends with a verification gate; no phase starts before the previous ga
 
 ## 5. Open items carried into implementation
 
-- **Embeddings × cache:** settled (§0): content-only keys, no eviction, model changes handled manually with `--refresh TRANSFORM`. Dims flow into the Phase 5 mapping.
-- **GraphAI `/rag/retrieve` impact:** consumers embed queries via GraphAI today; switching embeddings to RCP (Qwen3-Embedding-8B) breaks that pairing. Consumer-side work, tracked separately; the ETL side is done (models pinned in the catalog).
+- **Embeddings × cache:** settled (§0): content-only keys, no eviction, model changes handled manually with `--refresh TRANSFORM`. Dims decided with the Phase 5 mapping: 4096 (Qwen3-Embedding-8B).
+- **GraphAI `/rag/retrieve` impact:** consumers embed queries via GraphAI today; switching embeddings to RCP (Qwen3-Embedding-8B, 4096 dims) breaks that pairing, and the text half must query `content` (the old `content.en/fr` are gone). Consumer-side work, tracked separately; the ETL side is done.
 - **Cron wiring:** one timer looping over all projects vs one timer per project calling the CLI. Settle when enrolling the first project (Phase 6).
 - **MCP server handoff:** metadata-file contract documented by the end of Phase 5; MCP server work (tool autodiscovery, steps 7–11) tracked in its own repo.
 - **MOOC extractor usage:** confirmed (Phase 2) — actively used, kept and adapted; MOOC videos join the uniform Kaltura path.

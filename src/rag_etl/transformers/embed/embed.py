@@ -1,4 +1,4 @@
-"""Embed: one vector per chunk, handed to the loader, cached by content.
+"""Embed: the last transform, one vector per chunk, cached by content.
 
 Vectors live in the cache as JSON files keyed by the chunk text's hash,
 so a chunk that changed is embedded again and a chunk that did not is
@@ -11,12 +11,11 @@ from __future__ import annotations
 import json
 import logging
 
-from collections.abc import Sequence
-
 from ragtools.llm import get_model
 
 from rag_etl.cache import Cache
 from rag_etl.core import Resource
+from rag_etl.transformers.base import Transformer
 
 logger = logging.getLogger(__name__)
 
@@ -32,29 +31,31 @@ def chunks_of(roots: list[Resource]) -> list[Resource]:
     return [node for root in roots for node in root.walk() if node.text is not None]
 
 
-def embed(chunks: Sequence[Resource], cache: Cache) -> list[tuple[Resource, list[float]]]:
-    """Embed every chunk, one vector per chunk, cached by content.
+class EmbedTransformer(Transformer):
+    """Annotates every chunk with its vector, in place."""
 
-    The pairs go to the loader as they are.
-    """
-    pairs: list[tuple[Resource, list[float]]] = []
-    missing: list[Resource] = []
+    def __init__(self, cache: Cache):
+        self.cache = cache
 
-    for chunk in chunks:
-        cached = cache.read(chunk.content_hash, EMBEDDING_FILE)
-        if cached is not None:
-            pairs.append((chunk, json.loads(cached)))
-        else:
-            missing.append(chunk)
+    def transform(self, roots: list[Resource]) -> list[Resource]:
+        chunks = chunks_of(roots)
+        missing: list[Resource] = []
 
-    logger.info(f"{len(chunks)} chunks, {len(missing)} to embed")
+        for chunk in chunks:
+            cached = self.cache.read(chunk.content_hash, EMBEDDING_FILE)
+            if cached is None:
+                missing.append(chunk)
+            else:
+                chunk.embedding = json.loads(cached)
 
-    for position in range(0, len(missing), BATCH_SIZE):
-        batch = missing[position : position + BATCH_SIZE]
-        vectors = get_model("embedding").embeddings([chunk.text or "" for chunk in batch])
+        logger.info(f"{len(chunks)} chunks, {len(missing)} to embed")
 
-        for chunk, vector in zip(batch, vectors):
-            cache.write(chunk.content_hash, EMBEDDING_FILE, json.dumps(vector))
-            pairs.append((chunk, vector))
+        for position in range(0, len(missing), BATCH_SIZE):
+            batch = missing[position : position + BATCH_SIZE]
+            vectors = get_model("embedding").embeddings([chunk.text or "" for chunk in batch])
 
-    return pairs
+            for chunk, vector in zip(batch, vectors):
+                self.cache.write(chunk.content_hash, EMBEDDING_FILE, json.dumps(vector))
+                chunk.embedding = vector
+
+        return roots

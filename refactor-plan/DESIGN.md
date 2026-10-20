@@ -4,7 +4,7 @@ Short note fixing the core shapes that Phases 1–5 implement, updated as the ph
 
 ## Pipeline order
 
-extract (plain documents) → normalize → materialize (OCR etc.) → judge → cut → embed + load
+extract (plain documents) → normalize → materialize (OCR etc.) → judge → cut → embed (annotates chunks) → load
 
 - Extractors return plain documents — whatever is includable (Moodle: everything not marked NO_BOT). Whatever per-source labels a source itself infers (MOOC export tags, Ed Discussion's jury) stays in its extractor; the judge fills everything else.
 - The **judge** fills `type`/`subtype`/`is_solution` and the `cut` per resource — or drops the resource. It sits after materialize and before cut, because the cut depends on it. There is **no type/subtype → cut mapping in this codebase**: how the judge decides is Javier's business. The built stub (`transformers/judge/`) applies the exceptions and fills the default cuts — readable leaves cut whole, containers of text cut per child, roots never cut — leaving `type`/`subtype`/`is_solution` unlabelled until his inference replaces it.
@@ -12,7 +12,7 @@ extract (plain documents) → normalize → materialize (OCR etc.) → judge →
 
 ## Two packages: `ragtools` and `rag_etl` (Phase 3)
 
-**`src/ragtools/`** — pure file preparation, the colleague-facing library: archives (zip/tar.gz → files, NFC + UTF-8 fixes), notebooks (ipynb → md, ALT texts via a vision model), PDFs (deterministic PyMuPDF page render), images (→ text by a vision model), documents (heading-aware splitting, page stitching, exercise splitting, `documents/`), videos (ffmpeg frame extraction, SRT parsing/merging, the `SlideDetector` interface), the GraphAI and Kaltura plumbing, and the RCP client (`llm/`) with the settled model catalog (`defaults.py`: `MODELS` keyed `(model, mode)`, `get_model(task)` for the concerns — ocr, judge, split_exercises, stitch, embedding). It takes plain paths and hands files and text back; it **never imports `rag_etl`** (enforced by `tests/test_layering.py`) — capabilities build their own clients from the catalog and the `.env` endpoint (`config.py`), so the pipeline constructs none. A colleague pip installs the distribution and uses `ragtools` for OCR, splitting or their own file prep; the true standalone distribution (own pyproject, light deps only) splits off in Phase 7.
+**`src/ragtools/`** — pure file preparation, the colleague-facing library: archives (zip/tar.gz → files, NFC + UTF-8 fixes), notebooks (ipynb → md, ALT texts via a vision model), PDFs (deterministic PyMuPDF page render), images (→ text by a vision model), documents (heading-aware splitting, page stitching, exercise splitting, `documents/`), videos (ffmpeg frame extraction, SRT parsing/merging, the `SlideDetector` interface), the GraphAI and Kaltura plumbing, and the RCP client (`llm/`) with the settled model catalog (`defaults.py`: `MODELS` keyed `(model, mode)`, `get_model(task)` for the concerns — ocr, judge, split_exercises, stitch, embedding). It takes plain paths and hands files and text back; it **never imports `rag_etl`** (enforced by `tests/test_layering.py`) — capabilities build their own clients from the catalog and the environment (`RCP_BASE_URL`/`RCP_API_KEY`, read at call time so import order can never freeze empty endpoints; a `None` field means from-env, an explicit value wins), so the pipeline constructs none. A colleague pip installs the distribution and uses `ragtools` for OCR, splitting or their own file prep; the true standalone distribution (own pyproject, light deps only) splits off in Phase 7.
 
 **`src/rag_etl/`** — the pipeline plumbing: the `Resource` tree, extractors, transformers (thin adapters: walk the tree, call `ragtools` per file, handle caching and node bookkeeping), the cache, the orchestrator, project specs, loaders and the CLI. Transformers follow the explicit-inheritance contract of `Transformer` (`src/rag_etl/transformers/base.py`): frozen dataclasses with `transform(roots) -> roots`, reshaping trees in place.
 
@@ -46,6 +46,7 @@ class Resource:
 
     # content (chunks only)
     text: str | None = None
+    embedding: list[float] | None = None  # the chunk's vector, set by embed
 ```
 
 Invariants:
@@ -58,7 +59,7 @@ Invariants:
   - else → sha256 of empty
   Equal content anywhere in any project → equal hash → shared cache entries, `(transform, content_hash)` keys.
 - Deep links (Moodle URL, Mediaspace timestamp, Ed post, Git commit) travel as `url`; `lineage()` reconstructs the chain from any node back to its source. Video leaves never carry an `entry_id` field — the Kaltura entry id stays inside the video descriptor/XML and is read by materialize.
-- Embeddings are **not** on the node: the embed step produces them per chunk and hands the ES loader `(chunk, embedding)` pairs.
+- Embeddings land on the node (`embedding`, chunks only): the embed transform annotates the tree in place, and the ES loader reads vectors straight from the tree.
 
 State helpers on the class: `is_leaf`, `walk()` (depth-first), `lineage()` (root→self), `add_child()`. The hashing helpers `hash_bytes`/`hash_text` are the single sha256 implementation behind `content_hash`. Transformers add and remove children directly; a node reshaped into a container keeps its identity and gains children.
 
@@ -93,9 +94,10 @@ class ProjectSpec:
     language: str | None = None              # the project's language (materialize slide detection)
     exceptions: tuple[Rule, ...] = ()        # manual corrections for resources the judge would mislabel
     sources: tuple[Extractor, ...] = ()      # extractor instances, one per source
+    dir: Path | None = None                  # the project's material folder; manifests land in dir/output
 ```
 
-Specs live in **semester folders** (e.g. `projects/semester_2627_autumn/micro303.py`), one thin file per project, named after the project in lowercase and defining the spec under the project code in uppercase. There is no registry: `from_code` discovers a spec by convention (scans the semester folders; a file that exists is a project) and errors loudly when there is none.
+Specs live in **semester folders** (e.g. `projects/semester_2627_autumn/micro303test.py` — MICRO-303 under the test id until cutover), one thin file per project, named after the project in lowercase and defining the spec under the project code in uppercase. There is no registry: `from_code` discovers a spec by convention (scans the semester folders; a file that exists is a project) and errors loudly when there is none.
 
 ## Normalize + materialize (Phase 3, `src/rag_etl/transformers/`)
 
@@ -112,8 +114,17 @@ Specs live in **semester folders** (e.g. `projects/semester_2627_autumn/micro303
   - `per_child`: each readable child becomes a chunk in place, text read from its file. Children carrying their own different cut keep it (an exception inside a folder cut per child still applies).
   - `per_exercise`: the node's pages are stitched, then split — one LLM pass returning exercises as line ranges with number + is-solution (prompts kept as documents in `ragtools/documents/prompts/`, cached by the stitched text's hash) — then cut at the annotated markers: one chunk per exercise, deep-linking into the pdf page its text starts on. Nothing is split unless the cut asks for it.
   - `text`: header-aware chunking (split at the most common heading level, adjacent parts merged up to the guard).
-- **Embed** (`embed/embed.py`): RCP embeddings per chunk (`Qwen/Qwen3-Embedding-8B`, pinned in the catalog), batched, cache-aware — one JSON file per chunk under `{CACHE_DIR}/embed/{text hash}/`, via the cache's `read`/`write` text API. Output: `(chunk, embedding)` pairs for the Phase 5 loader; embeddings are not on the node.
+- **Embed** (`embed/embed.py`, the fifth transform): RCP embeddings per chunk (`Qwen/Qwen3-Embedding-8B`, pinned in the catalog), batched, cache-aware — one JSON file per chunk under `{CACHE_DIR}/embed/{text hash}/`, via the cache's `read`/`write` text API — annotating each chunk in place (`Resource.embedding`).
 - `run_pipeline` returns nothing content-wise: loaders run inside the pipeline and publish the index; failures propagate loud.
+
+## Loaders (Phase 5, `src/rag_etl/loaders/`)
+
+Loaders take trees — the pipeline contract is uniform (extractors produce trees, transformers take and return trees, loaders take trees) — and are configured by constructor args; no intermediate run object.
+
+- **`ManifestLoader`** writes one JSON manifest per run for human inspection; nothing reads it. All manifests land in `{dir}/output/` as `{timestamp}_manifest[_dry].json` (name-sorted, dry by suffix). Header: project, dry, timestamp, index, alias, pipeline version. Summary: sources, chunks, without_url, and a nested drill-down (source → type → subtype → number) counting chunks, without_url and is_solution per group, with `unknown` buckets and None sorted last. Tree: metadata-only — no text, no embeddings — with content-hash pointers, the `chunk` flag and the `cut` decision.
+- **`ElasticsearchLoader`** publishes one run: recreate the date-named index (`rag_{project}_{YYYY_MM_DD}`, Ramtin's convention; delete + create on same-day collision) → bulk (doc id `{epoch_ms}-{content_hash}`, within-run content dedupe, first occurrence wins with a warning) → refresh → **one atomic** `update_aliases` (remove old + add new; add-only on first run). A failed run never touches the alias. Documents carry `content`, `embedding` (from the node), a `lineage` breadcrumb (title → url → `"unknown"` per node, root→leaf), and a `url` that is always present: own → nearest ancestor's → `"<redacted>"` (redaction is pipeline policy).
+- **The frozen schema** ships verbatim as package data (`index_settings.json`, settings + mappings in one create-index body); the loader patches `content.analyzer` per project language (`base_en`/`base_fr`) at creation. 13 fields: `id`, `content`, `embedding` (dense_vector 4096, dot_product, int8_hnsw), `lineage`, `url`, `type`, `subtype`, `number`, `subnumber`, `week`, `is_solution`, `from`, `until` (ES default ISO dates). Dropped vs the old mapping: `content.en/fr`, `description.en/fr`, `raw`/`sayt`/`trigram` subfields + their analyzers and filters, synonyms, legacy date formats, 384 dims.
+- **Connection**: flat `ES_HOST`/`ES_PORT`/`ES_USERNAME`/`ES_PASSWORD`/`ES_CAFILE` env keys, proper TLS verification (`ca_certs`); `elasticsearch>=8,<9`. Search stays hybrid (embeddings + Elasticsearch text); consumers filter on `from`/`until` (automatic), `type`/`subtype`/`is_solution` — returned fields and routing are the MCP's concern.
 
 ## Stitching (Phase 4, at cut time)
 

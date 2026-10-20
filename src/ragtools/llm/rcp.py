@@ -48,17 +48,19 @@ class RCPClient:
 
     model: str
     params: dict[str, Any] = field(default_factory=dict)
-    base_url: str = field(default_factory=lambda: os.environ.get("RCP_BASE_URL", ""))
-    api_key: str = field(default_factory=lambda: os.environ.get("RCP_API_KEY", ""))
+    base_url: str | None = None
+    api_key: str | None = None
     max_retries: int = 3
     timeout: int = 600
 
     def _client(self) -> OpenAI:
-        if not self.base_url:
+        base_url = self.base_url if self.base_url is not None else os.environ.get("RCP_BASE_URL", "")
+        api_key = self.api_key if self.api_key is not None else os.environ.get("RCP_API_KEY", "")
+        if not base_url:
             raise ValueError("Missing required environment variable: RCP_BASE_URL")
-        if not self.api_key:
+        if not api_key:
             raise ValueError("Missing required environment variable: RCP_API_KEY")
-        return openai_client(self.base_url, self.api_key, self.max_retries, self.timeout)
+        return openai_client(base_url, api_key, self.max_retries, self.timeout)
 
     def _send(
         self,

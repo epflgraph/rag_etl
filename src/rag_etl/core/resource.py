@@ -55,6 +55,7 @@ class Resource:
 
     # content (chunks only)
     text: str | None = None
+    embedding: list[float] | None = None  # the chunk's vector, set by embed
 
     def __post_init__(self) -> None:
         for child in self.children:

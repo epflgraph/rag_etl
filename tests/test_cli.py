@@ -53,6 +53,6 @@ def test_known_project_runs(monkeypatch):
 
     monkeypatch.setattr("rag_etl.cli.run_pipeline", lambda spec, dry=False, refresh=None: ran.append(spec.id))
 
-    main(["run", "--project", "MICRO303"])
+    main(["run", "--project", "MICRO303TEST"])
 
-    assert ran == ["micro303"]
+    assert ran == ["micro303test"]

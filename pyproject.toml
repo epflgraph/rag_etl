@@ -30,6 +30,7 @@ dependencies = [
     "pathvalidate",     # sanitise user-input strings to use as filenames
     "langfuse",
     "KalturaApiClient",
+    "elasticsearch>=8,<9",
 ]
 
 [project.scripts]
@@ -44,6 +45,7 @@ where = ["src"]
 # The prompts are documents, not code: they ship with the package
 [tool.setuptools.package-data]
 "ragtools.documents" = ["prompts/*.md"]
+"rag_etl.loaders" = ["index_settings.json"]
 
 [project.optional-dependencies]
 dev = [
@@ -75,7 +77,9 @@ ignore_missing_imports = true
 # As a phase rewrites a module, remove its entry here so mypy gates it.
 [[tool.mypy.overrides]]
 module = [
-    "rag_etl.loaders.*",
+    "rag_etl.loaders.base_loader",
+    "rag_etl.loaders.content_metadata_loader",
+    "rag_etl.loaders.dummy_loader",
     "rag_etl.transformers.base_transformer",
     "rag_etl.transformers.extract_zip.*",
     "rag_etl.transformers.image_to_md.*",

@@ -6,6 +6,13 @@ from rag_etl.projects import from_code
 from rag_etl.pipeline import run_pipeline
 
 
+class _DropMediaUploadErrors(logging.Filter):
+    """Langfuse media uploads can fail without affecting the run; they are noise."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        return "Media upload error" not in record.getMessage()
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="rag-etl",
@@ -30,6 +37,7 @@ def main(argv: list[str] | None = None) -> None:
         format="[%(asctime)s] [%(levelname)s] [%(filename)s:%(lineno)d] %(message)s",
         handlers=[logging.StreamHandler(sys.stdout)],
     )
+    logging.getLogger("langfuse").addFilter(_DropMediaUploadErrors())
 
     if args.command == "run":
         logging.info(f"Run configuration: project={args.project}, dry={args.dry}, refresh={args.refresh or 'none'}")

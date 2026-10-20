@@ -90,6 +90,7 @@ class MoodleExtractor(Extractor):
 
     course_id: int
     mime_types: Sequence[str] = tuple(mt.DEFAULT_MIME_TYPES)
+    sections: int | None = None    # when set, only the first N sections are extracted
 
     def extract(self) -> Resource:
         """
@@ -116,12 +117,19 @@ class MoodleExtractor(Extractor):
         if not isinstance(sections, list):
             raise SourceUnavailable(f"Moodle API did not answer with course contents: {sections}")
 
+        if self.sections is not None:
+            sections = sections[: self.sections]
+
+        logging.info(f"Moodle course {self.course_id}: {len(sections)} sections")
+
         course_url = f"{CONFIG['MOODLE_URL']}/course/view.php?id={self.course_id}"
         course = Resource(title=f"Moodle course {self.course_id}", url=course_url)
 
         # Empty dir if it exists
         if self.dir.exists():
             shutil.rmtree(self.dir)
+
+        extracted = 0
 
         # Iterate over sections, modules and module contents
         for section in sections:
@@ -156,6 +164,7 @@ class MoodleExtractor(Extractor):
 
                     # Skip if mime type not in list
                     if mime_type not in self.mime_types:
+                        logging.debug(f"Skipping file {module_contents['filename']} because of mime type {mime_type}")
                         continue
 
                     # A file marked NO_BOT is not for the bots
@@ -188,6 +197,8 @@ class MoodleExtractor(Extractor):
                     # Save file to disk
                     module_contents_path.parent.mkdir(parents=True, exist_ok=True)
                     module_contents_path.write_bytes(response.content)
+                    extracted += 1
+                    logging.info(f"Downloaded {module_title} > {title}")
 
                     if section_node is None:
                         section_node = course.add_child(Resource(title=section.get("name")))
@@ -202,5 +213,7 @@ class MoodleExtractor(Extractor):
                             until=until,
                         )
                     )
+
+        logging.info(f"Moodle course {self.course_id}: extracted {extracted} files")
 
         return course

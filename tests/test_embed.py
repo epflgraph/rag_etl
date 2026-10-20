@@ -1,4 +1,4 @@
-"""Unit tests for embed: fake client, cache roundtrip. No network."""
+"""Unit tests for embed: fake model, cache roundtrip. No network."""
 
 from types import SimpleNamespace
 
@@ -6,7 +6,7 @@ import pytest
 
 from rag_etl.cache import Cache
 from rag_etl.core import Resource
-from rag_etl.transformers.embed.embed import BATCH_SIZE, chunks_of, embed
+from rag_etl.transformers.embed.embed import BATCH_SIZE, EmbedTransformer, chunks_of
 
 
 @pytest.fixture
@@ -29,29 +29,29 @@ def test_one_vector_per_chunk_in_order(cache, monkeypatch):
     fake_llm(monkeypatch, calls)
     chunks = [Resource(title=f"chunk {i}", text=f"text {i}") for i in range(3)]
 
-    pairs = embed(chunks, cache)
+    EmbedTransformer(cache).transform(chunks)
 
-    assert [pair[0] for pair in pairs] == chunks
-    assert all(pair[1] == [1.0, 0.0] for pair in pairs)
+    assert all(chunk.embedding == [1.0, 0.0] for chunk in chunks)
 
 
 def test_second_run_reads_from_cache(cache, monkeypatch):
     calls: list = []
     fake_llm(monkeypatch, calls)
-    chunks = [Resource(title="chunk", text="the same text")]
+    chunk = Resource(title="chunk", text="the same text")
 
-    embed(chunks, cache)
-    embed(chunks, cache)
+    EmbedTransformer(cache).transform([chunk])
+    EmbedTransformer(cache).transform([chunk])
 
     # The second run embeds nothing: same content, cached vector
     assert len(calls) == 1
+    assert chunk.embedding == [1.0, 0.0]
 
 
 def test_changed_chunks_embed_again(cache, monkeypatch):
     calls: list = []
     fake_llm(monkeypatch, calls)
-    embed([Resource(title="chunk", text="before")], cache)
-    embed([Resource(title="chunk", text="after")], cache)
+    EmbedTransformer(cache).transform([Resource(title="chunk", text="before")])
+    EmbedTransformer(cache).transform([Resource(title="chunk", text="after")])
 
     assert len(calls) == 2
 
@@ -61,9 +61,21 @@ def test_calls_are_batched(cache, monkeypatch):
     fake_llm(monkeypatch, calls)
     chunks = [Resource(title=f"chunk {i}", text=f"text {i}") for i in range(BATCH_SIZE + 1)]
 
-    embed(chunks, cache)
+    EmbedTransformer(cache).transform(chunks)
 
     assert [len(call) for call in calls] == [BATCH_SIZE, 1]
+
+
+def test_non_chunks_are_left_alone(cache, monkeypatch):
+    calls: list = []
+    fake_llm(monkeypatch, calls)
+    root = Resource(title="root")
+    root.add_child(Resource(title="container", children=[Resource(title="page")]))
+
+    EmbedTransformer(cache).transform([root])
+
+    assert calls == []
+    assert root.embedding is None
 
 
 def test_chunks_of_finds_text_nodes():

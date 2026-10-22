@@ -163,7 +163,7 @@ def test_french_project_gets_the_french_analyzer(monkeypatch):
     assert create[3]["properties"]["content"]["analyzer"] == "base_fr"
 
 
-def test_duplicate_content_is_dropped(monkeypatch):
+def test_duplicate_content_is_kept_with_distinct_ids(monkeypatch):
     root = Resource(title="root")
     root.add_child(Resource(title="first", text="same", embedding=[1.0]))
     root.add_child(Resource(title="second", text="same", embedding=[1.0]))
@@ -172,7 +172,10 @@ def test_duplicate_content_is_dropped(monkeypatch):
 
     loader(FakeClient()).load([root])
 
-    assert len(sink) == 1
+    assert len(sink) == 2
+    assert sink[0]["_id"] != sink[1]["_id"]
+    assert sink[0]["_source"]["lineage"] == ["root", "first"]
+    assert sink[1]["_source"]["lineage"] == ["root", "second"]
 
 
 def test_unembedded_chunk_fails_loud(monkeypatch):

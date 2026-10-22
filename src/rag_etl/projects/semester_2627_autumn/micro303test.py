@@ -39,7 +39,7 @@ MICRO303TEST = ProjectSpec(
     language="en",
     dir=course_path,
     sources=(
-        MoodleExtractor(dir=course_path / "moodle", course_id=19283, sections=1),
+        MoodleExtractor(dir=course_path / "moodle", course_id=19283),
         # MOOCExtractor(
         #     dir=course_path / "mooc",
         #     tag_metadata=MOOC_TAG_METADATA,

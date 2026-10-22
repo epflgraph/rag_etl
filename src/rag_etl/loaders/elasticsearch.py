@@ -77,19 +77,15 @@ class ElasticsearchLoader:
         self.client.indices.create(index=self.index, settings=body["settings"], mappings=body["mappings"])
 
     def _actions(self, roots: list[Resource]) -> list[dict[str, Any]]:
-        """One index action per chunk, deduplicated by content hash."""
-        epoch = time_ns() // 1_000_000
-        seen: set[str] = set()
+        """One index action per chunk, with a strictly increasing per-document timestamp."""
+        epoch = 0
         actions: list[dict[str, Any]] = []
 
         for root in roots:
             for node in root.walk():
                 if node.text is None:
                     continue
-                if node.content_hash in seen:
-                    logger.warning(f"{node.title!r}: duplicate content, first occurrence kept")
-                    continue
-                seen.add(node.content_hash)
+                epoch = max(time_ns() // 1_000_000, epoch + 1)
                 actions.append(
                     {
                         "_op_type": "index",

@@ -23,7 +23,7 @@ def tree() -> list[Resource]:
 
 
 def write(directory: Path, roots: list[Resource], dry: bool = False) -> dict:
-    ManifestLoader(directory, project="micro303", timestamp=TIMESTAMP, dry=dry).load(roots)
+    ManifestLoader(directory, project="demo", timestamp=TIMESTAMP, dry=dry).load(roots)
     [path] = directory.glob("*.json")
     return json.loads(path.read_text(encoding="utf-8"))
 
@@ -34,11 +34,11 @@ def test_manifest_lands_where_told_with_the_timestamp_name(tmp_path):
 
     assert (directory / "20261019T153045_manifest.json").exists()
     header = manifest["header"]
-    assert header["project"] == "micro303"
+    assert header["project"] == "demo"
     assert header["dry"] is False
     assert header["timestamp"] == TIMESTAMP.isoformat()
-    assert header["index"] == "rag_micro303_2026_10_19"
-    assert header["alias"] == "rag_micro303"
+    assert header["index"] == "rag_demo_20261019_153045"
+    assert header["alias"] == "rag_demo"
     assert isinstance(header["pipeline_version"], str)
 
 

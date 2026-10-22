@@ -1,9 +1,10 @@
-"""The Elasticsearch loader: publishes one run into a fresh index.
+"""The Elasticsearch loader: publishes one run into its own index.
 
-The index is named after the project and the date, so a day's first run
-is clean blue/green: recreate, bulk-load, refresh, then one atomic alias
-update points consumers at it. The alias consumers query is named after
-the project only, and a failed run never touches it.
+Every run builds a fresh index named after the project and the run's
+timestamp, so runs never collide and the index the alias points at is
+never touched: bulk-load, refresh, then one atomic alias update points
+consumers at the new index. A failed run leaves the alias — and every
+older index, kept for investigation and rollback — exactly as they were.
 """
 
 from __future__ import annotations
@@ -31,8 +32,8 @@ def alias_name(project: str) -> str:
 
 
 def index_name(project: str, timestamp: datetime) -> str:
-    """The fresh index one run publishes into: rag_{project}_{YYYY_MM_DD}."""
-    return f"{alias_name(project)}_{timestamp:%Y_%m_%d}"
+    """The fresh index one run publishes into: rag_{project}_{YYYYMMDD}_{HHMMSS}."""
+    return f"{alias_name(project)}_{timestamp:%Y%m%d_%H%M%S}"
 
 
 def index_settings(language: str | None) -> dict[str, Any]:
@@ -64,15 +65,13 @@ class ElasticsearchLoader:
         self.client = client if client is not None else _client()
 
     def load(self, roots: list[Resource]) -> None:
-        """Recreate the index, bulk-load the chunks, shift the alias."""
-        self._recreate_index()
+        """Create the run's index, bulk-load the chunks, shift the alias."""
+        self._create_index()
         bulk(self.client, self._actions(roots))
         self.client.indices.refresh(index=self.index)
         self._shift_alias()
 
-    def _recreate_index(self) -> None:
-        if self.client.indices.exists(index=self.index):
-            self.client.indices.delete(index=self.index)
+    def _create_index(self) -> None:
         body = index_settings(self.language)
         self.client.indices.create(index=self.index, settings=body["settings"], mappings=body["mappings"])
 

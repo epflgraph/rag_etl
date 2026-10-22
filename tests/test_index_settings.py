@@ -38,5 +38,5 @@ def test_analyzer_follows_the_language():
 def test_naming():
     when = datetime(2026, 10, 19, 15, 30, 45)
 
-    assert alias_name("micro303") == "rag_micro303"
-    assert index_name("micro303", when) == "rag_micro303_2026_10_19"
+    assert alias_name("demo") == "rag_demo"
+    assert index_name("demo", when) == "rag_demo_20261019_153045"

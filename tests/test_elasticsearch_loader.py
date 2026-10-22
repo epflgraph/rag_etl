@@ -13,22 +13,12 @@ TIMESTAMP = datetime(2026, 10, 19, 15, 30, 45, tzinfo=UTC)
 
 
 class FakeIndices:
-    def __init__(self, existing: set[str], aliases: dict[str, set[str]]):
-        self.existing = existing
+    def __init__(self, aliases: dict[str, set[str]]):
         self.aliases = aliases
         self.calls: list[tuple] = []
 
-    def exists(self, index):
-        self.calls.append(("exists", index))
-        return index in self.existing
-
-    def delete(self, index):
-        self.calls.append(("delete", index))
-        self.existing.discard(index)
-
     def create(self, index, settings=None, mappings=None):
         self.calls.append(("create", index, settings, mappings))
-        self.existing.add(index)
 
     def refresh(self, index):
         self.calls.append(("refresh", index))
@@ -44,12 +34,12 @@ class FakeIndices:
 
 
 class FakeClient:
-    def __init__(self, existing: set[str] | None = None, aliases: dict[str, set[str]] | None = None):
-        self.indices = FakeIndices(existing or set(), aliases or {})
+    def __init__(self, aliases: dict[str, set[str]] | None = None):
+        self.indices = FakeIndices(aliases or {})
 
 
 def loader(client: FakeClient, language: str | None = "en") -> ElasticsearchLoader:
-    return ElasticsearchLoader(project="micro303", timestamp=TIMESTAMP, language=language, client=client)
+    return ElasticsearchLoader(project="demo", timestamp=TIMESTAMP, language=language, client=client)
 
 
 def bulk_into(monkeypatch, sink: list) -> None:
@@ -88,7 +78,7 @@ def test_documents_are_built_from_chunks(monkeypatch):
     assert compute["_source"]["content"] == "compute"
     assert compute["_source"]["embedding"] == [1.0]
     assert compute["_id"].endswith(a.content_hash)
-    assert compute["_index"] == "rag_micro303_2026_10_19"
+    assert compute["_index"] == "rag_demo_20261019_153045"
 
     assert compute["_source"]["url"] == "https://moodle/3"
     assert compute["_source"]["lineage"] == ["Exercise set 3", "Exercise 2a"]
@@ -114,40 +104,44 @@ def test_first_run_creates_refreshes_and_adds_the_alias(monkeypatch):
     loader(client).load(roots)
 
     kinds = [call[0] for call in client.indices.calls]
-    assert kinds == ["exists", "create", "refresh", "get_alias", "update_aliases"]
+    assert kinds == ["create", "refresh", "get_alias", "update_aliases"]
 
     [create] = [call for call in client.indices.calls if call[0] == "create"]
-    assert create[1] == "rag_micro303_2026_10_19"
+    assert create[1] == "rag_demo_20261019_153045"
     assert create[3]["properties"]["content"]["analyzer"] == "base_en"
 
     [update] = [call for call in client.indices.calls if call[0] == "update_aliases"]
-    assert update[1] == [{"add": {"index": "rag_micro303_2026_10_19", "alias": "rag_micro303"}}]
+    assert update[1] == [{"add": {"index": "rag_demo_20261019_153045", "alias": "rag_demo"}}]
 
 
-def test_same_day_run_recreates_the_index(monkeypatch):
+def test_same_day_runs_get_distinct_indices(monkeypatch):
     roots, _ = tree()
     sink: list = []
     bulk_into(monkeypatch, sink)
-    client = FakeClient(existing={"rag_micro303_2026_10_19"})
+    client = FakeClient()
 
     loader(client).load(roots)
+    later = ElasticsearchLoader(
+        project="demo", timestamp=TIMESTAMP.replace(second=46), language="en", client=client
+    )
+    later.load(roots)
 
-    kinds = [call[0] for call in client.indices.calls]
-    assert kinds.index("delete") < kinds.index("create")
+    creates = [call[1] for call in client.indices.calls if call[0] == "create"]
+    assert creates == ["rag_demo_20261019_153045", "rag_demo_20261019_153046"]
 
 
 def test_alias_shift_removes_the_previous_index(monkeypatch):
     roots, _ = tree()
     sink: list = []
     bulk_into(monkeypatch, sink)
-    client = FakeClient(aliases={"rag_micro303": {"rag_micro303_2026_10_18"}})
+    client = FakeClient(aliases={"rag_demo": {"rag_demo_20261018_091500"}})
 
     loader(client).load(roots)
 
     [update] = [call for call in client.indices.calls if call[0] == "update_aliases"]
     assert update[1] == [
-        {"remove": {"index": "rag_micro303_2026_10_18", "alias": "rag_micro303"}},
-        {"add": {"index": "rag_micro303_2026_10_19", "alias": "rag_micro303"}},
+        {"remove": {"index": "rag_demo_20261018_091500", "alias": "rag_demo"}},
+        {"add": {"index": "rag_demo_20261019_153045", "alias": "rag_demo"}},
     ]
 
 

@@ -3,7 +3,6 @@ from __future__ import annotations
 from datetime import date
 
 import logging
-from typing import List, Tuple
 
 from rag_etl.courses import BaseCourse
 from rag_etl.extractors import BaseExtractor, LocalFolderExtractor
@@ -67,7 +66,7 @@ class CMICourse(BaseCourse):
     ################################################################
 
     @property
-    def pdf_to_markdown_type_subtypes(self) -> List[Tuple[str, str]]:
+    def pdf_to_markdown_type_subtypes(self) -> list[tuple[str, str]]:
         return [
             (self.tag_metadata[tag].get("type"), self.tag_metadata[tag].get("subtype"))
             for tag in self.tag_metadata
@@ -75,7 +74,7 @@ class CMICourse(BaseCourse):
         ]
 
     @property
-    def split_exercises_type_subtypes(self) -> List[Tuple[str, str]]:
+    def split_exercises_type_subtypes(self) -> list[tuple[str, str]]:
         return [
             (self.tag_metadata[tag].get("type"), self.tag_metadata[tag].get("subtype"))
             for tag in self.tag_metadata
@@ -83,7 +82,7 @@ class CMICourse(BaseCourse):
         ]
 
     @property
-    def extractors(self) -> List[BaseExtractor]:
+    def extractors(self) -> list[BaseExtractor]:
         return [
             LocalFolderExtractor(
                 folder_base_path=self.local_folder_base_path,
@@ -93,7 +92,7 @@ class CMICourse(BaseCourse):
         ]
 
     @property
-    def transformers(self) -> List[BaseTransformer]:
+    def transformers(self) -> list[BaseTransformer]:
         return [
             ExtractZipTransformer(cache=self.course_code),
             JupyterToMarkdownTransformer(cache=self.course_code),
@@ -103,7 +102,7 @@ class CMICourse(BaseCourse):
         ]
 
     @property
-    def loaders(self) -> List[BaseLoader]:
+    def loaders(self) -> list[BaseLoader]:
         return [ContentMetadataLoader(course_path=self.course_path, course_info=self.course_info)]
 
 

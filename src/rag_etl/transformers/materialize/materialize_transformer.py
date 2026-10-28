@@ -25,6 +25,7 @@ from ragtools.pdf import PDF_SYSTEM_PROMPT, PDF_USER_PROMPT, save_pdf_pages
 from ragtools.video import SlideDetector, extract_frame, filter_close_timestamps, frame_time, parse_srt, text_between
 
 from rag_etl.cache import Cache
+from rag_etl.config import config_value
 from rag_etl.core import Resource, child_inheriting
 from rag_etl.core.resource import hash_bytes
 from rag_etl.transformers.base import Transformer
@@ -40,6 +41,16 @@ TRANSCRIPT_PREFIX = "> "
 # Page and frame reads run bounded: twenty concurrent calls is what kept
 # the old pipeline well behaved against RCP
 MAX_CONCURRENT_OCR = 20
+
+
+def _work_dir(content_hash: str) -> Path:
+    """The work area for one piece of content: outside every source tree.
+
+    Generated files never sit next to the sources they came from, where an
+    extractor would read them back as resources of their own.
+    """
+
+    return Path(config_value("CACHE_DIR")) / "work" / content_hash
 
 
 @dataclass(frozen=True)
@@ -79,8 +90,7 @@ class MaterializeTransformer(Transformer):
         if pdf_path is None:
             return
 
-        # Pages live in a folder named after the pdf, like archives do
-        pages_dir = pdf_path.with_suffix("")
+        pages_dir = _work_dir(node.content_hash)
         page_paths = save_pdf_pages(pdf_path, pages_dir)
 
         with ThreadPoolExecutor(max_workers=MAX_CONCURRENT_OCR) as executor:
@@ -104,11 +114,10 @@ class MaterializeTransformer(Transformer):
         logger.info(f"{node.title}: {len(node.children)} pages")
 
     def _ocr_pdf_page(self, page_path: Path) -> Path:
-        return self._ocr_file(page_path, system=PDF_SYSTEM_PROMPT, user=PDF_USER_PROMPT)
+        return self._ocr_file(page_path, PDF_SYSTEM_PROMPT, PDF_USER_PROMPT, page_path.with_suffix(".md"))
 
-    def _ocr_file(self, image_path: Path, system: str, user: str) -> Path:
-        """Read one image into the markdown file next to it, cached by content."""
-        md_path = image_path.with_suffix(".md")
+    def _ocr_file(self, image_path: Path, system: str, user: str, md_path: Path) -> Path:
+        """Read one image into md_path, cached by content."""
         content_hash = hash_bytes(image_path.read_bytes())
 
         if not self.cache.get(content_hash, md_path):
@@ -124,7 +133,10 @@ class MaterializeTransformer(Transformer):
         if image_path is None:
             return
 
-        md_path = self._ocr_file(image_path, system=SLIDE_SYSTEM_PROMPT, user=SLIDE_USER_PROMPT)
+        work_dir = _work_dir(hash_bytes(image_path.read_bytes()))
+        md_path = self._ocr_file(
+            image_path, SLIDE_SYSTEM_PROMPT, SLIDE_USER_PROMPT, work_dir / f"{image_path.stem}.md"
+        )
 
         if not md_path.read_text(encoding="utf-8").strip():
             logger.info(f"Dropping {node.title}: no readable content on it")
@@ -143,14 +155,14 @@ class MaterializeTransformer(Transformer):
             logger.warning(f"Leaving {node.title} as it is: no Kaltura entry id to reach the video with")
             return
 
-        # Frames live in a folder named after the file the video stands for
+        # Frames live in the work area of the video's content
         if node.path is None:
             return
-        frames_path = node.path.with_suffix("")
+        frames_path = _work_dir(node.content_hash)
         content_hash = node.content_hash
 
-        # A changed video reuses the same frames folder: stale frames from
-        # the previous content must not survive into the new slides
+        # A crashed run can leave frames behind: they must not survive into
+        # the new slides
         shutil.rmtree(frames_path, ignore_errors=True)
 
         if not self.cache.get(content_hash, frames_path):
@@ -245,7 +257,7 @@ class MaterializeTransformer(Transformer):
         self._merge_captions(node)
 
     def _ocr_frame(self, frame_path: Path) -> Path:
-        return self._ocr_file(frame_path, system=SLIDE_SYSTEM_PROMPT, user=SLIDE_USER_PROMPT)
+        return self._ocr_file(frame_path, SLIDE_SYSTEM_PROMPT, SLIDE_USER_PROMPT, frame_path.with_suffix(".md"))
 
     def _merge_captions(self, node: Resource) -> None:
         """Append the words spoken over each slide to it.

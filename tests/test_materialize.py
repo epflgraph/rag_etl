@@ -9,6 +9,7 @@ import pytest
 import ragtools.mime_types as mt
 from rag_etl.cache import Cache
 from rag_etl.core import Resource
+from rag_etl.core.resource import hash_bytes
 from rag_etl.transformers.materialize.materialize_transformer import MaterializeTransformer
 
 
@@ -71,9 +72,11 @@ def test_pdf_gains_one_child_per_page(tmp_path, transformer, monkeypatch):
     assert all(child.mime_type == mt.MARKDOWN for child in lecture.children)
     # The page children carry the parent's descriptive metadata
     assert all(child.week == 3 and child.type == "theory" for child in lecture.children)
-    # And the rendered pages are on disk next to the pdf
-    assert (tmp_path / "lecture" / "page_1.png").exists()
-    assert (tmp_path / "lecture" / "page_1.md").exists()
+    # And the generated pages live in the work area, not beside the pdf
+    pages_dir = tmp_path / "cache" / "work" / hash_bytes(pdf_path.read_bytes())
+    assert (pages_dir / "page_1.png").exists()
+    assert (pages_dir / "page_1.md").exists()
+    assert not (tmp_path / "lecture").exists()
 
 
 def test_pdf_one_changed_page_reOCRs_one_page(tmp_path, transformer, monkeypatch):
@@ -96,7 +99,7 @@ def test_pdf_one_changed_page_reOCRs_one_page(tmp_path, transformer, monkeypatch
     assert len(calls) == 1
 
 
-def test_image_read_in_place(tmp_path, transformer):
+def test_image_read_into_work_dir(tmp_path, transformer):
     image_path = tmp_path / "slide.png"
     image_path.write_bytes(b"png fake")
     root = Resource(title="root", children=[Resource(title="slide", path=image_path, mime_type=mt.PNG)])
@@ -104,8 +107,11 @@ def test_image_read_in_place(tmp_path, transformer):
     transformer.transform([root])
 
     slide = root.children[0]
+    work_dir = tmp_path / "cache" / "work" / hash_bytes(image_path.read_bytes())
     assert slide.mime_type == mt.MARKDOWN
-    assert slide.path == image_path.with_suffix(".md")
+    assert slide.path == work_dir / "slide.md"
+    # Nothing is written beside the source image
+    assert not image_path.with_suffix(".md").exists()
 
 
 def test_unreadable_image_dropped(tmp_path, transformer, monkeypatch):

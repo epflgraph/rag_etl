@@ -13,7 +13,7 @@ import logging
 
 from pathlib import Path
 
-from ragtools.llm import get_model
+from ragtools.llm import AnswerTooLong, get_model
 
 logger = logging.getLogger(__name__)
 
@@ -93,7 +93,8 @@ ALT_TEXT_PROMPT = "Generate the ALT text for this image. If prominent text exist
 # One page, slide or figure never reads to more than this. Asked about a
 # repetitive page — a dot leader, a dense figure — the model sometimes
 # loops for minutes instead of answering; the longest real transcription
-# observed stays a few thousand characters below this mark
+# observed stays a few thousand characters below this mark. Reads are
+# streamed and cut the moment they pass the mark.
 MAX_ANSWER_CHARS = 20_000
 
 
@@ -136,32 +137,34 @@ def ocr_image(
     looped on; callers drop both.
     """
 
-    markdown = get_model("ocr").vision(
-        user,
-        [image_path],
-        system=system,
-        detail="high",
-        name="image-to-markdown",
-    )
-
-    markdown = strip_code_fence(markdown)
-
-    # A looped read runs to hundreds of thousands of characters; it is
-    # dropped rather than kept as garbage
-    if len(markdown) > MAX_ANSWER_CHARS:
-        logger.warning(f"Dropping the read of {image_path}: {len(markdown):,} chars is beyond any transcription")
+    try:
+        markdown = get_model("ocr").vision(
+            user,
+            [image_path],
+            system=system,
+            detail="high",
+            name="image-to-markdown",
+            max_chars=MAX_ANSWER_CHARS,
+        )
+    except AnswerTooLong as e:
+        logger.warning(f"Dropping the read of {image_path}: {e} — beyond any transcription")
         return ""
 
-    return markdown
+    return strip_code_fence(markdown)
 
 
 def alt_text(image_path: str | Path) -> str:
     """Generate the ALT text of one image, for documents that reference it."""
 
-    alt = get_model("ocr").vision(ALT_TEXT_PROMPT, [str(image_path)], name="generate-alt-text")
-
-    if len(alt) > MAX_ANSWER_CHARS:
-        logger.warning(f"Dropping the ALT text of {image_path}: {len(alt):,} chars is beyond any description")
+    try:
+        alt = get_model("ocr").vision(
+            ALT_TEXT_PROMPT,
+            [str(image_path)],
+            name="generate-alt-text",
+            max_chars=MAX_ANSWER_CHARS,
+        )
+    except AnswerTooLong as e:
+        logger.warning(f"Dropping the ALT text of {image_path}: {e} — beyond any description")
         return ""
 
     return alt

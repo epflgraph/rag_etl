@@ -6,7 +6,7 @@ from types import SimpleNamespace
 import pytest
 from pydantic import BaseModel
 
-from ragtools.llm import RCPClient, get_model
+from ragtools.llm import AnswerTooLong, RCPClient, get_model
 
 
 class Answer(BaseModel):
@@ -38,6 +38,28 @@ class FakeOpenAI:
     def __init__(self, content: str = " answer "):
         self.chat = SimpleNamespace(completions=FakeCompletions(content))
         self.embeddings = SimpleNamespace(create=lambda **kwargs: SimpleNamespace(data=[SimpleNamespace(embedding=[1.0, 2.0]) for _ in kwargs["input"]]))
+
+
+class FakeStream:
+    """A fake streaming answer: one content event per chunk, closeable mid-stream."""
+
+    def __init__(self, chunks: list[str]):
+        self.closed = False
+        self.events = [
+            SimpleNamespace(choices=[SimpleNamespace(delta=SimpleNamespace(content=chunk))]) for chunk in chunks
+        ]
+
+    def __iter__(self):
+        return iter(self.events)
+
+    def close(self):
+        self.closed = True
+
+
+class FakeStreamingOpenAI:
+    def __init__(self, chunks: list[str]):
+        self.stream = FakeStream(chunks)
+        self.chat = SimpleNamespace(completions=SimpleNamespace(create=lambda **kwargs: self.stream))
 
 
 @pytest.fixture(autouse=True)
@@ -99,3 +121,28 @@ def test_client_without_endpoint_fails_loud_at_use(monkeypatch):
     client = RCPClient(model="fake-model", base_url="", api_key="")
     with pytest.raises(ValueError):
         client.text("hello")
+
+
+def test_vision_streams_and_joins_chunks(tmp_path, monkeypatch):
+    image = tmp_path / "page.png"
+    image.write_bytes(b"png")
+    fake = FakeStreamingOpenAI([" Hel", "lo "])
+    monkeypatch.setattr("ragtools.llm.rcp.OpenAI", lambda **kwargs: fake)
+    monkeypatch.setattr("ragtools.llm.rcp.get_client", lambda: SimpleNamespace(start_as_current_observation=fake_observation))
+
+    client = RCPClient(model="fake-model", base_url="https://rcp", api_key="k")
+    assert client.vision("read", [image], max_chars=100) == "Hello"
+    assert not fake.stream.closed
+
+
+def test_vision_cuts_the_stream_past_max_chars(tmp_path, monkeypatch):
+    image = tmp_path / "page.png"
+    image.write_bytes(b"png")
+    fake = FakeStreamingOpenAI(["x" * 60, "y" * 60])
+    monkeypatch.setattr("ragtools.llm.rcp.OpenAI", lambda **kwargs: fake)
+    monkeypatch.setattr("ragtools.llm.rcp.get_client", lambda: SimpleNamespace(start_as_current_observation=fake_observation))
+
+    client = RCPClient(model="fake-model", base_url="https://rcp", api_key="k")
+    with pytest.raises(AnswerTooLong):
+        client.vision("read", [image], max_chars=100)
+    assert fake.stream.closed

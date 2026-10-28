@@ -18,7 +18,8 @@ from pathlib import Path
 from typing import Any, TypeVar
 
 from langfuse import get_client
-from openai import OpenAI
+from openai import OpenAI, Stream
+from openai.types.chat import ChatCompletionChunk
 from pydantic import BaseModel
 
 import ragtools.mime_types as mt
@@ -27,6 +28,10 @@ ModelT = TypeVar("ModelT", bound=BaseModel)
 
 # Closers vLLM may still leave inline in the content of thinking models
 THINKING_CLOSER = "</think>"
+
+
+class AnswerTooLong(Exception):
+    """A streamed answer passed the caller's character limit and was cut off mid-generation."""
 
 
 @lru_cache(maxsize=None)
@@ -118,6 +123,61 @@ class RCPClient:
 
         return content
 
+    def _send_streaming(
+        self,
+        messages: list[dict[str, Any]],
+        *,
+        max_chars: int,
+        system: str | None = None,
+        name: str,
+    ) -> str:
+        """Stream the answer and cut it the moment it passes ``max_chars``.
+
+        A non-streaming request has a total-duration timeout: a generation
+        slower than it is killed and restarted from zero, and an answer
+        that never fits in it kills the run. A healthy stream has no such
+        ceiling — chunks keep flowing — so the answer is read incrementally
+        and cut as soon as it grows past the limit.
+        """
+        if system:
+            messages = [{"role": "system", "content": system}, *messages]
+
+        client = self._client()
+        with get_client().start_as_current_observation(as_type="generation", name=name, model=self.model, input=messages) as generation:
+            parts: list[str] = []
+            try:
+                stream: Stream[ChatCompletionChunk] = client.chat.completions.create(  # type: ignore[assignment]
+                    model=self.model,
+                    messages=messages,  # type: ignore[arg-type]
+                    stream=True,
+                    **self.params,
+                )
+                total = 0
+                for chunk in stream:
+                    if not chunk.choices:
+                        continue
+                    piece = chunk.choices[0].delta.content
+                    if not piece:
+                        continue
+                    parts.append(piece)
+                    total += len(piece)
+                    if total > max_chars:
+                        stream.close()
+                        raise AnswerTooLong(f"the answer was cut off at {total:,} chars")
+            except AnswerTooLong:
+                raise
+            except Exception as e:
+                raise RuntimeError(f"RCP request '{name}' with model {self.model} failed: {e}") from e
+            finally:
+                generation.update(output="".join(parts).strip())
+
+        # Some models still leave the thinking trace inline in the content
+        content = "".join(parts).strip()
+        if THINKING_CLOSER in content:
+            content = content.split(THINKING_CLOSER)[-1].strip()
+
+        return content
+
     def text(
         self,
         prompt: str,
@@ -137,8 +197,13 @@ class RCPClient:
         system: str | None = None,
         detail: str | None = None,
         name: str = "vision-request",
+        max_chars: int | None = None,
     ) -> str:
-        """Send a prompt with one or more images (paths) and return the model's answer."""
+        """Send a prompt with one or more images (paths) and return the model's answer.
+
+        With ``max_chars``, the answer is streamed and cut the moment it
+        passes the limit, instead of being waited out to the end.
+        """
         content: list[dict[str, Any]] = [{"type": "text", "text": prompt}]
         for image in images:
             image = Path(image)
@@ -152,6 +217,8 @@ class RCPClient:
             content.append({"type": "image_url", "image_url": image_url})
 
         messages: list[dict[str, Any]] = [{"role": "user", "content": content}]
+        if max_chars is not None:
+            return self._send_streaming(messages, max_chars=max_chars, system=system, name=name)
         return self._send(messages, system=system, name=name)
 
     def structured(

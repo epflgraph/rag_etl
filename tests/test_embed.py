@@ -6,7 +6,7 @@ import pytest
 
 from rag_etl.cache import Cache
 from rag_etl.core import Resource
-from rag_etl.transformers.embed.embed import BATCH_SIZE, EmbedTransformer, chunks_of
+from rag_etl.transformers.embed.embed import BATCH_SIZE, REQUEST_CHAR_BUDGET, EmbedTransformer, chunks_of
 
 
 @pytest.fixture
@@ -64,6 +64,28 @@ def test_calls_are_batched(cache, monkeypatch):
     EmbedTransformer(cache).transform(chunks)
 
     assert [len(call) for call in calls] == [BATCH_SIZE, 1]
+
+
+def test_batches_close_at_the_char_budget(cache, monkeypatch):
+    calls: list = []
+    fake_llm(monkeypatch, calls)
+    chunks = [Resource(title=f"chunk {i}", text="x" * 20_000) for i in range(10)]
+
+    EmbedTransformer(cache).transform(chunks)
+
+    assert [len(call) for call in calls] == [4, 4, 2]
+    assert all(sum(len(text) for text in call) <= REQUEST_CHAR_BUDGET for call in calls)
+
+
+def test_single_oversized_chunk_raises(cache, monkeypatch):
+    calls: list = []
+    fake_llm(monkeypatch, calls)
+    chunk = Resource(title="the thesis", text="x" * (REQUEST_CHAR_BUDGET + 1))
+
+    with pytest.raises(ValueError, match="the thesis"):
+        EmbedTransformer(cache).transform([chunk])
+
+    assert calls == []
 
 
 def test_non_chunks_are_left_alone(cache, monkeypatch):

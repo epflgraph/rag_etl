@@ -90,14 +90,14 @@ One thin, declarative spec per project. Sources are **extractor instances**, eac
 ```python
 @dataclass(frozen=True)
 class ProjectSpec:
-    id: str                                  # lowercase, e.g. "com202"; names the index/alias rag_{id}
+    id: str                                  # lowercase, e.g. "micro303"; names the index/alias rag_{id}
     language: str | None = None              # the project's language (materialize slide detection)
     exceptions: tuple[Rule, ...] = ()        # manual corrections for resources the judge would mislabel
     sources: tuple[Extractor, ...] = ()      # extractor instances, one per source
     dir: Path | None = None                  # the project's material folder; manifests land in dir/output
 ```
 
-Specs live in **semester folders** (e.g. `projects/semester_2627_autumn/micro303test.py` — MICRO-303 under the test id until cutover), one thin file per project, named after the project in lowercase and defining the spec under the project code in uppercase. There is no registry: `from_code` discovers a spec by convention (scans the semester folders; a file that exists is a project) and errors loudly when there is none.
+Specs live in **semester folders** (e.g. `projects/semester_2627_autumn/micro303.py`), one thin file per project, named after the project in lowercase and defining the spec under the project code in uppercase. There is no registry: `from_code` discovers a spec by convention (scans the semester folders; a file that exists is a project) and errors loudly when there is none.
 
 ## Normalize + materialize (Phase 3, `src/rag_etl/transformers/`)
 

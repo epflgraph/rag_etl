@@ -129,7 +129,7 @@ Decisions taken while implementing, binding the phases (details in DESIGN.md and
 - **Size limits (normalize):** PDF 50 MB, images 10 MB, text 5 MB, as module constants.
 - **Videos: one uniform Kaltura path** for Mediaspace and MOOC videos (entry id from the video descriptor or the playManifest url); YouTube videos keep only their captions. The Gemini video path is gone.
 - **Stitching is kept, only where files are actually merged** (never for slides): polycopiés and exercises stitch ordered sibling pages before being cut. It lands at cut time (Phase 4), deterministic-first, LLM only as a per-document fallback; the old 10-page-batch LLM stitching is replaced.
-- **Specs live in semester folders** (e.g. `projects/semester_2627_autumn/micro303test.py` — MICRO-303 gate runs under the test id until cutover), one thin file per project, discovered by convention (`from_code`) with no registry.
+- **Specs live in semester folders** (e.g. `projects/semester_2627_autumn/micro303.py`), one thin file per project, discovered by convention (`from_code`) with no registry.
 - **MICRO-303 pilots the rollout** (over COM202, more recent); the real run waits until all the code is ready.
 
 Phase 4 (judge, cuts, embeddings):

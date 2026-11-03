@@ -17,11 +17,9 @@ requires-python = ">=3.12"
 # optional: your runtime dependencies
 dependencies = [
     "python-dotenv",
-    "pandas",
     "requests",
     "openai",
     "lxml",
-    "google-genai",
     "bs4",
     "nbformat",
     "nbconvert",
@@ -73,25 +71,10 @@ ignore = [
 python_version = "3.12"
 ignore_missing_imports = true
 
-# Legacy modules, pre-refactor: type errors suppressed until each is rewritten.
-# As a phase rewrites a module, remove its entry here so mypy gates it.
+# Legacy-but-alive, pre-refactor: Ed's LLM cascade, awaiting its migration
+# into ragtools. Remove this entry when it moves so mypy gates it.
 [[tool.mypy.overrides]]
 module = [
-    "rag_etl.loaders.base_loader",
-    "rag_etl.loaders.content_metadata_loader",
-    "rag_etl.loaders.dummy_loader",
-    "rag_etl.transformers.base_transformer",
-    "rag_etl.transformers.extract_zip.*",
-    "rag_etl.transformers.image_to_md.*",
-    "rag_etl.transformers.jupyter_to_markdown.*",
-    "rag_etl.transformers.merge_slide_transcript.*",
-    "rag_etl.transformers.pdf_to_markdown.*",
-    "rag_etl.transformers.split_exercises.*",
-    "rag_etl.transformers.split_pages.*",
-    "rag_etl.transformers.video_to_frames.*",
-    "rag_etl.transformers.video_to_json.*",
-    "rag_etl.utils.*",
-    "rag_etl.projects.*.*",
-    "rag_etl.resources.*",
+    "rag_etl.utils.llms",
 ]
 ignore_errors = true

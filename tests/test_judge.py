@@ -139,6 +139,53 @@ def test_extractor_labels_are_never_overwritten():
     assert leaf.type == "practice" and leaf.subtype == "mooc_quiz" and leaf.week == 2
 
 
+def test_children_inherit_the_parent_context():
+    root = Resource(title="root")
+    doc = root.add_child(
+        Resource(
+            title="MICRO-303 2026 Lecture 5 CVD.pdf", mime_type=mt.PDF,
+            week=5, from_="2026-09-07T08:00:00", until="2027-01-31T20:00:00",
+        )
+    )
+    page = doc.add_child(Resource(title="doc > page 1", mime_type=mt.MARKDOWN))
+    own = doc.add_child(
+        Resource(title="doc > page 2", mime_type=mt.MARKDOWN, from_="2026-10-01T08:00:00", week=6)
+    )
+
+    JudgeTransformer().transform([root])
+
+    assert page.from_ == "2026-09-07T08:00:00"
+    assert page.until == "2027-01-31T20:00:00"
+    assert page.week == 5
+    assert own.from_ == "2026-10-01T08:00:00" and own.week == 6
+
+
+def test_children_inherit_the_parents_labels():
+    root = Resource(title="root")
+    section = root.add_child(Resource(title="Série 3", mime_type=mt.PDF))
+    doc = section.add_child(Resource(title="exercises.pdf", mime_type=mt.PDF))
+    page = doc.add_child(Resource(title="doc > page 1", mime_type=mt.MARKDOWN))
+
+    JudgeTransformer().transform([root])
+
+    assert section.type == "practice" and section.subtype == "exercise" and section.number == "3"
+    assert doc.type == "practice" and doc.subtype == "exercise" and doc.number == "3"
+    assert page.type == "practice" and page.subtype == "exercise" and page.number == "3"
+
+
+def test_a_childs_own_cues_beat_the_inherited_ones():
+    root = Resource(title="root")
+    section = root.add_child(Resource(title="Lecture slides CVD", mime_type=mt.PDF))
+    doc = section.add_child(Resource(title="Quiz 1.pdf", mime_type=mt.PDF))
+    page = doc.add_child(Resource(title="doc > page 1", mime_type=mt.MARKDOWN))
+
+    JudgeTransformer().transform([root])
+
+    assert section.subtype == "lecture_slides"
+    assert doc.type == "practice" and doc.subtype == "quiz"
+    assert page.type == "practice" and page.subtype == "quiz"
+
+
 def test_exceptions_win_over_the_defaults():
     rule = Rule(where='title="recap"', subtype="recap")
     root = Resource(title="root")

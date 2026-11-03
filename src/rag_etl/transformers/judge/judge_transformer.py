@@ -19,9 +19,8 @@ from rag_etl.core.rules import Rule, apply
 from rag_etl.transformers.base import Transformer
 
 # The stub's broad regex defaults, applied where no extractor set a label
-# and corrected by the exceptions. A cue is looked for in the node's own
-# title first, then its ancestors', nearest first: a page of a deck is
-# lecture material too, a page of a series is practice.
+# and corrected by the exceptions. A node's own title speaks first; what
+# it leaves unset the lineage inherits; the fallbacks come last.
 
 # Anything quiz-, exam- or exercise-shaped is practice; everything else is theory
 PRACTICE_RE = re.compile(
@@ -59,10 +58,12 @@ DEFAULT_SUBTYPE = "unknown"  # an honest flag for the titles no rule matched
 class JudgeTransformer(Transformer):
     """Labels the trees: the stub's regex defaults and cuts, corrected by the exceptions.
 
-    The stub fills type/subtype/number from broad title regexes where no
-    extractor set a label, applies the exceptions (the permanent behavior)
-    and fills the cut a tree needs to produce chunks. is_solution is left
-    to the extractors and the exercise cut; the real inference lands later.
+    The stub works in three passes: what each node itself says (its cut
+    and the labels its own title carries), what the lineage adds (every
+    metadata field a node lacks it inherits from its parent, then the
+    exceptions correct), and the fallbacks that leave nothing empty.
+    is_solution stays with the extractors and the exercise cut; the real
+    inference lands later.
     """
 
     exceptions: tuple[Rule, ...] = ()
@@ -71,8 +72,12 @@ class JudgeTransformer(Transformer):
         for root in roots:
             for node in root.walk():
                 self._default_cut(node)
-                self._default_labels(node)
+                self._own_labels(node)
+            for node in root.walk():
+                self._inherit(node)
                 apply(node, self.exceptions)
+            for node in root.walk():
+                self._fallback(node)
         return roots
 
     def _default_cut(self, node: Resource) -> None:
@@ -91,35 +96,42 @@ class JudgeTransformer(Transformer):
         elif any(child.mime_type == mt.MARKDOWN for child in node.children):
             node.cut = "per_child"
 
-    def _default_labels(self, node: Resource) -> None:
-        """The stub's regex defaults: fill the labels no extractor set."""
-        context = [link.title or "" for link in reversed(node.lineage())]
-        self._default_type(node, context)
-        self._default_subtype(node, context)
-        self._default_number(node, context)
-
-    def _default_type(self, node: Resource, context: list[str]) -> None:
-        """Practice on a quiz/exam/exercise cue in the titles, theory otherwise."""
-        if node.type is None:
-            node.type = "practice" if any(PRACTICE_RE.search(title) for title in context) else DEFAULT_TYPE
-
-    def _default_subtype(self, node: Resource, context: list[str]) -> None:
-        """The first rule matching a context title names the subtype."""
-        if node.subtype is not None:
-            return
-        for title in context:
+    def _own_labels(self, node: Resource) -> None:
+        """What the node's own title says: the type, subtype and number its cues carry."""
+        title = node.title or ""
+        if node.type is None and PRACTICE_RE.search(title):
+            node.type = "practice"
+        if node.subtype is None:
             for name, pattern in SUBTYPES:
                 if pattern.search(title):
                     node.subtype = name
-                    return
-        node.subtype = DEFAULT_SUBTYPE
+                    break
+        if node.number is None and (found := NUMBER_RE.search(title)):
+            node.number = found.group(1)
 
-    def _default_number(self, node: Resource, context: list[str]) -> None:
-        """A practice resource keeps the series/exercise number its titles carry."""
-        if node.number is not None or node.type != "practice":
+    def _inherit(self, node: Resource) -> None:
+        """The metadata a node lacks, it inherits from its parent.
+
+        The walk is top-down, so a parent's labels are final before its
+        children are visited, and a node's own labels always beat the
+        inherited ones. cut is not inherited — an instruction for
+        splitting the node itself, a leaf with a container-cut would
+        never become a chunk — and neither is is_solution, a bool having
+        no unset state to inherit through.
+        """
+        if node.parent is None:
             return
-        for title in context:
-            found = NUMBER_RE.search(title)
-            if found:
-                node.number = found.group(1)
-                return
+        for name in ("type", "subtype", "number", "subnumber", "week", "from_", "until"):
+            if getattr(node, name) is None:
+                setattr(node, name, getattr(node.parent, name))
+
+    def _fallback(self, node: Resource) -> None:
+        """No metadata is left empty: what nobody determined is defaulted.
+
+        The fallbacks run after inheritance, so a default never travels
+        down the tree ahead of a child's own cues.
+        """
+        if node.type is None:
+            node.type = DEFAULT_TYPE
+        if node.subtype is None:
+            node.subtype = DEFAULT_SUBTYPE

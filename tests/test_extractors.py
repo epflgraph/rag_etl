@@ -2,6 +2,7 @@
 
 import json
 import subprocess
+from copy import deepcopy
 from datetime import datetime
 from pathlib import Path
 from types import SimpleNamespace
@@ -92,6 +93,17 @@ def test_moodle_tree(monkeypatch, tmp_path):
     assert leaf.mime_type == mt.PDF
     assert leaf.from_ is None and leaf.until is None
     assert leaf.path and leaf.path.read_bytes() == b"file"
+
+
+def test_moodle_unnamed_section_casts_to_an_empty_title(monkeypatch, tmp_path):
+    sections = deepcopy(MOODLE_SECTIONS)
+    sections[0]["name"] = None
+    fake_moodle_get(monkeypatch, sections)
+
+    extractor = MoodleExtractor(course_id=1, dir=tmp_path / "moodle")
+    course = extractor.extract()
+
+    assert course.children[0].title == ""
 
 
 def test_moodle_dates(monkeypatch, tmp_path):

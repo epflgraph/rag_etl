@@ -137,7 +137,7 @@ class CourseParser:
         if not asset_base_url:
             asset_base_url = self.load_asset_base_url(course_path)
 
-        root = Resource(title=self.course_title(course_path), url=course_url)
+        root = Resource(title=self.course_title(course_path) or "", url=course_url)
         chapter_parser = ChapterParser()
 
         # Chapters are taken in course order rather than in the order the

@@ -98,7 +98,7 @@ class JudgeTransformer(Transformer):
 
     def _own_labels(self, node: Resource) -> None:
         """What the node's own title says: the type, subtype and number its cues carry."""
-        title = node.title or ""
+        title = node.title
         if node.type is None and PRACTICE_RE.search(title):
             node.type = "practice"
         if node.subtype is None:

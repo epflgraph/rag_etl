@@ -76,7 +76,7 @@ def _attributes(resource: Resource) -> dict[str, str]:
         "path": path,
         "filename": Path(path).name if path else "",
         "mime_type": resource.mime_type or "",
-        "title": resource.title or "",
+        "title": resource.title,
         "type": resource.type or "",
         "subtype": resource.subtype or "",
         "cut": resource.cut or "",

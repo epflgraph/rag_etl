@@ -201,7 +201,7 @@ class MoodleExtractor(Extractor):
                     logging.info(f"Downloaded {module_title} > {title}")
 
                     if section_node is None:
-                        section_node = course.add_child(Resource(title=section.get("name")))
+                        section_node = course.add_child(Resource(title=section.get("name") or ""))
 
                     section_node.add_child(
                         Resource(

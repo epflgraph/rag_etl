@@ -42,7 +42,7 @@ class Resource:
     children: list[Resource] = field(default_factory=list)
 
     # descriptive metadata (extractors fill some; the judge fills type/subtype/is_solution/cut; exceptions correct)
-    title: str | None = None
+    title: str = ""               # identity; "" is the faithful value when the source names nothing
     type: str | None = None        # theory / practice / ... (inferred by the judge)
     subtype: str | None = None     # lecture_slides / homework / ...
     cut: str | None = None         # whole_document | per_child | per_exercise | text (inferred by the judge)

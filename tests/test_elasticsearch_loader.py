@@ -91,7 +91,7 @@ def test_documents_are_built_from_chunks(monkeypatch):
 
     assert solution["_source"]["is_solution"] is True
 
-    assert hello["_source"]["url"] == "<redacted>"
+    assert "url" not in hello["_source"]
     assert hello["_source"]["lineage"] == ["Lecture 5", "intro"]
 
 

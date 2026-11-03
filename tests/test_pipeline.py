@@ -68,7 +68,7 @@ def test_transform_bypasses_only_the_refreshed_cache(tmp_path, monkeypatch):
     caches = []
 
     class RecordingCache:
-        def __init__(self, transform, refresh=False):
+        def __init__(self, project, transform, refresh=False):
             caches.append((transform, refresh))
 
     def stub(**kwargs):

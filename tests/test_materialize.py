@@ -1,5 +1,7 @@
 """Unit tests for materialize: PDF pages, images, videos. Models are stubbed."""
 
+import shutil
+
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -34,12 +36,14 @@ def transformer(tmp_path, monkeypatch):
         "rag_etl.transformers.materialize.materialize_transformer.KalturaVideoResolver", lambda: fake_resolver
     )
     monkeypatch.setattr(
-        "rag_etl.transformers.materialize.materialize_transformer.extract_frame", fake_extract_frame
+        "rag_etl.transformers.materialize.video.extract_frame", fake_extract_frame
     )
 
     detector = SimpleNamespace(detect=lambda *args, **kwargs: [0, 40, 80])
 
-    return MaterializeTransformer(cache=Cache("materialize"), detector=detector)
+    return MaterializeTransformer(
+        cache=Cache("micro303", "materialize"), work_root=tmp_path / "material" / "work", detector=detector
+    )
 
 
 def fake_extract_frame(video_url: str, seconds: int, output_path: Path) -> bool:
@@ -73,7 +77,7 @@ def test_pdf_gains_one_child_per_page(tmp_path, transformer, monkeypatch):
     # The page children carry the parent's descriptive metadata
     assert all(child.week == 3 and child.type == "theory" for child in lecture.children)
     # And the generated pages live in the work area, not beside the pdf
-    pages_dir = tmp_path / "cache" / "work" / hash_bytes(pdf_path.read_bytes())
+    pages_dir = tmp_path / "material" / "work" / hash_bytes(pdf_path.read_bytes())
     assert (pages_dir / "page_1.png").exists()
     assert (pages_dir / "page_1.md").exists()
     assert not (tmp_path / "lecture").exists()
@@ -90,13 +94,88 @@ def test_pdf_one_changed_page_reOCRs_one_page(tmp_path, transformer, monkeypatch
         "ragtools.llm.RCPClient.vision",
         lambda self, prompt, images, **kwargs: calls.append(kwargs.get("name")) or "slide text",
     )
-    counting = MaterializeTransformer(cache=Cache("materialize"), detector=transformer.detector)
+    counting = MaterializeTransformer(
+        cache=Cache("micro303", "materialize"), work_root=transformer.work_root, detector=transformer.detector
+    )
 
     make_pdf(pdf_path, ["alpha", "beta, slightly changed"])
     root = Resource(title="root", children=[Resource(title="lecture", path=pdf_path, mime_type=mt.PDF)])
     counting.transform([root])
 
     assert len(calls) == 1
+
+
+def test_warm_pdf_rerun_adopts_the_whole_subtree(tmp_path, transformer, monkeypatch):
+    """A second run over an unchanged pdf renders nothing and reads nothing."""
+    pdf_path = make_pdf(tmp_path / "lecture.pdf", ["alpha", "beta"])
+    first = Resource(title="root", children=[Resource(title="lecture", path=pdf_path, mime_type=mt.PDF)])
+    transformer.transform([first])
+
+    def no_render(*args, **kwargs):
+        raise AssertionError("rendering must not happen on a warm run")
+
+    monkeypatch.setattr("rag_etl.transformers.materialize.pdf.save_pdf_pages", no_render)
+    calls = []
+    monkeypatch.setattr(
+        "ragtools.llm.RCPClient.vision",
+        lambda self, prompt, images, **kwargs: calls.append(kwargs.get("name")) or "slide text",
+    )
+
+    # As the pipeline does at every run start: the bench is scratch, so the
+    # warm run must rebuild it from the cache alone
+    shutil.rmtree(transformer.work_root)
+
+    root = Resource(title="root", children=[Resource(title="lecture", path=pdf_path, mime_type=mt.PDF)])
+    transformer.transform([root])
+
+    assert calls == []
+    assert [child.title for child in root.children[0].children] == ["lecture > page 1", "lecture > page 2"]
+    # Only the transcripts are staged back into the work area: no page is
+    # rendered, so no png exists at all
+    bench = tmp_path / "material" / "work" / hash_bytes(pdf_path.read_bytes())
+    assert (bench / "page_1.md").is_file()
+    assert not (bench / "page_1.png").exists()
+
+
+def test_fingerprint_bump_reOCRs_every_page(tmp_path, transformer, monkeypatch):
+    """A bumped fingerprint means the recipe changed: every page is read again."""
+    pdf_path = make_pdf(tmp_path / "lecture.pdf", ["alpha", "beta"])
+    root = Resource(title="root", children=[Resource(title="lecture", path=pdf_path, mime_type=mt.PDF)])
+    transformer.transform([root])
+
+    calls = []
+    monkeypatch.setattr(
+        "ragtools.llm.RCPClient.vision",
+        lambda self, prompt, images, **kwargs: calls.append(kwargs.get("name")) or "slide text",
+    )
+    monkeypatch.setattr("rag_etl.transformers.materialize.pdf.FINGERPRINT", "pdf-ocr-2")
+
+    root = Resource(title="root", children=[Resource(title="lecture", path=pdf_path, mime_type=mt.PDF)])
+    transformer.transform([root])
+
+    assert len(calls) == 2
+    assert [child.title for child in root.children[0].children] == ["lecture > page 1", "lecture > page 2"]
+
+
+def test_missing_leaf_self_heals(tmp_path, transformer, monkeypatch):
+    """A leaf lost from the cache costs its own page, not the whole subtree."""
+    pdf_path = make_pdf(tmp_path / "lecture.pdf", ["alpha", "beta"])
+    root = Resource(title="root", children=[Resource(title="lecture", path=pdf_path, mime_type=mt.PDF)])
+    transformer.transform([root])
+
+    shutil.rmtree(next((tmp_path / "cache" / "micro303" / "materialize").glob("*/page_1.md")).parent)
+
+    calls = []
+    monkeypatch.setattr(
+        "ragtools.llm.RCPClient.vision",
+        lambda self, prompt, images, **kwargs: calls.append(kwargs.get("name")) or "slide text",
+    )
+
+    root = Resource(title="root", children=[Resource(title="lecture", path=pdf_path, mime_type=mt.PDF)])
+    transformer.transform([root])
+
+    assert len(calls) == 1
+    assert [child.title for child in root.children[0].children] == ["lecture > page 1", "lecture > page 2"]
 
 
 def test_image_read_into_work_dir(tmp_path, transformer):
@@ -107,7 +186,7 @@ def test_image_read_into_work_dir(tmp_path, transformer):
     transformer.transform([root])
 
     slide = root.children[0]
-    work_dir = tmp_path / "cache" / "work" / hash_bytes(image_path.read_bytes())
+    work_dir = tmp_path / "material" / "work" / hash_bytes(image_path.read_bytes())
     assert slide.mime_type == mt.MARKDOWN
     assert slide.path == work_dir / "slide.md"
     # Nothing is written beside the source image
@@ -169,6 +248,7 @@ def test_youtube_video_left_untouched(tmp_path, transformer):
 def test_video_with_no_frames_dropped(tmp_path, transformer):
     one_timestamp = MaterializeTransformer(
         cache=transformer.cache,
+        work_root=transformer.work_root,
         detector=SimpleNamespace(detect=lambda *args, **kwargs: [0]),
     )
     descriptor_path = tmp_path / "0_abc.json"
@@ -195,6 +275,7 @@ def test_changed_video_leaves_no_stale_frames(tmp_path, transformer):
     descriptor_path.write_text('{"entry_id": "0_abc", "version": 2}', encoding="utf-8")
     shorter = MaterializeTransformer(
         cache=transformer.cache,
+        work_root=transformer.work_root,
         detector=SimpleNamespace(detect=lambda *args, **kwargs: [0]),
     )
     root = Resource(title="root", children=[Resource(title="lecture 1", url="https://mediaspace.epfl.ch/watch/0_abc", path=descriptor_path, mime_type=mt.MP4)])

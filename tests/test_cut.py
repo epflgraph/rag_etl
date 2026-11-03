@@ -16,7 +16,7 @@ def transformer(tmp_path, monkeypatch):
     monkeypatch.setattr("rag_etl.config.CONFIG", {"CACHE_DIR": str(tmp_path / "cache")}, raising=False)
     (tmp_path / "cache").mkdir()
 
-    return CutTransformer(cache=Cache("cut"))
+    return CutTransformer(cache=Cache("micro303", "cut"))
 
 
 def write_page(tmp_path: Path, name: str, content: str) -> Path:

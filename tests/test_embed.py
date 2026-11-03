@@ -13,7 +13,7 @@ from rag_etl.transformers.embed.embed import BATCH_SIZE, REQUEST_CHAR_BUDGET, Em
 def cache(tmp_path, monkeypatch):
     monkeypatch.setattr("rag_etl.config.CONFIG", {"CACHE_DIR": str(tmp_path / "cache")}, raising=False)
     (tmp_path / "cache").mkdir()
-    return Cache("embed")
+    return Cache("micro303", "embed")
 
 
 def fake_llm(monkeypatch, calls: list):

@@ -1,11 +1,17 @@
 """Content-hash disk cache: the one cache every transform shares.
 
-The scope is the transform's name; the key is the sha256 of the content
-the transform would recompute from, so identical content shares an entry
-across projects. Values are files or whole directories (nested), copied
-in and out as they are. A per-run `--refresh TRANSFORM` flag bypasses
-lookups for the named transform; there is no eviction — the cache grows
-until cleaned.
+The scope is the project and the transform's name; the key is the sha256
+of the content the transform would recompute from, so identical content
+within one project shares an entry. Values are files or whole
+directories (nested), copied in and out as they are. A per-run
+`--refresh TRANSFORM` flag bypasses lookups for the named transform;
+there is no eviction — the cache grows until cleaned.
+
+One convention lives above this layer, in the transformers: a parent
+value may be a small node record (e.g. `children.json`) listing its
+children's hashes, so a node hit adopts a whole subtree while the
+children stay the single copy of the content — a Merkle tree. The cache
+itself stays agnostic: node or leaf, every entry is content keyed.
 """
 
 from __future__ import annotations
@@ -18,16 +24,17 @@ from rag_etl.config import config_value
 
 
 class Cache:
-    """Disk cache for one transform, keyed by content hash only."""
+    """Disk cache for one project's transform, keyed by content hash only."""
 
-    def __init__(self, transform: str, refresh: bool = False):
+    def __init__(self, project: str, transform: str, refresh: bool = False):
+        self.project = project
         self.transform = transform
         self.refresh = refresh
 
         cache_path = Path(config_value("CACHE_DIR"))
         if not cache_path.exists():
             raise ValueError(f"Cache path {cache_path} does not exist.")
-        self.cache_path = cache_path / transform
+        self.cache_path = cache_path / project / transform
 
     def _entry_path(self, content_hash: str, value: Path) -> Path:
         return self.cache_path / content_hash / value.name

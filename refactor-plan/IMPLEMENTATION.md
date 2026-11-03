@@ -81,21 +81,21 @@ src/
     ├── extractors/              # base_extractor.py (Extractor, SourceUnavailable) + moodle/, mooc/,
     │                            #   mediaspace/, local_folder/, ed_discussion/, git/
     ├── transformers/            # base.py (Transformer ABC); normalize/, materialize/ (thin adapters
-    │                            #   over ragtools, no clients of their own); cut/, embed/, judge/;
-    │                            #   legacy subpackages kept, mypy-suppressed, die at cutover
+    │                            #   over ragtools, no clients of their own); cut/, embed/, judge/
     ├── cache/                   # content-hash disk cache (refresh flag, (project, transform, hash) scoping; Merkle node + leaf values)
     ├── pipeline.py              # the fixed sequence orchestrator
     ├── projects/                # spec.py (ProjectSpec: id, language, exceptions, sources, dir — no models) +
     │                            #   from_code discovery; semester_2627_autumn/ with one thin spec file
-    │                            #   per project; legacy course class folders kept, mypy-suppressed, die at cutover
+    │                            #   per project
     ├── config.py                # .env CONFIG + shared config_value (required values, fail loud)
     ├── loaders/                 # manifest.py (ManifestLoader) + elasticsearch.py (ElasticsearchLoader,
-    │                            #   index_settings.json shipped verbatim); legacy loaders kept,
-    │                            #   mypy-suppressed, die at cutover
-    ├── utils/                   # legacy but alive: llms.py (Ed's cascade), tags.py; dead: cache.py
-    ├── resources/               # legacy BaseResource subclasses; mypy-suppressed, die at cutover
+    │                            #   index_settings.json shipped verbatim)
+    ├── utils/                   # legacy but alive: llms.py (Ed's cascade), tags.py — both migrate
+    │                            #   into ragtools/their extractors later
     └── cli.py                   # rag-etl run --project X [--dry] [--refresh TRANSFORM]
 ```
+
+The pre-refactor tree (old course classes, transformers, resources, loaders) moved to `legacy/` at the root — kept for reference only: not packaged, not importable as `rag_etl.*`, outside every gate. Delete it after the consumer cutover.
 
 Specs are discovered by convention (`from_code` in `projects/__init__.py` scans the `semester_*` folders — e.g. `projects/semester_2627_autumn/micro303.py`), not by a registry.
 

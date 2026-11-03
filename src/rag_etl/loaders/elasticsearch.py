@@ -14,7 +14,6 @@ import logging
 
 from datetime import datetime
 from pathlib import Path
-from time import time_ns
 from typing import Any
 
 from elasticsearch import Elasticsearch, NotFoundError
@@ -76,20 +75,20 @@ class ElasticsearchLoader:
         self.client.indices.create(index=self.index, settings=body["settings"], mappings=body["mappings"])
 
     def _actions(self, roots: list[Resource]) -> list[dict[str, Any]]:
-        """One index action per chunk, with a strictly increasing per-document timestamp."""
-        epoch = 0
+        """One index action per chunk, with a strictly increasing per-document number."""
+        number = 0
         actions: list[dict[str, Any]] = []
 
         for root in roots:
             for node in root.walk():
                 if node.text is None:
                     continue
-                epoch = max(time_ns() // 1_000_000, epoch + 1)
+                number += 1
                 actions.append(
                     {
                         "_op_type": "index",
                         "_index": self.index,
-                        "_id": f"{epoch}-{node.content_hash}",
+                        "_id": f"{number}-{node.content_hash}",
                         "_source": self._source(node),
                     }
                 )

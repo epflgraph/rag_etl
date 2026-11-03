@@ -77,7 +77,7 @@ def test_documents_are_built_from_chunks(monkeypatch):
     [compute, solution, hello] = sink
     assert compute["_source"]["content"] == "compute"
     assert compute["_source"]["embedding"] == [1.0]
-    assert compute["_id"].endswith(a.content_hash)
+    assert compute["_id"] == f"1-{a.content_hash}"
     assert compute["_index"] == "rag_demo_20261019_153045"
 
     assert compute["_source"]["url"] == "https://moodle/3"

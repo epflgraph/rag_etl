@@ -41,7 +41,7 @@ class Resource:
     parent: Resource | None = None
     children: list[Resource] = field(default_factory=list)
 
-    # descriptive metadata (extractors fill some; the judge fills type/subtype/is_solution/cut; exceptions correct)
+    # descriptive metadata (extractors fill some; the judge fills type/subtype/cut; exceptions correct)
     title: str = ""               # identity; "" is the faithful value when the source names nothing
     type: str | None = None        # theory / practice / ... (inferred by the judge)
     subtype: str | None = None     # lecture_slides / homework / ...
@@ -49,7 +49,8 @@ class Resource:
     number: str | None = None      # exercise number
     subnumber: str | None = None   # exercise subnumber
     week: int | None = None        # lecture week (slides, recordings)
-    is_solution: bool = False
+    exercise_parts: str | None = None  # what the chunk holds: "statement" | "solution" | "statement + solution"
+    has_solution: bool = False     # the exercise has a solution chunk (even if this chunk isn't one)
     from_: str | None = None       # release date and time, ISO format
     until: str | None = None       # close date and time
 
@@ -112,7 +113,7 @@ def child_inheriting(node: Resource, **overrides: Any) -> Resource:
         "number": node.number,
         "subnumber": node.subnumber,
         "week": node.week,
-        "is_solution": node.is_solution,
+        "exercise_parts": node.exercise_parts,
         "from_": node.from_,
         "until": node.until,
     }

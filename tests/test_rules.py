@@ -24,9 +24,11 @@ def test_filename_derived_from_path():
     assert not rule.matches(Resource(path="/data/exam/ex.pdf"))
 
 
-def test_bool_and_is_leaf_attributes():
-    assert Rule(where="is_solution=true").matches(Resource(is_solution=True))
-    assert not Rule(where="is_solution=true").matches(Resource())
+def test_exercise_and_is_leaf_attributes():
+    assert Rule(where="has_solution=true").matches(Resource(has_solution=True))
+    assert not Rule(where="has_solution=true").matches(Resource())
+    assert Rule(where='exercise_parts="solution"').matches(Resource(exercise_parts="solution"))
+    assert not Rule(where='exercise_parts="solution"').matches(Resource(exercise_parts="statement"))
     assert Rule(where="is_leaf=true").matches(Resource(text="c"))
     assert not Rule(where="is_leaf=true").matches(Resource(children=[Resource()]))
 

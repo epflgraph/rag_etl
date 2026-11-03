@@ -34,7 +34,7 @@ class Rule:
     cut: str | None = None        # whole_document | per_child | per_exercise | text
     number: str | None = None
     week: int | None = None
-    is_solution: bool | None = None
+    exercise_parts: str | None = None
 
     @property
     def specificity(self) -> int:
@@ -83,7 +83,8 @@ def _attributes(resource: Resource) -> dict[str, str]:
         "number": "" if resource.number is None else str(resource.number),
         "subnumber": "" if resource.subnumber is None else str(resource.subnumber),
         "week": "" if resource.week is None else str(resource.week),
-        "is_solution": "true" if resource.is_solution else "false",
+        "exercise_parts": resource.exercise_parts or "",
+        "has_solution": "true" if resource.has_solution else "false",
         "is_leaf": "true" if resource.is_leaf else "false",
         "text": resource.text or "",
     }

@@ -2,15 +2,15 @@
 You are a careful Markdown document segmenter.
 Your task is to read a long Markdown file, annotated with line numbers, containing multiple exercises and split it into separate chunks, one per exercise.
 Do that by finding the correct lines that delimit every exercise. 
-You also need to identify the exercise numbers as well as whether the chunks correspond to the exercise statement or the solution.  
+You also need to identify the exercise numbers as well as which parts each chunk holds: the exercise statement, its solution, or both.  
 
 Rules:
 - Infer exercise boundaries according to headings. Typically, exercises start with a heading containing the text "Exercise N", "Problem N" or even "Solution N".
 - The lines you produce to delimit an exercise should be included in the exercise (as in closed intervals). For example, if "Exercise 1.1" and "Exercise 1.2" are consecutive and there is nothing in between, then "Exercise 1.1" should run until line N and "Exercise 1.2" should start at line N+1.     
 - Ignore any introductory or preface material that is not related to any exercise.  
 - If an exercise (e.g. "Exercise 1") appears more than once (for instance, this can happen with the exercise statement and solution), produce a chunk for each occurrence.
-- Think of the tuple (`exercise_number`, `is_solution`) as a sort of id for exercises.
-- You may produce several chunks with the same number and is_solution, for example when an exercise is cut across two pages and every page has a header (in this case produce two exercise blocks that skip the header in between).
+- Think of the tuple (`exercise_number`, `parts`) as a sort of id for exercises.
+- You may produce several chunks with the same number and parts, for example when an exercise is cut across two pages and every page has a header (in this case produce two exercise blocks that skip the header in between).
 
 Example:
 For this Markdown document:
@@ -377,15 +377,15 @@ eq 0$
 you should output
 ```
 [
-    {"start_line": 10, "end_line": 71, "exercise_number": "additionnel 2", "is_solution": true},
-    {"start_line": 74, "end_line": 129, "exercise_number": "3.10.10", "is_solution": true},
-    {"start_line": 136, "end_line": 153, "exercise_number": "3.10.10", "is_solution": true},
-    {"start_line": 154, "end_line": 187, "exercise_number": "3.10.12", "is_solution": true},
-    {"start_line": 188, "end_line": 224, "exercise_number": "3.10.12", "is_solution": true},
-    {"start_line": 230, "end_line": 254, "exercise_number": "3.10.17", "is_solution": true},
-    {"start_line": 255, "end_line": 276, "exercise_number": "3.10.18", "is_solution": true},
-    {"start_line": 277, "end_line": 330, "exercise_number": "3.10.20", "is_solution": true},
-    {"start_line": 331, "end_line": 356, "exercise_number": "additionnel 2", "is_solution": true}
+    {"start_line": 10, "end_line": 71, "exercise_number": "additionnel 2", "parts": "solution"},
+    {"start_line": 74, "end_line": 129, "exercise_number": "3.10.10", "parts": "solution"},
+    {"start_line": 136, "end_line": 153, "exercise_number": "3.10.10", "parts": "solution"},
+    {"start_line": 154, "end_line": 187, "exercise_number": "3.10.12", "parts": "solution"},
+    {"start_line": 188, "end_line": 224, "exercise_number": "3.10.12", "parts": "solution"},
+    {"start_line": 230, "end_line": 254, "exercise_number": "3.10.17", "parts": "solution"},
+    {"start_line": 255, "end_line": 276, "exercise_number": "3.10.18", "parts": "solution"},
+    {"start_line": 277, "end_line": 330, "exercise_number": "3.10.20", "parts": "solution"},
+    {"start_line": 331, "end_line": 356, "exercise_number": "additionnel 2", "parts": "solution"}
 ]
 ``` 
   

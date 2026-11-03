@@ -114,7 +114,8 @@ class ElasticsearchLoader:
             "number": node.number,
             "subnumber": node.subnumber,
             "week": node.week,
-            "is_solution": node.is_solution,
+            "exercise_parts": node.exercise_parts,
+            "has_solution": node.has_solution,
             "from": node.from_,
             "until": node.until,
         }

@@ -15,7 +15,7 @@ def tree() -> list[Resource]:
     pdf = Resource(title="Exercise set 3", url="https://moodle/3", type="practice", subtype="homework")
     pdf.add_child(Resource(title="Exercise 2a", type="practice", subtype="homework", number="2", subnumber="a", text="compute"))
     pdf.add_child(
-        Resource(title="Exercise 2b", type="practice", subtype="homework", number="2", subnumber="b", is_solution=True, text="solution")
+        Resource(title="Exercise 2b", type="practice", subtype="homework", number="2", subnumber="b", exercise_parts="solution", has_solution=True, text="solution")
     )
     video = Resource(title="Lecture 5")
     video.add_child(Resource(title="intro", type="theory", subtype="lecture", text="hello"))
@@ -57,7 +57,8 @@ def test_tree_is_metadata_only(tmp_path):
     assert pdf["title"] == "Exercise set 3"
     assert pdf["chunk"] is False
     assert pdf["children"][0]["chunk"] is True
-    assert pdf["children"][1]["is_solution"] is True
+    assert pdf["children"][1]["exercise_parts"] == "solution"
+    assert pdf["children"][1]["has_solution"] is True
 
 
 def test_summary_drills_down_per_source_type_subtype_number(tmp_path):
@@ -72,7 +73,7 @@ def test_summary_drills_down_per_source_type_subtype_number(tmp_path):
     assert pdf_group["source"] == "Exercise set 3"
     assert pdf_group["chunks"] == 2
     assert pdf_group["without_url"] == 0
-    assert pdf_group["is_solution"] == 1
+    assert pdf_group["has_solution"] == 1
 
     [practice] = pdf_group["counts"]
     assert practice["type"] == "practice"

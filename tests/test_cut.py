@@ -106,9 +106,10 @@ def test_per_child_keeps_children_with_their_own_cut(tmp_path, transformer):
 
 
 def test_per_exercise_cuts_at_markers(tmp_path, transformer, monkeypatch):
+    """A sheet cut in 2n: statement and solution chunks, all has_solution."""
     snippets = [
-        ExerciseSnippet(number="1", is_solution=False, text="<!-- page 1 -->\nExercise 1"),
-        ExerciseSnippet(number="1", is_solution=True, text="<!-- page 1 -->\nSolution 1"),
+        ExerciseSnippet(number="1", parts="statement", text="<!-- page 1 -->\nExercise 1"),
+        ExerciseSnippet(number="1", parts="solution", text="<!-- page 1 -->\nSolution 1"),
     ]
     monkeypatch.setattr("rag_etl.transformers.cut.cut_transformer.split_exercises", lambda *args, **kwargs: snippets)
 
@@ -119,8 +120,74 @@ def test_per_exercise_cuts_at_markers(tmp_path, transformer, monkeypatch):
     transformer.transform([root])
 
     assert [child.number for child in doc.children] == ["1", "1"]
-    assert [child.is_solution for child in doc.children] == [False, True]
+    assert [child.exercise_parts for child in doc.children] == ["statement", "solution"]
+    assert [child.title for child in doc.children] == ["sheet > Exercise 1 (statement)", "sheet > Exercise 1 (solution)"]
+    # Both chunks of the solved exercise carry has_solution, not just the solution one
+    assert all(child.has_solution for child in doc.children)
     assert doc.children[0].url == "https://moodle/x.pdf#page=1"
+
+
+def test_per_exercise_statement_only_sheet_has_no_solution(tmp_path, transformer, monkeypatch):
+    """A sheet with only statements: every chunk is a statement, has_solution False."""
+    snippets = [ExerciseSnippet(number="1", parts="statement", text="Exercise 1")]
+    monkeypatch.setattr("rag_etl.transformers.cut.cut_transformer.split_exercises", lambda *args, **kwargs: snippets)
+
+    root = Resource(title="root")
+    doc = root.add_child(Resource(title="sheet", cut="per_exercise"))
+    doc.add_child(Resource(title="sheet > page 1", path=write_page(tmp_path, "page_1.md", "Exercise 1"), mime_type=mt.MARKDOWN))
+
+    transformer.transform([root])
+
+    [chunk] = doc.children
+    assert chunk.exercise_parts == "statement"
+    assert not chunk.has_solution
+    assert chunk.title == "sheet > Exercise 1 (statement)"
+
+
+def test_per_exercise_solution_only_sheet(tmp_path, transformer, monkeypatch):
+    """A corrigé: every chunk is a solution and has_solution."""
+    snippets = [ExerciseSnippet(number="1", parts="solution", text="Solution 1")]
+    monkeypatch.setattr("rag_etl.transformers.cut.cut_transformer.split_exercises", lambda *args, **kwargs: snippets)
+
+    root = Resource(title="root")
+    doc = root.add_child(Resource(title="corrigé", cut="per_exercise"))
+    doc.add_child(Resource(title="corrigé > page 1", path=write_page(tmp_path, "page_1.md", "Solution 1"), mime_type=mt.MARKDOWN))
+
+    transformer.transform([root])
+
+    [chunk] = doc.children
+    assert chunk.exercise_parts == "solution"
+    assert chunk.has_solution
+    assert chunk.title == "corrigé > Exercise 1 (solution)"
+
+
+def test_per_exercise_joined_statement_and_solution(tmp_path, transformer, monkeypatch):
+    """A sheet cut in n: each chunk holds statement and solution together."""
+    snippets = [ExerciseSnippet(number="1", parts="statement + solution", text="Exercise 1\nSolution 1")]
+    monkeypatch.setattr("rag_etl.transformers.cut.cut_transformer.split_exercises", lambda *args, **kwargs: snippets)
+
+    root = Resource(title="root")
+    doc = root.add_child(Resource(title="sheet", cut="per_exercise"))
+    doc.add_child(Resource(title="sheet > page 1", path=write_page(tmp_path, "page_1.md", "Exercise 1"), mime_type=mt.MARKDOWN))
+
+    transformer.transform([root])
+
+    [chunk] = doc.children
+    assert chunk.exercise_parts == "statement + solution"
+    assert chunk.has_solution
+    assert chunk.title == "sheet > Exercise 1 (statement + solution)"
+
+
+def test_solution_file_chunks_catch_up_has_solution(tmp_path, transformer):
+    """A per_child chunk inheriting a solution file's parts counts as has_solution."""
+    root = Resource(title="root")
+    folder = root.add_child(Resource(title="corrigé", exercise_parts="solution", cut="per_child"))
+    child = folder.add_child(Resource(title="corrigé > 1", path=write_page(tmp_path, "1.md", "Solution 1"), mime_type=mt.MARKDOWN))
+
+    transformer.transform([root])
+
+    assert child.exercise_parts == "solution"
+    assert child.has_solution
 
 
 def test_per_exercise_drops_when_no_exercises(tmp_path, transformer, monkeypatch):
@@ -205,7 +272,7 @@ def test_split_exercises_merges_duplicate_exercises_on_separate_lines(monkeypatc
 
     class FakeLLM:
         def structured(self, prompt, schema, **kwargs):
-            return ExerciseList(exercises=[Exercise(start_line=1, end_line=2, number="1", is_solution=False)])
+            return ExerciseList(exercises=[Exercise(start_line=1, end_line=2, number="1", parts="statement")])
 
     monkeypatch.setattr("ragtools.documents.exercises.get_model", lambda task: FakeLLM())
 

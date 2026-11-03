@@ -15,7 +15,8 @@ FIELDS = {
     "number",
     "subnumber",
     "week",
-    "is_solution",
+    "exercise_parts",
+    "has_solution",
     "from",
     "until",
 }

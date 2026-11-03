@@ -57,7 +57,8 @@ def _node(node: Resource) -> dict[str, Any]:
         "number": node.number,
         "subnumber": node.subnumber,
         "week": node.week,
-        "is_solution": node.is_solution,
+        "exercise_parts": node.exercise_parts,
+        "has_solution": node.has_solution,
         "from": node.from_,
         "until": node.until,
         "chunk": node.text is not None,
@@ -87,7 +88,7 @@ def _level(rows: list[dict[str, Any]], keys: tuple[str, ...]) -> list[dict[str, 
                 keys[0]: value,
                 "chunks": len(members),
                 "without_url": sum(member["without_url"] for member in members),
-                "is_solution": sum(member["is_solution"] for member in members),
+                "has_solution": sum(member["has_solution"] for member in members),
                 "counts": _level(members, keys[1:]),
             }
         )
@@ -128,7 +129,8 @@ class ManifestLoader:
                             "subtype": chunk.subtype or "unknown",
                             "number": chunk.number,
                             "without_url": _without_url(chunk),
-                            "is_solution": chunk.is_solution,
+                            "exercise_parts": chunk.exercise_parts,
+                            "has_solution": chunk.has_solution,
                         }
                         for root, chunk in chunks
                     ],

@@ -2,8 +2,9 @@
 
 One LLM pass over the document: the text is split into heading-bounded
 sections, each annotated with line numbers, and the model returns the
-exercises as line ranges with their number and whether the chunk holds a
-solution. Nothing is split unless a per_exercise cut asks for it.
+exercises as line ranges with their number and the parts the chunk
+holds: the statement, the solution, or both. Nothing is split unless a
+per_exercise cut asks for it.
 """
 
 from __future__ import annotations
@@ -12,6 +13,7 @@ import logging
 
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -33,7 +35,7 @@ class ExerciseSnippet:
     """One exercise cut from a stitched document."""
 
     number: str
-    is_solution: bool
+    parts: str
     text: str
 
 
@@ -48,9 +50,9 @@ class Exercise(BaseModel):
         ...,
         description="The exercise number, as referenced in the Markdown chunk. Typically one or more integers, as in `3` or `2.7`.",
     )
-    is_solution: bool = Field(
+    parts: Literal["statement", "solution", "statement + solution"] = Field(
         ...,
-        description="Whether the Markdown chunk contains the solution of the exercise, as opposed to only the question.",
+        description="What the Markdown chunk holds: only the exercise statement, only its solution, or both.",
     )
 
 
@@ -59,14 +61,14 @@ class ExerciseList(BaseModel):
 
 
 def split_exercises(text: str) -> list[ExerciseSnippet]:
-    """Split a document into exercises, one (number, is-solution, text) per exercise.
+    """Split a document into exercises, one (number, parts, text) per exercise.
 
     The document is split into heading-bounded sections so one call never
     sees more than MAX_SECTION_LINES lines. Exercises appearing more than
     once (statement and solution, or an exercise cut across pages) produce
-    one snippet each; duplicates merge by (number, is-solution).
+    one snippet each; duplicates merge by (number, parts).
     """
-    snippets: dict[tuple[str, bool], str] = {}
+    snippets: dict[tuple[str, str], str] = {}
 
     for section in merge_up_to_max_lines(split_by_most_common_heading(text), MAX_SECTION_LINES):
         lines = section.splitlines()
@@ -91,7 +93,7 @@ def split_exercises(text: str) -> list[ExerciseSnippet]:
                 continue
 
             snippet = "\n".join(lines[exercise.start_line - 1 : exercise.end_line])
-            key = (exercise.number, exercise.is_solution)
+            key = (exercise.number, exercise.parts)
             # An exercise cut across sections reassembles in order, parts on separate lines
             if key in snippets:
                 snippets[key] += "\n" + snippet
@@ -99,6 +101,6 @@ def split_exercises(text: str) -> list[ExerciseSnippet]:
                 snippets[key] = snippet
 
     return [
-        ExerciseSnippet(number=number, is_solution=is_solution, text=snippet)
-        for (number, is_solution), snippet in snippets.items()
+        ExerciseSnippet(number=number, parts=parts, text=snippet)
+        for (number, parts), snippet in snippets.items()
     ]

@@ -1,6 +1,6 @@
 """Judge: labels the trees the materializer produced.
 
-The judge fills type, subtype, is_solution and the cut for every resource
+The judge fills type, subtype and the cut for every resource
 — or drops it — and the spec's exceptions correct on top of its output.
 There is no type/subtype → cut mapping here: how the judge decides is
 Javier's business; this is a stub for his inference.
@@ -62,7 +62,7 @@ class JudgeTransformer(Transformer):
     and the labels its own title carries), what the lineage adds (every
     metadata field a node lacks it inherits from its parent, then the
     exceptions correct), and the fallbacks that leave nothing empty.
-    is_solution stays with the extractors and the exercise cut; the real
+    Exercise parts stay with the extractors and the exercise cut; the real
     inference lands later.
     """
 
@@ -116,8 +116,8 @@ class JudgeTransformer(Transformer):
         children are visited, and a node's own labels always beat the
         inherited ones. cut is not inherited — an instruction for
         splitting the node itself, a leaf with a container-cut would
-        never become a chunk — and neither is is_solution, a bool having
-        no unset state to inherit through.
+        never become a chunk — and neither are exercise_parts and
+        has_solution: chunk-level facts, derived from the chunks.
         """
         if node.parent is None:
             return

@@ -26,7 +26,8 @@
       "number":      { "type": "keyword" },
       "subnumber":   { "type": "keyword" },
       "week":        { "type": "integer" },
-      "is_solution": { "type": "boolean" },
+      "exercise_parts": { "type": "keyword" },
+      "has_solution":   { "type": "boolean" },
       "from":        { "type": "date" },
       "until":       { "type": "date" }
     }

@@ -538,7 +538,6 @@ class EdDiscussionExtractor(Extractor):
             mime_type="text/markdown",
             type=thread_type,
             subtype=subtype,
-            is_solution=False,
             week=week,
             number=doc_number,
             subnumber=doc_subnumber,

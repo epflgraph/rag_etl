@@ -341,7 +341,7 @@ class HtmlParser:
                     mime_type=mime_type,
                     type=tag_dict.get("type"),
                     subtype=tag_dict.get("subtype"),
-                    is_solution=tag_dict.get("is_solution", False),
+                    exercise_parts=tag_dict.get("exercise_parts"),
                     week=week,
                     cut=cut_from_flags(tag_dict.get("one_chunk_per_page"), tag_dict.get("one_chunk_per_doc")),
                 )
@@ -591,7 +591,7 @@ class HtmlParser:
                 subtype=link_tag_dict.get("subtype"),
                 number=link_module_number,
                 week=week,
-                is_solution=link_tag_dict.get("is_solution", False),
+                exercise_parts=link_tag_dict.get("exercise_parts"),
                 cut=cut_from_flags(link_tag_dict.get("one_chunk_per_page"), link_tag_dict.get("one_chunk_per_doc")),
             )
 

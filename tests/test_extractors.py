@@ -273,8 +273,8 @@ def test_mooc_tree(tmp_path):
     titles = {leaf.title for leaf in vertical.children}
     assert titles == {"Vert - Quiz 1", "Vert - Lecture video"}
     quiz_leaves = [leaf for leaf in vertical.children if leaf.title == "Vert - Quiz 1"]
-    quiz_leaves.sort(key=lambda leaf: leaf.is_solution)
-    assert [leaf.is_solution for leaf in quiz_leaves] == [False, True]
+    quiz_leaves.sort(key=lambda leaf: leaf.exercise_parts == "solution")
+    assert [leaf.exercise_parts for leaf in quiz_leaves] == ["statement", "solution"]
     assert all(leaf.cut == "whole_document" for leaf in vertical.children)
     assert all(leaf.number == "1" for leaf in vertical.children if leaf.title == "Vert - Quiz 1")
 

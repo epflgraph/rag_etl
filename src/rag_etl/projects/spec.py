@@ -14,7 +14,7 @@ class ProjectSpec:
     """The declarative spec of one project.
 
     Sources are extractor instances, each configured for its source; the
-    judge infers type/subtype/is_solution/cut per resource; exceptions
+    judge infers type/subtype/cut per resource; exceptions
     correct specific resources that would otherwise be mislabelled.
     """
 

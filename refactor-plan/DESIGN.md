@@ -7,7 +7,7 @@ Short note fixing the core shapes that Phases 1–5 implement, updated as the ph
 extract (plain documents) → normalize → materialize (OCR etc.) → judge → cut → embed (annotates chunks) → load
 
 - Extractors return plain documents — whatever is includable (Moodle: everything not marked NO_BOT). Whatever per-source labels a source itself infers (MOOC export tags, Ed Discussion's jury) stays in its extractor; the judge fills everything else.
-- The **judge** fills `type`/`subtype`/`is_solution` and the `cut` per resource — or drops the resource. It sits after materialize and before cut, because the cut depends on it. There is **no type/subtype → cut mapping in this codebase**: how the judge decides is Javier's business. The built stub (`transformers/judge/`) applies the exceptions and fills the default cuts — readable leaves cut whole, containers of text cut per child, roots never cut — leaving `type`/`subtype`/`is_solution` unlabelled until his inference replaces it.
+- The **judge** fills `type`/`subtype` and the `cut` per resource — or drops the resource. It sits after materialize and before cut, because the cut depends on it. There is **no type/subtype → cut mapping in this codebase**: how the judge decides is Javier's business. The built stub (`transformers/judge/`) applies the exceptions and fills the default cuts — readable leaves cut whole, containers of text cut per child, roots never cut — leaving `type`/`subtype` unlabelled until his inference replaces it.
 - Exceptions (below) correct specific resources the judge would mislabel.
 
 ## Two packages: `ragtools` and `rag_etl` (Phase 3)
@@ -32,7 +32,7 @@ class Resource:
     parent: Resource | None = None
     children: list["Resource"] = field(default_factory=list)
 
-    # descriptive metadata (extractors fill some; the judge fills type/subtype/is_solution/cut; exceptions correct)
+    # descriptive metadata (extractors fill some; the judge fills type/subtype/cut; exceptions correct)
     title: str | None = None
     type: str | None = None       # theory / practice / ... (inferred by the judge)
     subtype: str | None = None    # lecture_slides / homework / ...
@@ -40,7 +40,8 @@ class Resource:
     number: str | None = None     # exercise number (per_exercise annotator); MOOC dotted "1.3.3"
     subnumber: str | None = None  # exercise sub-number
     week: int | None = None       # lecture week (slides, recordings)
-    is_solution: bool = False
+    exercise_parts: str | None = None  # what the chunk holds: "statement" | "solution" | "statement + solution"
+    has_solution: bool = False    # the exercise has a solution chunk (even if this chunk isn't one)
     from_: str | None = None      # release date and time, ISO format
     until: str | None = None      # close date and time
 
@@ -77,7 +78,7 @@ class Rule:
     cut: str | None = None        # whole_document | per_child | per_exercise | text
     number: str | None = None
     week: int | None = None
-    is_solution: bool | None = None
+    exercise_parts: str | None = None
 ```
 
 - `apply(resource, exceptions)` corrects matching resources in place, on top of whatever the judge filled.
@@ -122,10 +123,10 @@ Specs live in **semester folders** (e.g. `projects/semester_2627_autumn/micro303
 
 Loaders take trees — the pipeline contract is uniform (extractors produce trees, transformers take and return trees, loaders take trees) — and are configured by constructor args; no intermediate run object.
 
-- **`ManifestLoader`** writes one JSON manifest per run for human inspection; nothing reads it. All manifests land in `{dir}/output/` as `{timestamp}_manifest[_dry].json` (name-sorted, dry by suffix). Header: project, dry, timestamp, index, alias, pipeline version. Summary: sources, chunks, without_url, and a nested drill-down (source → type → subtype → number) counting chunks, without_url and is_solution per group, with `unknown` buckets and None sorted last. Tree: metadata-only — no text, no embeddings — with content-hash pointers, the `chunk` flag and the `cut` decision.
+- **`ManifestLoader`** writes one JSON manifest per run for human inspection; nothing reads it. All manifests land in `{dir}/output/` as `{timestamp}_manifest[_dry].json` (name-sorted, dry by suffix). Header: project, dry, timestamp, index, alias, pipeline version. Summary: sources, chunks, without_url, and a nested drill-down (source → type → subtype → number) counting chunks, without_url and has_solution per group, with `unknown` buckets and None sorted last. Tree: metadata-only — no text, no embeddings — with content-hash pointers, the `chunk` flag, `exercise_parts`/`has_solution` and the `cut` decision.
 - **`ElasticsearchLoader`** publishes one run: create the run's own index (`rag_{project}_{YYYYMMDD}_{HHMMSS}` — one index per run, nothing recreated or deleted, so the index the alias points at is never touched) → bulk (doc id `{epoch_ms}-{content_hash}`, the epoch taken **per document, strictly increasing** — `max(time_ns() // 1_000_000, previous + 1)` — so same-content documents stay distinct; **no content dedupe**: courses own their duplicates, the same content under different metadata must survive as separate documents or metadata filtering could empty a view) → refresh → **one atomic** `update_aliases` (remove old + add new; add-only on first run). A failed run never touches the alias; superseded indices stay for investigation and rollback. Documents carry `content`, `embedding` (from the node), a `lineage` breadcrumb (title → url → `"unknown"` per node, root→leaf), and a `url` that may be absent: own → nearest ancestor's → nothing (no fabricated placeholder — the pipeline writes no data it doesn't have). ES 9.2+ keeps vectors out of `_source` by default (`index.mapping.exclude_source_vectors`) — retrievable via the `fields` option, rehydrated for reindex/recovery; `dot_product` requires unit-length query vectors.
-- **The frozen schema** ships verbatim as package data (`index_settings.json`, settings + mappings in one create-index body); the loader patches `content.analyzer` per project language (`base_en`/`base_fr`) at creation. 13 fields: `id`, `content`, `embedding` (dense_vector 4096, dot_product, int8_hnsw), `lineage`, `url`, `type`, `subtype`, `number`, `subnumber`, `week`, `is_solution`, `from`, `until` (ES default ISO dates). Dropped vs the old mapping: `content.en/fr`, `description.en/fr`, `raw`/`sayt`/`trigram` subfields + their analyzers and filters, synonyms, legacy date formats, 384 dims.
-- **Connection**: flat `ES_HOST`/`ES_PORT`/`ES_USERNAME`/`ES_PASSWORD`/`ES_CAFILE` env keys, proper TLS verification (`ca_certs`); `elasticsearch>=8,<9`. Search stays hybrid (embeddings + Elasticsearch text); consumers filter on `from`/`until` (automatic), `type`/`subtype`/`is_solution` — returned fields and routing are the MCP's concern.
+- **The frozen schema** ships verbatim as package data (`index_settings.json`, settings + mappings in one create-index body); the loader patches `content.analyzer` per project language (`base_en`/`base_fr`) at creation. 14 fields: `id`, `content`, `embedding` (dense_vector 4096, dot_product, int8_hnsw), `lineage`, `url`, `type`, `subtype`, `number`, `subnumber`, `week`, `exercise_parts`, `has_solution`, `from`, `until` (ES default ISO dates). Dropped vs the old mapping: `content.en/fr`, `description.en/fr`, `raw`/`sayt`/`trigram` subfields + their analyzers and filters, synonyms, legacy date formats, 384 dims.
+- **Connection**: flat `ES_HOST`/`ES_PORT`/`ES_USERNAME`/`ES_PASSWORD`/`ES_CAFILE` env keys, proper TLS verification (`ca_certs`); `elasticsearch>=8,<9`. Search stays hybrid (embeddings + Elasticsearch text); consumers filter on `from`/`until` (automatic), `type`/`subtype`/`has_solution` — returned fields and routing are the MCP's concern.
 
 ## Stitching (Phase 4, at cut time)
 
@@ -138,7 +139,7 @@ Direction (replacing the old 10-page-batch LLM stitching, ~20 LLM calls per long
 
 ## What this kills
 
-- The 41 `tag_metadata` tables and `course_info`: **not converted — dropped.** Type/subtype/is_solution/cut are inferred by the judge; only manual exceptions survive as rules (MOOC-export tags and Ed Discussion's jury stay in their extractors).
+- The 41 `tag_metadata` tables and `course_info`: **not converted — dropped.** Type/subtype/cut are inferred by the judge; only manual exceptions survive as rules (MOOC-export tags and Ed Discussion's jury stay in their extractors).
 - Policy flags in data (`one_chunk_per_page`, `processing_method`, `model`, `is_gemini_processed_video`, `tikz`).
 - The two parallel video paths and `<!-- page N -->` markers (Phase 3 materialize: PDF → page children OCR'd by RCP; video → GraphAI `detect_slides` + Kaltura SRT upstream, then frame OCR; MOOC videos join the same Kaltura path, the Gemini path is gone).
 - The old LLM stitching of PDF pages into one document (10-page batches): replaced by per-page children and, in Phase 4, deterministic-first stitching where files are actually merged.

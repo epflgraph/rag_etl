@@ -130,13 +130,16 @@ def per_child(transformer: "CutTransformer", node: Resource) -> None:
 
         child.text = text
         child.cut = None
+        # A chunk holds what its file held; a chunk of a corrigé is a solution
+        if child.exercise_parts is None:
+            child.exercise_parts = node.exercise_parts
 
 
 def per_exercise(transformer: "CutTransformer", node: Resource) -> None:
     """The node's pages are stitched, annotated and cut into exercise chunks.
 
-    One chunk per exercise, carrying its number and whether it holds a
-    solution; a chunk whose text starts on a pdf page deep-links into it.
+    One chunk per exercise, carrying its number and the parts it holds; a
+    chunk whose text starts on a pdf page deep-links into it.
     """
     pages = document_texts(node)
     if not pages:
@@ -156,10 +159,10 @@ def per_exercise(transformer: "CutTransformer", node: Resource) -> None:
     for exercise in found:
         chunk = child_inheriting(
             node,
-            title=f"{node.title} > Exercise {exercise.number}{' (solution)' if exercise.is_solution else ''}",
+            title=f"{node.title} > Exercise {exercise.number} ({exercise.parts})",
             text=exercise.text,
             number=exercise.number,
-            is_solution=exercise.is_solution,
+            exercise_parts=exercise.parts,
             cut=None,
         )
 
@@ -168,6 +171,12 @@ def per_exercise(transformer: "CutTransformer", node: Resource) -> None:
             chunk.url = f"{node.url}#page={page.group(1)}"
 
         node.add_child(chunk)
+
+    # has_solution is derived, not inherited: an exercise with any solution
+    # chunk in this sheet — its own or a sibling's — has one
+    solved = {chunk.number for chunk in node.children if "solution" in (chunk.exercise_parts or "")}
+    for chunk in node.children:
+        chunk.has_solution = chunk.number in solved
 
 
 def text(transformer: "CutTransformer", node: Resource) -> None:
@@ -216,6 +225,11 @@ class CutTransformer(Transformer):
     def transform(self, roots: list[Resource]) -> list[Resource]:
         for root in roots:
             self._cut(root)
+            # Chunks that hold a solution but were not cut by per_exercise
+            # (per_child children of a solution file inherit its parts) catch up
+            for node in root.walk():
+                if "solution" in (node.exercise_parts or ""):
+                    node.has_solution = True
         return roots
 
     def _cut(self, node: Resource) -> None:

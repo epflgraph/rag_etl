@@ -51,7 +51,7 @@ class MediaspaceExtractor(Extractor):
     playlist_or_channel_url: str
     type: str | None = None
     subtype: str | None = None
-    is_solution: bool = False
+    exercise_parts: str | None = None
     cut: str | None = None
     language: str | None = None
     created_after: str | date | datetime | float | None = None
@@ -247,7 +247,7 @@ class MediaspaceExtractor(Extractor):
                     mime_type=mt.MP4,
                     type=self.type,
                     subtype=self.subtype,
-                    is_solution=self.is_solution,
+                    exercise_parts=self.exercise_parts,
                     cut=self.cut,
                 )
             )

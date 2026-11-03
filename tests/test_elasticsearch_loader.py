@@ -57,7 +57,7 @@ def tree() -> tuple[list[Resource], tuple[Resource, Resource, Resource]]:
     b = pdf.add_child(
         Resource(
             title="Exercise 2b", type="practice", subtype="homework", number="2", subnumber="b",
-            is_solution=True, text="solution",
+            has_solution=True, exercise_parts="solution", text="solution",
         )
     )
     video = Resource(title="Lecture 5")
@@ -85,11 +85,13 @@ def test_documents_are_built_from_chunks(monkeypatch):
     assert compute["_source"]["type"] == "practice"
     assert compute["_source"]["number"] == "2"
     assert compute["_source"]["subnumber"] == "a"
-    assert compute["_source"]["is_solution"] is False
+    assert compute["_source"]["has_solution"] is False
+    assert "exercise_parts" not in compute["_source"]
     assert "from" not in compute["_source"]
     assert "week" not in compute["_source"]
 
-    assert solution["_source"]["is_solution"] is True
+    assert solution["_source"]["has_solution"] is True
+    assert solution["_source"]["exercise_parts"] == "solution"
 
     assert "url" not in hello["_source"]
     assert hello["_source"]["lineage"] == ["Lecture 5", "intro"]

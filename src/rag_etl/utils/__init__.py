@@ -1,7 +1,5 @@
-from rag_etl.utils.llms import send_llm_request
-from ragtools.encoding import sanitize_for_filename
+"""Legacy-but-alive helpers: llms.py (Ed's cascade) and tags.py (filename tags).
 
-__all__ = [
-    "send_llm_request",
-    "sanitize_for_filename",
-]
+Both are still imported by live extractors and migrate into ragtools (or
+their extractors) later; nothing else lives here.
+"""

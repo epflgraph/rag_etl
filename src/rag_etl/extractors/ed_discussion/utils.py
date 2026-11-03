@@ -8,11 +8,11 @@ import requests
 from pydantic import BaseModel, Field
 
 from rag_etl.extractors.ed_discussion.catalogue import CatalogueEntry, render_catalogue
+from rag_etl.extractors.ed_discussion.image_to_md import convert_image_to_md
 from rag_etl.extractors.ed_discussion.prompts import (
     CLASSIFY_THREAD_SYSTEM_PROMPT,
     CLASSIFY_THREAD_USER_PROMPT,
 )
-from rag_etl.transformers.image_to_md.utils import convert_image_to_md
 from rag_etl.utils.llms import send_llm_request
 
 logger = logging.getLogger(__name__)

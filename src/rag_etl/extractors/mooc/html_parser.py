@@ -23,8 +23,8 @@ from rag_etl.extractors.mooc.utils import (
     cut_from_flags,
 )
 
+from ragtools.encoding import sanitize_for_filename
 from rag_etl.utils.tags import split_tag_number_text, split_tag_text
-from rag_etl.utils import sanitize_for_filename
 
 import ragtools.mime_types as mt
 

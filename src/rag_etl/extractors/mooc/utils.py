@@ -11,13 +11,9 @@ import unicodedata
 from pydantic import BaseModel, Field
 
 from rag_etl.config import CONFIG
-from rag_etl.transformers.pdf_to_markdown.utils import (
-    downscale_if_needed,
-    render_pdf_pages,
-    to_data_uri,
-)
-from rag_etl.utils import sanitize_for_filename
 from rag_etl.utils.llms import send_llm_request
+from ragtools.encoding import sanitize_for_filename
+from ragtools.pdf import downscale_if_needed, render_pdf_pages, to_data_uri
 
 logger = logging.getLogger(__name__)
 

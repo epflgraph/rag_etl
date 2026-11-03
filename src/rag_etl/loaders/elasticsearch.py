@@ -101,6 +101,8 @@ class ElasticsearchLoader:
         embedding = node.embedding
         if embedding is None:
             raise ValueError(f"chunk {node.title!r} is not embedded")
+        if node.type is None or node.subtype is None:
+            raise ValueError(f"chunk {node.title!r} is unlabelled: every indexed chunk needs a type and a subtype")
 
         url = next((ancestor.url for ancestor in reversed(node.lineage()) if ancestor.url is not None), "<redacted>")
         document: dict[str, Any] = {

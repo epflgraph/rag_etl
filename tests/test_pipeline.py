@@ -106,7 +106,7 @@ def test_run_pipeline_writes_a_manifest(tmp_path, monkeypatch):
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     assert manifest["header"]["project"] == "fake"
     assert manifest["header"]["index"].startswith("rag_fake_")
-    assert manifest["summary"]["sources"] == 1
+    assert manifest["summary"]["chunks"] == 0
 
 
 def test_run_pipeline_marks_dry_manifests(tmp_path, monkeypatch):

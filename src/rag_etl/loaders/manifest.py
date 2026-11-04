@@ -2,9 +2,11 @@
 
 The manifest records what a run produced without carrying content: the
 header states run identity, the summary drills down per source, type,
-subtype and number, and the tree mirrors the resource trees with
-metadata and content-hash pointers only — text and vectors are
-recovered from the cache by hash. Nothing reads a manifest; it is
+subtype, number, subnumber and exercise parts — per group counting how
+many chunks carry a url, week or release dates, and stating those values
+when the whole group shares one — and the tree mirrors the resource
+trees with metadata and content-hash pointers only — text and vectors
+are recovered from the cache by hash. Nothing reads a manifest; it is
 inspected.
 """
 
@@ -24,7 +26,11 @@ from rag_etl.loaders.elasticsearch import alias_name, index_name
 logger = logging.getLogger(__name__)
 
 # Levels of the summary drill-down, outermost first
-SUMMARY_LEVELS = ("source", "type", "subtype", "number")
+SUMMARY_LEVELS = ("source", "type", "subtype", "number", "subnumber", "parts")
+
+# Coverage fields a summary group reports: a with_X count of the chunks
+# carrying one, plus X itself when every chunk in the group shares one value
+COVERAGE_FIELDS = ("url", "week", "from", "until")
 
 
 def _pipeline_version() -> str:
@@ -37,11 +43,6 @@ def _pipeline_version() -> str:
 def _chunks(roots: list[Resource]) -> list[tuple[Resource, Resource]]:
     """Every chunk, paired with the root of its tree."""
     return [(root, node) for root in roots for node in root.walk() if node.text is not None]
-
-
-def _without_url(node: Resource) -> bool:
-    """Whether no node on the chain down to this one carries a url."""
-    return all(ancestor.url is None for ancestor in node.lineage())
 
 
 def _node(node: Resource) -> dict[str, Any]:
@@ -67,33 +68,33 @@ def _node(node: Resource) -> dict[str, Any]:
     }
 
 
-def _level(rows: list[dict[str, Any]], keys: tuple[str, ...]) -> list[dict[str, Any]]:
-    """One nesting level: group rows by the next key, aggregate, recurse.
+def _summary(rows: list[dict[str, Any]], keys: tuple[str, ...]) -> dict[str, Any]:
+    """One summary node: coverage counts, unanimous values, drill-down.
 
-    Rows are chunk facts; each node aggregates its group and nests the
-    remaining keys. None sorts last, so manifests diff cleanly.
+    Each coverage field reports how many chunks in the group carry a
+    non-null value, and the value itself only when they all share one.
+    The drill-down groups rows by the next key — None sorts last, so
+    manifests diff cleanly — and recurses; the last level, where no keys
+    remain, carries no counts key.
     """
+    node: dict[str, Any] = {"chunks": len(rows)}
+    for name in COVERAGE_FIELDS:
+        node[f"with_{name}"] = sum(1 for row in rows if row[name] is not None)
+        values = {row[name] for row in rows}
+        if len(values) == 1 and (value := next(iter(values))) is not None:
+            node[name] = value
     if not keys:
-        return []
+        return node
 
     grouped: dict[Any, list[dict[str, Any]]] = {}
     for row in rows:
         grouped.setdefault(row[keys[0]], []).append(row)
 
-    nodes: list[dict[str, Any]] = []
-    for value in sorted(grouped, key=lambda v: (v is not None, v)):
-        members = grouped[value]
-        nodes.append(
-            {
-                keys[0]: value,
-                "chunks": len(members),
-                "without_url": sum(member["without_url"] for member in members),
-                "has_solution": sum(member["has_solution"] for member in members),
-                "counts": _level(members, keys[1:]),
-            }
-        )
-
-    return nodes
+    node["counts"] = [
+        {keys[0]: value, **_summary(grouped[value], keys[1:])}
+        for value in sorted(grouped, key=lambda v: (v is not None, v))
+    ]
+    return node
 
 
 class ManifestLoader:
@@ -117,26 +118,24 @@ class ManifestLoader:
                 "alias": alias_name(self.project),
                 "pipeline_version": _pipeline_version(),
             },
-            "summary": {
-                "sources": len(roots),
-                "chunks": len(chunks),
-                "without_url": sum(1 for _, chunk in chunks if _without_url(chunk)),
-                "counts": _level(
-                    [
-                        {
-                            "source": root.title or root.url or "unknown",
-                            "type": chunk.type or "unknown",
-                            "subtype": chunk.subtype or "unknown",
-                            "number": chunk.number,
-                            "without_url": _without_url(chunk),
-                            "exercise_parts": chunk.exercise_parts,
-                            "has_solution": chunk.has_solution,
-                        }
-                        for root, chunk in chunks
-                    ],
-                    SUMMARY_LEVELS,
-                ),
-            },
+            "summary": _summary(
+                [
+                    {
+                        "source": root.title,
+                        "type": chunk.type,
+                        "subtype": chunk.subtype,
+                        "number": chunk.number,
+                        "subnumber": chunk.subnumber,
+                        "parts": chunk.exercise_parts,
+                        "url": chunk.url,
+                        "week": chunk.week,
+                        "from": chunk.from_,
+                        "until": chunk.until,
+                    }
+                    for root, chunk in chunks
+                ],
+                SUMMARY_LEVELS,
+            ),
             "tree": [_node(root) for root in roots],
         }
 

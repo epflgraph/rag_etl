@@ -51,17 +51,13 @@ def bulk_into(monkeypatch, sink: list) -> None:
 
 def tree() -> tuple[list[Resource], tuple[Resource, Resource, Resource]]:
     pdf = Resource(title="Exercise set 3", url="https://moodle/3", type="practice", subtype="homework")
-    a = pdf.add_child(
-        Resource(title="Exercise 2a", type="practice", subtype="homework", number="2", subnumber="a", text="compute")
-    )
+    a = pdf.add_child(title="Exercise 2a", number="2", subnumber="a", text="compute")
     b = pdf.add_child(
-        Resource(
-            title="Exercise 2b", type="practice", subtype="homework", number="2", subnumber="b",
-            has_solution=True, exercise_parts="solution", text="solution",
-        )
+        title="Exercise 2b", number="2", subnumber="b",
+        has_solution=True, exercise_parts="solution", text="solution",
     )
     video = Resource(title="Lecture 5")
-    intro = video.add_child(Resource(title="intro", type="theory", subtype="lecture", text="hello"))
+    intro = video.add_child(title="intro", type="theory", subtype="lecture", text="hello")
     for chunk in (a, b, intro):
         chunk.embedding = [1.0]
     return [pdf, video], (a, b, intro)
@@ -161,8 +157,8 @@ def test_french_project_gets_the_french_analyzer(monkeypatch):
 
 def test_duplicate_content_is_kept_with_distinct_ids(monkeypatch):
     root = Resource(title="root")
-    root.add_child(Resource(title="first", text="same", embedding=[1.0], type="theory", subtype="unknown"))
-    root.add_child(Resource(title="second", text="same", embedding=[1.0], type="theory", subtype="unknown"))
+    root.add_child(title="first", text="same", embedding=[1.0], type="theory", subtype="unknown")
+    root.add_child(title="second", text="same", embedding=[1.0], type="theory", subtype="unknown")
     sink: list = []
     bulk_into(monkeypatch, sink)
 
@@ -176,7 +172,7 @@ def test_duplicate_content_is_kept_with_distinct_ids(monkeypatch):
 
 def test_unembedded_chunk_fails_loud(monkeypatch):
     root = Resource(title="root")
-    root.add_child(Resource(title="chunk", text="body"))
+    root.add_child(title="chunk", text="body")
     sink: list = []
     bulk_into(monkeypatch, sink)
 
@@ -186,7 +182,7 @@ def test_unembedded_chunk_fails_loud(monkeypatch):
 
 def test_unlabelled_chunk_fails_loud(monkeypatch):
     root = Resource(title="root")
-    root.add_child(Resource(title="chunk", text="body", embedding=[1.0]))
+    root.add_child(title="chunk", text="body", embedding=[1.0])
     sink: list = []
     bulk_into(monkeypatch, sink)
 

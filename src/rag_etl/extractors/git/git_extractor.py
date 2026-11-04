@@ -100,11 +100,9 @@ class GitExtractor(Extractor):
                     continue
 
                 base.add_child(
-                    Resource(
-                        title=str(file_path.relative_to(self.dir)),
-                        path=file_path,
-                        mime_type=mt.guess_mime_type(str(file_path)),
-                    )
+                    title=str(file_path.relative_to(self.dir)),
+                    path=file_path,
+                    mime_type=mt.guess_mime_type(str(file_path)),
                 )
 
         return base

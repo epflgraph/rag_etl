@@ -94,13 +94,7 @@ class NormalizeTransformer(Transformer):
                 if mime_type.startswith("text/"):
                     ensure_utf8(extracted_file)
 
-                node.add_child(
-                    Resource(
-                        title=f"{node.title} > {extracted_file.name}",
-                        path=extracted_file,
-                        mime_type=mime_type,
-                    )
-                )
+                node.add_child(title=f"{node.title} > {extracted_file.name}", path=extracted_file, mime_type=mime_type)
 
             if not node.children:
                 logger.warning(f"Dropping {node.title}: archive holds no supported file")

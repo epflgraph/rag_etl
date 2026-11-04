@@ -201,17 +201,15 @@ class MoodleExtractor(Extractor):
                     logging.info(f"Downloaded {module_title} > {title}")
 
                     if section_node is None:
-                        section_node = course.add_child(Resource(title=section.get("name") or ""))
+                        section_node = course.add_child(title=section.get("name") or "")
 
                     section_node.add_child(
-                        Resource(
-                            title=f"{module_title} > {title}",
-                            url=extract_url(module, module_contents),
-                            path=module_contents_path,
-                            mime_type=mime_type,
-                            from_=from_,
-                            until=until,
-                        )
+                        title=f"{module_title} > {title}",
+                        url=extract_url(module, module_contents),
+                        path=module_contents_path,
+                        mime_type=mime_type,
+                        from_=from_,
+                        until=until,
                     )
 
         logging.info(f"Moodle course {self.course_id}: extracted {extracted} files")

@@ -14,7 +14,7 @@ from ragtools.images import SLIDE_SYSTEM_PROMPT, SLIDE_USER_PROMPT
 from ragtools.video import SlideDetector, extract_frame, filter_close_timestamps, frame_time, parse_srt, text_between
 
 from rag_etl.cache import Cache
-from rag_etl.core import Resource, child_inheriting
+from rag_etl.core import Resource
 from rag_etl.transformers.materialize.ocr import MAX_CONCURRENT_OCR, ocr_cached
 from rag_etl.transformers.materialize.videos import KalturaVideoResolver, entry_id_of
 from ragtools.graphai import GraphAIError
@@ -134,14 +134,11 @@ class VideoMaterializer:
             # Each slide carries the public watch url of its own moment, so a
             # chunk cut from it links straight into that moment of the lecture
             node.add_child(
-                child_inheriting(
-                    node,
-                    title=f"{node.title} > {start_seconds // 60}:{start_seconds % 60:02d}",
-                    path=md_path,
-                    mime_type=mt.MARKDOWN,
-                    url=build_entry_url(entry_id, self.mediaspace_url, start_seconds),
-                    cut="whole_document",
-                )
+                title=f"{node.title} > {start_seconds // 60}:{start_seconds % 60:02d}",
+                path=md_path,
+                mime_type=mt.MARKDOWN,
+                url=build_entry_url(entry_id, self.mediaspace_url, start_seconds),
+                cut="whole_document",
             )
 
         self._merge_captions(node)

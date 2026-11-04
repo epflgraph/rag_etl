@@ -214,7 +214,7 @@ def test_video_gains_one_slide_child_per_segment(tmp_path, transformer, monkeypa
     )
 
     video = Resource(title="lecture 1", url="https://mediaspace.epfl.ch/watch/0_abc", path=descriptor_path, mime_type=mt.MP4)
-    video.add_child(Resource(path=srt_path, mime_type=mt.SRT))
+    video.add_child(path=srt_path, mime_type=mt.SRT)
     root = Resource(title="root", children=[video])
 
     transformer.transform([root])

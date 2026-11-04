@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import hashlib
 from collections.abc import Iterator
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
 
@@ -33,8 +33,9 @@ class Resource:
     """
 
     # identity
-    path: Path | None = None       # where the content lives on disk; None for pure containers
-    url: str | None = None         # public url the resource is available at
+    title: str                    # the source's name for this resource; "" when it names nothing
+    path: Path | None = None      # where the content lives on disk; None for pure containers
+    url: str | None = None        # public url the resource is available at
     mime_type: str | None = None
 
     # lineage
@@ -42,7 +43,6 @@ class Resource:
     children: list[Resource] = field(default_factory=list)
 
     # descriptive metadata (extractors fill some; the judge fills type/subtype/cut; exceptions correct)
-    title: str = ""               # identity; "" is the faithful value when the source names nothing
     type: str | None = None        # theory / practice / ... (inferred by the judge)
     subtype: str | None = None     # lecture_slides / homework / ...
     cut: str | None = None         # whole_document | per_child | per_exercise | text (inferred by the judge)
@@ -82,9 +82,19 @@ class Resource:
             return hash_bytes(self.path.read_bytes())
         return hash_text("")
 
-    def add_child(self, child: Resource) -> Resource:
-        """Attach a child under this node and return it."""
-        child.parent = self
+    def add_child(self, child: Resource | None = None, **overrides: Any) -> Resource:
+        """Attach a child under this node and return it.
+
+        Without a child, one is built as a copy of this node — every
+        field comes down as it is, and the overrides name what differs:
+        `pdf.add_child(title="page 1", path=md, mime_type=mt.MARKDOWN)`.
+        A child passed in — typically a subtree an extractor built — is
+        attached as it is.
+        """
+        if child is None:
+            child = replace(self, **overrides, parent=self, children=[])
+        else:
+            child.parent = self
         self.children.append(child)
         return child
 
@@ -103,22 +113,6 @@ class Resource:
             node = node.parent
         chain.reverse()
         return chain
-
-
-def child_inheriting(node: Resource, **overrides: Any) -> Resource:
-    """One child of a node, carrying the parent's descriptive metadata."""
-    fields: dict[str, Any] = {
-        "type": node.type,
-        "subtype": node.subtype,
-        "number": node.number,
-        "subnumber": node.subnumber,
-        "week": node.week,
-        "exercise_parts": node.exercise_parts,
-        "from_": node.from_,
-        "until": node.until,
-    }
-    fields.update(overrides)
-    return Resource(**fields)
 
 
 def is_text_node(node: Resource) -> bool:

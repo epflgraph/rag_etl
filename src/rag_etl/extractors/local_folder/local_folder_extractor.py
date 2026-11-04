@@ -92,14 +92,12 @@ class LocalFolderExtractor(Extractor):
                 url = self.extract_closest_metadata(file_path.parent, "url")
 
                 base.add_child(
-                    Resource(
-                        title=title,
-                        url=url,
-                        path=file_path,
-                        mime_type=mime_type,
-                        from_=from_,
-                        until=until,
-                    )
+                    title=title,
+                    url=url,
+                    path=file_path,
+                    mime_type=mime_type,
+                    from_=from_,
+                    until=until,
                 )
 
         return base

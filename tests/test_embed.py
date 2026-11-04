@@ -92,7 +92,8 @@ def test_non_chunks_are_left_alone(cache, monkeypatch):
     calls: list = []
     fake_llm(monkeypatch, calls)
     root = Resource(title="root")
-    root.add_child(Resource(title="container", children=[Resource(title="page")]))
+    container = root.add_child(title="container")
+    container.add_child(title="page")
 
     EmbedTransformer(cache).transform([root])
 
@@ -102,7 +103,8 @@ def test_non_chunks_are_left_alone(cache, monkeypatch):
 
 def test_chunks_of_finds_text_nodes():
     root = Resource(title="root")
-    chunk = root.add_child(Resource(title="chunk", text="hello"))
-    root.add_child(Resource(title="container", children=[Resource(title="page")]))
+    chunk = root.add_child(title="chunk", text="hello")
+    container = root.add_child(title="container")
+    container.add_child(title="page")
 
     assert chunks_of([root]) == [chunk]

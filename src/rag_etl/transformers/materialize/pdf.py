@@ -22,7 +22,7 @@ import ragtools.mime_types as mt
 from ragtools.pdf import PDF_SYSTEM_PROMPT, PDF_USER_PROMPT, save_pdf_pages
 
 from rag_etl.cache import Cache
-from rag_etl.core import Resource, child_inheriting
+from rag_etl.core import Resource
 from rag_etl.core.resource import hash_bytes
 from rag_etl.transformers.materialize.ocr import MAX_CONCURRENT_OCR, ocr_cached
 
@@ -64,14 +64,7 @@ class PdfMaterializer:
                 logger.debug(f"Dropping page {page_number} of {node.title}: no readable content")
                 continue
 
-            node.add_child(
-                child_inheriting(
-                    node,
-                    title=f"{node.title} > page {page_number}",
-                    path=md_path,
-                    mime_type=mt.MARKDOWN,
-                )
-            )
+            node.add_child(title=f"{node.title} > page {page_number}", path=md_path, mime_type=mt.MARKDOWN)
 
         logger.info(f"{node.title}: {len(node.children)} pages")
 

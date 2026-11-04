@@ -240,21 +240,19 @@ class MediaspaceExtractor(Extractor):
             descriptor_path = self.write_descriptor(entry_id, entry_name)
 
             video = resources.add_child(
-                Resource(
-                    title=entry_name,
-                    url=build_entry_url(entry_id, self.playlist_or_channel_url),
-                    path=descriptor_path,
-                    mime_type=mt.MP4,
-                    type=self.type,
-                    subtype=self.subtype,
-                    exercise_parts=self.exercise_parts,
-                    cut=self.cut,
-                )
+                title=entry_name,
+                url=build_entry_url(entry_id, self.playlist_or_channel_url),
+                path=descriptor_path,
+                mime_type=mt.MP4,
+                type=self.type,
+                subtype=self.subtype,
+                exercise_parts=self.exercise_parts,
+                cut=self.cut,
             )
 
             # Subtitles travel beside the video as a caption leaf
             if srt_path is not None:
-                video.add_child(Resource(path=Path(srt_path), mime_type=mt.SRT))
+                video.add_child(title=f"{entry_name} > subtitles", path=Path(srt_path), mime_type=mt.SRT)
 
         if not resources.children:
             logger.warning(f"No videos extracted from {self.playlist_or_channel_url}")

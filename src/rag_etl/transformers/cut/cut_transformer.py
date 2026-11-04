@@ -16,7 +16,7 @@ from collections.abc import Callable
 from dataclasses import asdict, dataclass
 
 from rag_etl.cache import Cache
-from rag_etl.core import Resource, child_inheriting, is_text_node
+from rag_etl.core import Resource, is_text_node
 from rag_etl.core.resource import hash_text
 from rag_etl.transformers.base import Transformer
 from ragtools.documents import (
@@ -157,8 +157,7 @@ def per_exercise(transformer: "CutTransformer", node: Resource) -> None:
 
     node.children = []
     for exercise in found:
-        chunk = child_inheriting(
-            node,
+        chunk = node.add_child(
             title=f"{node.title} > Exercise {exercise.number} ({exercise.parts})",
             text=exercise.text,
             number=exercise.number,
@@ -167,10 +166,8 @@ def per_exercise(transformer: "CutTransformer", node: Resource) -> None:
         )
 
         page = PAGE_MARKER_RE.search(exercise.text)
-        if page and node.url:
-            chunk.url = f"{node.url}#page={page.group(1)}"
-
-        node.add_child(chunk)
+        if page and chunk.url:
+            chunk.url = f"{chunk.url}#page={page.group(1)}"
 
     # has_solution is derived, not inherited: an exercise with any solution
     # chunk in this sheet — its own or a sibling's — has one
@@ -196,14 +193,7 @@ def text(transformer: "CutTransformer", node: Resource) -> None:
             logger.warning(f"Dropping part {position} of {node.title}: over the {MAX_SECTION_LINES}-line size guard")
             continue
 
-        node.add_child(
-            child_inheriting(
-                node,
-                title=f"{node.title} > part {position}",
-                text=section,
-                cut=None,
-            )
-        )
+        node.add_child(title=f"{node.title} > part {position}", text=section, cut=None)
 
 
 # The one cut catalogue; new cuts join here via PR

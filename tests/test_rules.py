@@ -20,17 +20,17 @@ def test_glob_matching():
 
 def test_filename_derived_from_path():
     rule = Rule(where='filename="*.pdf" AND path="*week*"')
-    assert rule.matches(Resource(path="/data/week1/ex.pdf"))
-    assert not rule.matches(Resource(path="/data/exam/ex.pdf"))
+    assert rule.matches(Resource(title="ex", path="/data/week1/ex.pdf"))
+    assert not rule.matches(Resource(title="ex", path="/data/exam/ex.pdf"))
 
 
 def test_exercise_and_is_leaf_attributes():
-    assert Rule(where="has_solution=true").matches(Resource(has_solution=True))
-    assert not Rule(where="has_solution=true").matches(Resource())
-    assert Rule(where='exercise_parts="solution"').matches(Resource(exercise_parts="solution"))
-    assert not Rule(where='exercise_parts="solution"').matches(Resource(exercise_parts="statement"))
-    assert Rule(where="is_leaf=true").matches(Resource(text="c"))
-    assert not Rule(where="is_leaf=true").matches(Resource(children=[Resource()]))
+    assert Rule(where="has_solution=true").matches(Resource(title="t", has_solution=True))
+    assert not Rule(where="has_solution=true").matches(Resource(title="t"))
+    assert Rule(where='exercise_parts="solution"').matches(Resource(title="t", exercise_parts="solution"))
+    assert not Rule(where='exercise_parts="solution"').matches(Resource(title="t", exercise_parts="statement"))
+    assert Rule(where="is_leaf=true").matches(Resource(title="t", text="c"))
+    assert not Rule(where="is_leaf=true").matches(Resource(title="t", children=[Resource(title="c")]))
 
 
 def test_unknown_field_never_matches(caplog):

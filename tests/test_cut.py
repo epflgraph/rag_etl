@@ -28,7 +28,7 @@ def write_page(tmp_path: Path, name: str, content: str) -> Path:
 def test_whole_document_leaf_reads_its_file(tmp_path, transformer):
     md = write_page(tmp_path, "notes.md", "# Notes\nsome text")
     root = Resource(title="root")
-    leaf = root.add_child(Resource(title="notes", path=md, mime_type=mt.MARKDOWN, cut="whole_document"))
+    leaf = root.add_child(title="notes", path=md, mime_type=mt.MARKDOWN, cut="whole_document")
 
     transformer.transform([root])
 
@@ -38,9 +38,9 @@ def test_whole_document_leaf_reads_its_file(tmp_path, transformer):
 
 def test_whole_document_container_stitches_its_pages(tmp_path, transformer):
     root = Resource(title="root")
-    doc = root.add_child(Resource(title="doc", cut="whole_document"))
+    doc = root.add_child(title="doc", cut="whole_document")
     for i in range(1, 3):
-        doc.add_child(Resource(title=f"doc > page {i}", path=write_page(tmp_path, f"page_{i}.md", f"page {i} text"), mime_type=mt.MARKDOWN))
+        doc.add_child(title=f"doc > page {i}", path=write_page(tmp_path, f"page_{i}.md", f"page {i} text"), mime_type=mt.MARKDOWN)
 
     transformer.transform([root])
 
@@ -51,9 +51,9 @@ def test_whole_document_container_stitches_its_pages(tmp_path, transformer):
 
 def test_whole_document_size_guard_drops(tmp_path, transformer):
     root = Resource(title="root")
-    doc = root.add_child(Resource(title="big", cut="whole_document"))
+    doc = root.add_child(title="big", cut="whole_document")
     lines = "\n".join(f"line {i}" for i in range(MAX_SECTION_LINES + 1))
-    doc.add_child(Resource(title="big > page 1", path=write_page(tmp_path, "page_1.md", lines), mime_type=mt.MARKDOWN))
+    doc.add_child(title="big > page 1", path=write_page(tmp_path, "page_1.md", lines), mime_type=mt.MARKDOWN)
 
     transformer.transform([root])
 
@@ -62,7 +62,7 @@ def test_whole_document_size_guard_drops(tmp_path, transformer):
 
 def test_whole_document_with_nothing_readable_drops(tmp_path, transformer):
     root = Resource(title="root")
-    doc = root.add_child(Resource(title="empty", cut="whole_document"))
+    doc = root.add_child(title="empty", cut="whole_document")
 
     transformer.transform([root])
 
@@ -71,9 +71,9 @@ def test_whole_document_with_nothing_readable_drops(tmp_path, transformer):
 
 def test_per_child_reads_each_readable_child(tmp_path, transformer):
     root = Resource(title="root")
-    doc = root.add_child(Resource(title="doc", cut="per_child"))
+    doc = root.add_child(title="doc", cut="per_child")
     for i in range(1, 3):
-        doc.add_child(Resource(title=f"doc > page {i}", path=write_page(tmp_path, f"page_{i}.md", f"page {i}"), mime_type=mt.MARKDOWN))
+        doc.add_child(title=f"doc > page {i}", path=write_page(tmp_path, f"page_{i}.md", f"page {i}"), mime_type=mt.MARKDOWN)
 
     transformer.transform([root])
 
@@ -83,9 +83,9 @@ def test_per_child_reads_each_readable_child(tmp_path, transformer):
 
 def test_per_child_dropping_one_child_keeps_the_next(tmp_path, transformer):
     root = Resource(title="root")
-    doc = root.add_child(Resource(title="doc", cut="per_child"))
-    doc.add_child(Resource(title="doc > empty", path=write_page(tmp_path, "empty.md", "   "), mime_type=mt.MARKDOWN))
-    doc.add_child(Resource(title="doc > good", path=write_page(tmp_path, "good.md", "good text"), mime_type=mt.MARKDOWN))
+    doc = root.add_child(title="doc", cut="per_child")
+    doc.add_child(title="doc > empty", path=write_page(tmp_path, "empty.md", "   "), mime_type=mt.MARKDOWN)
+    doc.add_child(title="doc > good", path=write_page(tmp_path, "good.md", "good text"), mime_type=mt.MARKDOWN)
 
     transformer.transform([root])
 
@@ -95,8 +95,8 @@ def test_per_child_dropping_one_child_keeps_the_next(tmp_path, transformer):
 def test_per_child_keeps_children_with_their_own_cut(tmp_path, transformer):
     md = write_page(tmp_path, "notes.md", "# A\nalpha\n# B\nbeta")
     root = Resource(title="root")
-    folder = root.add_child(Resource(title="folder", cut="per_child"))
-    notes = folder.add_child(Resource(title="notes", path=md, mime_type=mt.MARKDOWN, cut="text"))
+    folder = root.add_child(title="folder", cut="per_child")
+    notes = folder.add_child(title="notes", path=md, mime_type=mt.MARKDOWN, cut="text")
 
     transformer.transform([root])
 
@@ -114,8 +114,8 @@ def test_per_exercise_cuts_at_markers(tmp_path, transformer, monkeypatch):
     monkeypatch.setattr("rag_etl.transformers.cut.cut_transformer.split_exercises", lambda *args, **kwargs: snippets)
 
     root = Resource(title="root")
-    doc = root.add_child(Resource(title="sheet", cut="per_exercise", url="https://moodle/x.pdf"))
-    doc.add_child(Resource(title="sheet > page 1", path=write_page(tmp_path, "page_1.md", "Exercise 1"), mime_type=mt.MARKDOWN))
+    doc = root.add_child(title="sheet", cut="per_exercise", url="https://moodle/x.pdf")
+    doc.add_child(title="sheet > page 1", path=write_page(tmp_path, "page_1.md", "Exercise 1"), mime_type=mt.MARKDOWN)
 
     transformer.transform([root])
 
@@ -133,8 +133,8 @@ def test_per_exercise_statement_only_sheet_has_no_solution(tmp_path, transformer
     monkeypatch.setattr("rag_etl.transformers.cut.cut_transformer.split_exercises", lambda *args, **kwargs: snippets)
 
     root = Resource(title="root")
-    doc = root.add_child(Resource(title="sheet", cut="per_exercise"))
-    doc.add_child(Resource(title="sheet > page 1", path=write_page(tmp_path, "page_1.md", "Exercise 1"), mime_type=mt.MARKDOWN))
+    doc = root.add_child(title="sheet", cut="per_exercise")
+    doc.add_child(title="sheet > page 1", path=write_page(tmp_path, "page_1.md", "Exercise 1"), mime_type=mt.MARKDOWN)
 
     transformer.transform([root])
 
@@ -150,8 +150,8 @@ def test_per_exercise_solution_only_sheet(tmp_path, transformer, monkeypatch):
     monkeypatch.setattr("rag_etl.transformers.cut.cut_transformer.split_exercises", lambda *args, **kwargs: snippets)
 
     root = Resource(title="root")
-    doc = root.add_child(Resource(title="corrigé", cut="per_exercise"))
-    doc.add_child(Resource(title="corrigé > page 1", path=write_page(tmp_path, "page_1.md", "Solution 1"), mime_type=mt.MARKDOWN))
+    doc = root.add_child(title="corrigé", cut="per_exercise")
+    doc.add_child(title="corrigé > page 1", path=write_page(tmp_path, "page_1.md", "Solution 1"), mime_type=mt.MARKDOWN)
 
     transformer.transform([root])
 
@@ -167,8 +167,8 @@ def test_per_exercise_joined_statement_and_solution(tmp_path, transformer, monke
     monkeypatch.setattr("rag_etl.transformers.cut.cut_transformer.split_exercises", lambda *args, **kwargs: snippets)
 
     root = Resource(title="root")
-    doc = root.add_child(Resource(title="sheet", cut="per_exercise"))
-    doc.add_child(Resource(title="sheet > page 1", path=write_page(tmp_path, "page_1.md", "Exercise 1"), mime_type=mt.MARKDOWN))
+    doc = root.add_child(title="sheet", cut="per_exercise")
+    doc.add_child(title="sheet > page 1", path=write_page(tmp_path, "page_1.md", "Exercise 1"), mime_type=mt.MARKDOWN)
 
     transformer.transform([root])
 
@@ -181,8 +181,8 @@ def test_per_exercise_joined_statement_and_solution(tmp_path, transformer, monke
 def test_solution_file_chunks_catch_up_has_solution(tmp_path, transformer):
     """A per_child chunk inheriting a solution file's parts counts as has_solution."""
     root = Resource(title="root")
-    folder = root.add_child(Resource(title="corrigé", exercise_parts="solution", cut="per_child"))
-    child = folder.add_child(Resource(title="corrigé > 1", path=write_page(tmp_path, "1.md", "Solution 1"), mime_type=mt.MARKDOWN))
+    folder = root.add_child(title="corrigé", exercise_parts="solution", cut="per_child")
+    child = folder.add_child(title="corrigé > 1", path=write_page(tmp_path, "1.md", "Solution 1"), mime_type=mt.MARKDOWN)
 
     transformer.transform([root])
 
@@ -194,8 +194,8 @@ def test_per_exercise_drops_when_no_exercises(tmp_path, transformer, monkeypatch
     monkeypatch.setattr("rag_etl.transformers.cut.cut_transformer.split_exercises", lambda *args, **kwargs: [])
 
     root = Resource(title="root")
-    doc = root.add_child(Resource(title="sheet", cut="per_exercise"))
-    doc.add_child(Resource(title="sheet > page 1", path=write_page(tmp_path, "page_1.md", "no exercises here"), mime_type=mt.MARKDOWN))
+    doc = root.add_child(title="sheet", cut="per_exercise")
+    doc.add_child(title="sheet > page 1", path=write_page(tmp_path, "page_1.md", "no exercises here"), mime_type=mt.MARKDOWN)
 
     transformer.transform([root])
 
@@ -206,7 +206,7 @@ def test_text_cut_chunks_by_headings(tmp_path, transformer):
     section = "\n".join(f"line {i}" for i in range(1500))
     md = write_page(tmp_path, "notes.md", f"# Doc\n\n## A\n{section}\n\n## B\n{section}")
     root = Resource(title="root")
-    leaf = root.add_child(Resource(title="notes", path=md, mime_type=mt.MARKDOWN, cut="text"))
+    leaf = root.add_child(title="notes", path=md, mime_type=mt.MARKDOWN, cut="text")
 
     transformer.transform([root])
 
@@ -219,7 +219,7 @@ def test_text_cut_chunks_by_headings(tmp_path, transformer):
 def test_text_cut_merges_small_sections(tmp_path, transformer):
     md = write_page(tmp_path, "notes.md", "# Doc\nintro\n## A\nalpha\n## B\nbeta")
     root = Resource(title="root")
-    leaf = root.add_child(Resource(title="notes", path=md, mime_type=mt.MARKDOWN, cut="text"))
+    leaf = root.add_child(title="notes", path=md, mime_type=mt.MARKDOWN, cut="text")
 
     transformer.transform([root])
 
@@ -228,7 +228,7 @@ def test_text_cut_merges_small_sections(tmp_path, transformer):
 
 def test_unknown_cut_fails_loud(transformer):
     root = Resource(title="root")
-    root.add_child(Resource(title="doc", cut="per_paragraph"))
+    root.add_child(title="doc", cut="per_paragraph")
 
     with pytest.raises(ValueError):
         transformer.transform([root])

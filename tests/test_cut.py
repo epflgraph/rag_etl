@@ -40,7 +40,7 @@ def test_whole_document_container_stitches_its_pages(tmp_path, transformer):
     root = Resource(title="root")
     doc = root.add_child(title="doc", cut="whole_document")
     for i in range(1, 3):
-        doc.add_child(title=f"doc > page {i}", path=write_page(tmp_path, f"page_{i}.md", f"page {i} text"), mime_type=mt.MARKDOWN)
+        doc.add_child(title=f"page {i}", path=write_page(tmp_path, f"page_{i}.md", f"page {i} text"), mime_type=mt.MARKDOWN)
 
     transformer.transform([root])
 
@@ -53,7 +53,7 @@ def test_whole_document_size_guard_drops(tmp_path, transformer):
     root = Resource(title="root")
     doc = root.add_child(title="big", cut="whole_document")
     lines = "\n".join(f"line {i}" for i in range(MAX_SECTION_LINES + 1))
-    doc.add_child(title="big > page 1", path=write_page(tmp_path, "page_1.md", lines), mime_type=mt.MARKDOWN)
+    doc.add_child(title="page 1", path=write_page(tmp_path, "page_1.md", lines), mime_type=mt.MARKDOWN)
 
     transformer.transform([root])
 
@@ -73,7 +73,7 @@ def test_per_child_reads_each_readable_child(tmp_path, transformer):
     root = Resource(title="root")
     doc = root.add_child(title="doc", cut="per_child")
     for i in range(1, 3):
-        doc.add_child(title=f"doc > page {i}", path=write_page(tmp_path, f"page_{i}.md", f"page {i}"), mime_type=mt.MARKDOWN)
+        doc.add_child(title=f"page {i}", path=write_page(tmp_path, f"page_{i}.md", f"page {i}"), mime_type=mt.MARKDOWN)
 
     transformer.transform([root])
 
@@ -84,8 +84,8 @@ def test_per_child_reads_each_readable_child(tmp_path, transformer):
 def test_per_child_dropping_one_child_keeps_the_next(tmp_path, transformer):
     root = Resource(title="root")
     doc = root.add_child(title="doc", cut="per_child")
-    doc.add_child(title="doc > empty", path=write_page(tmp_path, "empty.md", "   "), mime_type=mt.MARKDOWN)
-    doc.add_child(title="doc > good", path=write_page(tmp_path, "good.md", "good text"), mime_type=mt.MARKDOWN)
+    doc.add_child(title="empty", path=write_page(tmp_path, "empty.md", "   "), mime_type=mt.MARKDOWN)
+    doc.add_child(title="good", path=write_page(tmp_path, "good.md", "good text"), mime_type=mt.MARKDOWN)
 
     transformer.transform([root])
 
@@ -115,13 +115,13 @@ def test_per_exercise_cuts_at_markers(tmp_path, transformer, monkeypatch):
 
     root = Resource(title="root")
     doc = root.add_child(title="sheet", cut="per_exercise", url="https://moodle/x.pdf")
-    doc.add_child(title="sheet > page 1", path=write_page(tmp_path, "page_1.md", "Exercise 1"), mime_type=mt.MARKDOWN)
+    doc.add_child(title="page 1", path=write_page(tmp_path, "page_1.md", "Exercise 1"), mime_type=mt.MARKDOWN)
 
     transformer.transform([root])
 
     assert [child.number for child in doc.children] == ["1", "1"]
     assert [child.exercise_parts for child in doc.children] == ["statement", "solution"]
-    assert [child.title for child in doc.children] == ["sheet > Exercise 1 (statement)", "sheet > Exercise 1 (solution)"]
+    assert [child.title for child in doc.children] == ["Exercise 1 (statement)", "Exercise 1 (solution)"]
     # Both chunks of the solved exercise carry has_solution, not just the solution one
     assert all(child.has_solution for child in doc.children)
     assert doc.children[0].url == "https://moodle/x.pdf#page=1"
@@ -134,14 +134,14 @@ def test_per_exercise_statement_only_sheet_has_no_solution(tmp_path, transformer
 
     root = Resource(title="root")
     doc = root.add_child(title="sheet", cut="per_exercise")
-    doc.add_child(title="sheet > page 1", path=write_page(tmp_path, "page_1.md", "Exercise 1"), mime_type=mt.MARKDOWN)
+    doc.add_child(title="page 1", path=write_page(tmp_path, "page_1.md", "Exercise 1"), mime_type=mt.MARKDOWN)
 
     transformer.transform([root])
 
     [chunk] = doc.children
     assert chunk.exercise_parts == "statement"
     assert not chunk.has_solution
-    assert chunk.title == "sheet > Exercise 1 (statement)"
+    assert chunk.title == "Exercise 1 (statement)"
 
 
 def test_per_exercise_solution_only_sheet(tmp_path, transformer, monkeypatch):
@@ -151,14 +151,14 @@ def test_per_exercise_solution_only_sheet(tmp_path, transformer, monkeypatch):
 
     root = Resource(title="root")
     doc = root.add_child(title="corrigé", cut="per_exercise")
-    doc.add_child(title="corrigé > page 1", path=write_page(tmp_path, "page_1.md", "Solution 1"), mime_type=mt.MARKDOWN)
+    doc.add_child(title="page 1", path=write_page(tmp_path, "page_1.md", "Solution 1"), mime_type=mt.MARKDOWN)
 
     transformer.transform([root])
 
     [chunk] = doc.children
     assert chunk.exercise_parts == "solution"
     assert chunk.has_solution
-    assert chunk.title == "corrigé > Exercise 1 (solution)"
+    assert chunk.title == "Exercise 1 (solution)"
 
 
 def test_per_exercise_joined_statement_and_solution(tmp_path, transformer, monkeypatch):
@@ -168,21 +168,21 @@ def test_per_exercise_joined_statement_and_solution(tmp_path, transformer, monke
 
     root = Resource(title="root")
     doc = root.add_child(title="sheet", cut="per_exercise")
-    doc.add_child(title="sheet > page 1", path=write_page(tmp_path, "page_1.md", "Exercise 1"), mime_type=mt.MARKDOWN)
+    doc.add_child(title="page 1", path=write_page(tmp_path, "page_1.md", "Exercise 1"), mime_type=mt.MARKDOWN)
 
     transformer.transform([root])
 
     [chunk] = doc.children
     assert chunk.exercise_parts == "statement + solution"
     assert chunk.has_solution
-    assert chunk.title == "sheet > Exercise 1 (statement + solution)"
+    assert chunk.title == "Exercise 1 (statement + solution)"
 
 
 def test_solution_file_chunks_catch_up_has_solution(tmp_path, transformer):
     """A per_child chunk inheriting a solution file's parts counts as has_solution."""
     root = Resource(title="root")
     folder = root.add_child(title="corrigé", exercise_parts="solution", cut="per_child")
-    child = folder.add_child(title="corrigé > 1", path=write_page(tmp_path, "1.md", "Solution 1"), mime_type=mt.MARKDOWN)
+    child = folder.add_child(title="1", path=write_page(tmp_path, "1.md", "Solution 1"), mime_type=mt.MARKDOWN)
 
     transformer.transform([root])
 
@@ -195,7 +195,7 @@ def test_per_exercise_drops_when_no_exercises(tmp_path, transformer, monkeypatch
 
     root = Resource(title="root")
     doc = root.add_child(title="sheet", cut="per_exercise")
-    doc.add_child(title="sheet > page 1", path=write_page(tmp_path, "page_1.md", "no exercises here"), mime_type=mt.MARKDOWN)
+    doc.add_child(title="page 1", path=write_page(tmp_path, "page_1.md", "no exercises here"), mime_type=mt.MARKDOWN)
 
     transformer.transform([root])
 

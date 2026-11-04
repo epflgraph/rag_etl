@@ -134,7 +134,7 @@ class VideoMaterializer:
             # Each slide carries the public watch url of its own moment, so a
             # chunk cut from it links straight into that moment of the lecture
             node.add_child(
-                title=f"{node.title} > {start_seconds // 60}:{start_seconds % 60:02d}",
+                title=f"{start_seconds // 60}:{start_seconds % 60:02d}",
                 path=md_path,
                 mime_type=mt.MARKDOWN,
                 url=build_entry_url(entry_id, self.mediaspace_url, start_seconds),

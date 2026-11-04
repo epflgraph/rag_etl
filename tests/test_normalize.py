@@ -38,7 +38,7 @@ def test_zip_expands_into_container(tmp_path, transformer):
     transformer.transform([root])
 
     bundle = root.children[0]
-    assert [child.title for child in bundle.children] == ["bundle > lecture.pdf", "bundle > notes.txt"]
+    assert [child.title for child in bundle.children] == ["lecture.pdf", "notes.txt"]
     assert [child.mime_type for child in bundle.children] == [mt.PDF, mt.TXT]
 
 

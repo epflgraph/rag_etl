@@ -158,7 +158,7 @@ def per_exercise(transformer: "CutTransformer", node: Resource) -> None:
     node.children = []
     for exercise in found:
         chunk = node.add_child(
-            title=f"{node.title} > Exercise {exercise.number} ({exercise.parts})",
+            title=f"Exercise {exercise.number} ({exercise.parts})",
             text=exercise.text,
             number=exercise.number,
             exercise_parts=exercise.parts,
@@ -193,7 +193,7 @@ def text(transformer: "CutTransformer", node: Resource) -> None:
             logger.warning(f"Dropping part {position} of {node.title}: over the {MAX_SECTION_LINES}-line size guard")
             continue
 
-        node.add_child(title=f"{node.title} > part {position}", text=section, cut=None)
+        node.add_child(title=f"part {position}", text=section, cut=None)
 
 
 # The one cut catalogue; new cuts join here via PR

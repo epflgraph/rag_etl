@@ -64,7 +64,7 @@ class PdfMaterializer:
                 logger.debug(f"Dropping page {page_number} of {node.title}: no readable content")
                 continue
 
-            node.add_child(title=f"{node.title} > page {page_number}", path=md_path, mime_type=mt.MARKDOWN)
+            node.add_child(title=f"page {page_number}", path=md_path, mime_type=mt.MARKDOWN)
 
         logger.info(f"{node.title}: {len(node.children)} pages")
 

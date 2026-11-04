@@ -18,7 +18,7 @@ def test_readable_leaf_cuts_whole():
 def test_container_with_text_children_cuts_per_child():
     root = Resource(title="root")
     doc = root.add_child(title="doc", mime_type=mt.PDF)
-    doc.add_child(title="doc > page 1", mime_type=mt.MARKDOWN)
+    doc.add_child(title="page 1", mime_type=mt.MARKDOWN)
 
     JudgeTransformer().transform([root])
 
@@ -74,7 +74,7 @@ def test_titles_without_cues_get_the_defaults():
 def test_ancestor_titles_label_the_leaves():
     root = Resource(title="root")
     doc = root.add_child(title="MICRO-303 2026 Lecture 5 CVD.pdf", mime_type=mt.PDF)
-    page = doc.add_child(title="doc > page 1", mime_type=mt.MARKDOWN)
+    page = doc.add_child(title="page 1", mime_type=mt.MARKDOWN)
 
     JudgeTransformer().transform([root])
 
@@ -112,7 +112,7 @@ def test_video_titles_become_video_lectures():
 def test_theory_slides_folder_labels_its_children():
     root = Resource(title="[THEORY_SLIDES]Complementary Slides")
     doc = root.add_child(title="2025 Introduction Micro332.pdf", mime_type=mt.PDF)
-    page = doc.add_child(title="doc > page 1", mime_type=mt.MARKDOWN)
+    page = doc.add_child(title="page 1", mime_type=mt.MARKDOWN)
 
     JudgeTransformer().transform([root])
 
@@ -143,8 +143,8 @@ def test_children_inherit_the_parent_context():
         title="MICRO-303 2026 Lecture 5 CVD.pdf", mime_type=mt.PDF,
         week=5, from_="2026-09-07T08:00:00", until="2027-01-31T20:00:00",
     )
-    page = doc.add_child(title="doc > page 1", mime_type=mt.MARKDOWN)
-    own = doc.add_child(title="doc > page 2", mime_type=mt.MARKDOWN, from_="2026-10-01T08:00:00", week=6)
+    page = doc.add_child(title="page 1", mime_type=mt.MARKDOWN)
+    own = doc.add_child(title="page 2", mime_type=mt.MARKDOWN, from_="2026-10-01T08:00:00", week=6)
 
     JudgeTransformer().transform([root])
 
@@ -158,7 +158,7 @@ def test_children_inherit_the_parents_labels():
     root = Resource(title="root")
     section = root.add_child(title="Série 3", mime_type=mt.PDF)
     doc = section.add_child(title="exercises.pdf", mime_type=mt.PDF)
-    page = doc.add_child(title="doc > page 1", mime_type=mt.MARKDOWN)
+    page = doc.add_child(title="page 1", mime_type=mt.MARKDOWN)
 
     JudgeTransformer().transform([root])
 
@@ -171,7 +171,7 @@ def test_a_childs_own_cues_beat_the_inherited_ones():
     root = Resource(title="root")
     section = root.add_child(title="Lecture slides CVD", mime_type=mt.PDF)
     doc = section.add_child(title="Quiz 1.pdf", mime_type=mt.PDF)
-    page = doc.add_child(title="doc > page 1", mime_type=mt.MARKDOWN)
+    page = doc.add_child(title="page 1", mime_type=mt.MARKDOWN)
 
     JudgeTransformer().transform([root])
 

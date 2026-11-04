@@ -72,7 +72,7 @@ def test_pdf_gains_one_child_per_page(tmp_path, transformer, monkeypatch):
     transformer.transform([root])
 
     lecture = root.children[0]
-    assert [child.title for child in lecture.children] == ["lecture > page 1", "lecture > page 2"]
+    assert [child.title for child in lecture.children] == ["page 1", "page 2"]
     assert all(child.mime_type == mt.MARKDOWN for child in lecture.children)
     # The page children carry the parent's descriptive metadata
     assert all(child.week == 3 and child.type == "theory" for child in lecture.children)
@@ -129,7 +129,7 @@ def test_warm_pdf_rerun_adopts_the_whole_subtree(tmp_path, transformer, monkeypa
     transformer.transform([root])
 
     assert calls == []
-    assert [child.title for child in root.children[0].children] == ["lecture > page 1", "lecture > page 2"]
+    assert [child.title for child in root.children[0].children] == ["page 1", "page 2"]
     # Only the transcripts are staged back into the work area: no page is
     # rendered, so no png exists at all
     bench = tmp_path / "material" / "work" / hash_bytes(pdf_path.read_bytes())
@@ -154,7 +154,7 @@ def test_fingerprint_bump_reOCRs_every_page(tmp_path, transformer, monkeypatch):
     transformer.transform([root])
 
     assert len(calls) == 2
-    assert [child.title for child in root.children[0].children] == ["lecture > page 1", "lecture > page 2"]
+    assert [child.title for child in root.children[0].children] == ["page 1", "page 2"]
 
 
 def test_missing_leaf_self_heals(tmp_path, transformer, monkeypatch):
@@ -175,7 +175,7 @@ def test_missing_leaf_self_heals(tmp_path, transformer, monkeypatch):
     transformer.transform([root])
 
     assert len(calls) == 1
-    assert [child.title for child in root.children[0].children] == ["lecture > page 1", "lecture > page 2"]
+    assert [child.title for child in root.children[0].children] == ["page 1", "page 2"]
 
 
 def test_image_read_into_work_dir(tmp_path, transformer):
@@ -222,7 +222,7 @@ def test_video_gains_one_slide_child_per_segment(tmp_path, transformer, monkeypa
     lecture = root.children[0]
     # Two slide segments: [0, 40) and [40, end); each frame is named after
     # the second its interval starts at, which is where the title reads back
-    assert [child.title for child in lecture.children] == ["lecture 1 > 0:00", "lecture 1 > 0:40"]
+    assert [child.title for child in lecture.children] == ["0:00", "0:40"]
     # The words spoken over each slide were appended as a quote
     assert "hello" in lecture.children[0].path.read_text(encoding="utf-8")
     assert "world" in lecture.children[1].path.read_text(encoding="utf-8")

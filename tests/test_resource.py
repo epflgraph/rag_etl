@@ -98,11 +98,11 @@ def test_children_get_parent_backfill():
 
 def test_add_child_builds_a_copy_of_the_parent():
     pdf = Resource(title="pdf", url="https://moodle/x", type="practice", week=3)
-    page = pdf.add_child(title="pdf > 1", path=Path("p.md"), mime_type="text/markdown")
+    page = pdf.add_child(title="page 1", path=Path("p.md"), mime_type="text/markdown")
 
     # everything comes down; the overrides name what differs
     assert page.parent is pdf
-    assert page.title == "pdf > 1"
+    assert page.title == "page 1"
     assert page.url == "https://moodle/x"
     assert page.type == "practice"
     assert page.week == 3

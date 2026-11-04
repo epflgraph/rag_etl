@@ -24,7 +24,8 @@ One recursive dataclass. Nodes are created from extracted files and reshaped in 
 @dataclass
 class Resource:
     # identity
-    path: Path | None             # where the content lives on disk; None for pure containers
+    title: str                    # the source's name for this resource; "" when it names nothing
+    path: Path | None = None      # where the content lives on disk; None for pure containers
     url: str | None = None        # public url the resource is available at
     mime_type: str | None = None
 
@@ -33,7 +34,6 @@ class Resource:
     children: list["Resource"] = field(default_factory=list)
 
     # descriptive metadata (extractors fill some; the judge fills type/subtype/cut; exceptions correct)
-    title: str | None = None
     type: str | None = None       # theory / practice / ... (inferred by the judge)
     subtype: str | None = None    # lecture_slides / homework / ...
     cut: str | None = None        # whole_document | per_child | per_exercise | text
@@ -60,10 +60,10 @@ Invariants:
   - else → sha256 of empty
   Equal content within one project → equal hash → shared cache entries, `(project, transform, content_hash)` keys.
   Materialize caches as a **Merkle tree** — the pattern's pilot, with video and judge as recorded follow-ups: the leaves (the transcripts) are stored exactly once, keyed by their own content (a page's rendered PNG bytes, a frame's JPG bytes); a parent node (`children.json`, keyed by the parent's input hash) is a small record of its ordered `(child name, child hash)` pairs plus a fingerprint of the materialization recipe. A node hit adopts the whole subtree — no rendering, no per-leaf lookups; a node miss renders and falls back to the leaves, so one edited page re-OCRs one page. A recipe bump or a leaf missing under the node is a miss (self-healing).
-- Deep links (Moodle URL, Mediaspace timestamp, Ed post, Git commit) travel as `url`; `lineage()` reconstructs the chain from any node back to its source. Video leaves never carry an `entry_id` field — the Kaltura entry id stays inside the video descriptor/XML and is read by materialize.
+- Deep links (Moodle URL, Mediaspace timestamp, Ed post, Git commit) travel as `url`, copied down the tree at attach: a child built by `add_child` carries its parent's url unless it names its own, and edits (a `#page=N` anchor into a pdf) own it from there. The ES loader reads `node.url` directly — nothing re-resolves the lineage at load. Video leaves never carry an `entry_id` field — the Kaltura entry id stays inside the video descriptor/XML and is read by materialize.
 - Embeddings land on the node (`embedding`, chunks only): the embed transform annotates the tree in place, and the ES loader reads vectors straight from the tree.
 
-State helpers on the class: `is_leaf`, `walk()` (depth-first), `lineage()` (root→self), `add_child()`. The hashing helpers `hash_bytes`/`hash_text` are the single sha256 implementation behind `content_hash`. Transformers add and remove children directly; a node reshaped into a container keeps its identity and gains children.
+State helpers on the class: `is_leaf`, `walk()` (depth-first), `lineage()` (root→self), `add_child()` — which builds the child as a copy of the parent, every field coming down unless an override names what differs (`pdf.add_child(title="page 1", path=md, mime_type=mt.MARKDOWN)` keeps the pdf's url and labels), or attaches an already-built subtree as it is. The hashing helpers `hash_bytes`/`hash_text` are the single sha256 implementation behind `content_hash`. Transformers add and remove children directly; a node reshaped into a container keeps its identity and gains children.
 
 ## Exceptions (Phase 1, `src/rag_etl/core/rules.py`)
 
@@ -123,7 +123,7 @@ Specs live in **semester folders** (e.g. `projects/semester_2627_autumn/micro303
 
 Loaders take trees — the pipeline contract is uniform (extractors produce trees, transformers take and return trees, loaders take trees) — and are configured by constructor args; no intermediate run object.
 
-- **`ManifestLoader`** writes one JSON manifest per run for human inspection; nothing reads it. All manifests land in `{dir}/output/` as `{timestamp}_manifest[_dry].json` (name-sorted, dry by suffix). Header: project, dry, timestamp, index, alias, pipeline version. Summary: sources, chunks, without_url, and a nested drill-down (source → type → subtype → number) counting chunks, without_url and has_solution per group, with `unknown` buckets and None sorted last. Tree: metadata-only — no text, no embeddings — with content-hash pointers, the `chunk` flag, `exercise_parts`/`has_solution` and the `cut` decision.
+- **`ManifestLoader`** writes one JSON manifest per run for human inspection; nothing reads it. All manifests land in `{dir}/output/` as `{timestamp}_manifest[_dry].json` (name-sorted, dry by suffix). Header: project, dry, timestamp, index, alias, pipeline version. Summary: one nested drill-down (source → type → subtype → number → subnumber → parts) whose every node counts its chunks and, per coverage field (`url`, `week`, `from`, `until`), how many chunks carry one — stating the value itself only when the whole group shares one — with null buckets visible and None sorted last. Tree: metadata-only — no text, no embeddings — with content-hash pointers, the `chunk` flag, `exercise_parts`/`has_solution` and the `cut` decision.
 - **`ElasticsearchLoader`** publishes one run: create the run's own index (`rag_{project}_{YYYYMMDD}_{HHMMSS}` — one index per run, nothing recreated or deleted, so the index the alias points at is never touched) → bulk (doc id `{epoch_ms}-{content_hash}`, the epoch taken **per document, strictly increasing** — `max(time_ns() // 1_000_000, previous + 1)` — so same-content documents stay distinct; **no content dedupe**: courses own their duplicates, the same content under different metadata must survive as separate documents or metadata filtering could empty a view) → refresh → **one atomic** `update_aliases` (remove old + add new; add-only on first run). A failed run never touches the alias; superseded indices stay for investigation and rollback. Documents carry `content`, `embedding` (from the node), a `lineage` breadcrumb (title → url → `"unknown"` per node, root→leaf), and a `url` that may be absent: own → nearest ancestor's → nothing (no fabricated placeholder — the pipeline writes no data it doesn't have). ES 9.2+ keeps vectors out of `_source` by default (`index.mapping.exclude_source_vectors`) — retrievable via the `fields` option, rehydrated for reindex/recovery; `dot_product` requires unit-length query vectors.
 - **The frozen schema** ships verbatim as package data (`index_settings.json`, settings + mappings in one create-index body); the loader patches `content.analyzer` per project language (`base_en`/`base_fr`) at creation. 14 fields: `id`, `content`, `embedding` (dense_vector 4096, dot_product, int8_hnsw), `lineage`, `url`, `type`, `subtype`, `number`, `subnumber`, `week`, `exercise_parts`, `has_solution`, `from`, `until` (ES default ISO dates). Dropped vs the old mapping: `content.en/fr`, `description.en/fr`, `raw`/`sayt`/`trigram` subfields + their analyzers and filters, synonyms, legacy date formats, 384 dims.
 - **Connection**: flat `ES_HOST`/`ES_PORT`/`ES_USERNAME`/`ES_PASSWORD`/`ES_CAFILE` env keys, proper TLS verification (`ca_certs`); `elasticsearch>=8,<9`. Search stays hybrid (embeddings + Elasticsearch text); consumers filter on `from`/`until` (automatic), `type`/`subtype`/`has_solution` — returned fields and routing are the MCP's concern.

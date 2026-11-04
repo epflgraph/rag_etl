@@ -10,6 +10,7 @@ run completes or it stops loud.
 from __future__ import annotations
 
 import base64
+import io
 import os
 from collections.abc import Sequence
 from dataclasses import dataclass, field
@@ -20,6 +21,7 @@ from typing import Any, TypeVar
 from langfuse import get_client
 from openai import OpenAI, Stream
 from openai.types.chat import ChatCompletionChunk
+from PIL import Image
 from pydantic import BaseModel
 
 import ragtools.mime_types as mt
@@ -38,6 +40,13 @@ class AnswerTooLong(Exception):
 def openai_client(base_url: str, api_key: str, max_retries: int, timeout: int) -> OpenAI:
     """One underlying client per config, shared across calls: no per-call connection setup."""
     return OpenAI(base_url=base_url, api_key=api_key, timeout=timeout, max_retries=max_retries)
+
+
+def _pil_data_uri(img: Image.Image) -> str:
+    """Encode an in-memory image as a base64 PNG data URI."""
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    return f"data:image/png;base64,{base64.b64encode(buf.getvalue()).decode('utf-8')}"
 
 
 @dataclass(frozen=True)
@@ -189,37 +198,67 @@ class RCPClient:
         messages: list[dict[str, Any]] = [{"role": "user", "content": prompt}]
         return self._send(messages, system=system, name=name)
 
+    def _image_content(
+        self,
+        prompt: str,
+        images: Sequence[str | Path | Image.Image],
+        detail: str | None,
+    ) -> list[dict[str, Any]]:
+        """One user message carrying the prompt and every image, encoded inline.
+
+        Images arrive as file paths or as in-memory PIL images (a page
+        still being worked on); both become base64 data URIs.
+        """
+        content: list[dict[str, Any]] = [{"type": "text", "text": prompt}]
+        for image in images:
+            if isinstance(image, Image.Image):
+                image_url: dict[str, Any] = {"url": _pil_data_uri(image)}
+            else:
+                image = Path(image)
+                mime_type = mt.guess_mime_type(str(image))
+                if mime_type is None:
+                    raise ValueError(f"Could not determine MIME type for {image}")
+                b64 = base64.b64encode(image.read_bytes()).decode("utf-8")
+                image_url = {"url": f"data:{mime_type};base64,{b64}"}
+            if detail:
+                image_url["detail"] = detail
+            content.append({"type": "image_url", "image_url": image_url})
+        return content
+
     def vision(
         self,
         prompt: str,
-        images: Sequence[str | Path],
+        images: Sequence[str | Path | Image.Image],
         *,
         system: str | None = None,
         detail: str | None = None,
         name: str = "vision-request",
         max_chars: int | None = None,
     ) -> str:
-        """Send a prompt with one or more images (paths) and return the model's answer.
+        """Send a prompt with one or more images and return the model's answer.
 
         With ``max_chars``, the answer is streamed and cut the moment it
         passes the limit, instead of being waited out to the end.
         """
-        content: list[dict[str, Any]] = [{"type": "text", "text": prompt}]
-        for image in images:
-            image = Path(image)
-            mime_type = mt.guess_mime_type(str(image))
-            if mime_type is None:
-                raise ValueError(f"Could not determine MIME type for {image}")
-            b64 = base64.b64encode(image.read_bytes()).decode("utf-8")
-            image_url: dict[str, Any] = {"url": f"data:{mime_type};base64,{b64}"}
-            if detail:
-                image_url["detail"] = detail
-            content.append({"type": "image_url", "image_url": image_url})
-
-        messages: list[dict[str, Any]] = [{"role": "user", "content": content}]
+        messages: list[dict[str, Any]] = [{"role": "user", "content": self._image_content(prompt, images, detail)}]
         if max_chars is not None:
             return self._send_streaming(messages, max_chars=max_chars, system=system, name=name)
         return self._send(messages, system=system, name=name)
+
+    def structured_vision(
+        self,
+        prompt: str,
+        images: Sequence[str | Path | Image.Image],
+        schema: type[ModelT],
+        *,
+        system: str | None = None,
+        detail: str | None = None,
+        name: str = "structured-vision-request",
+    ) -> ModelT:
+        """Send a prompt with one or more images and parse the answer into the given pydantic schema."""
+        messages: list[dict[str, Any]] = [{"role": "user", "content": self._image_content(prompt, images, detail)}]
+        content = self._send(messages, response_format=schema, system=system, name=name)
+        return schema.model_validate_json(content)
 
     def structured(
         self,

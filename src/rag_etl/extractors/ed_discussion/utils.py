@@ -13,7 +13,7 @@ from rag_etl.extractors.ed_discussion.prompts import (
     CLASSIFY_THREAD_SYSTEM_PROMPT,
     CLASSIFY_THREAD_USER_PROMPT,
 )
-from rag_etl.utils.llms import send_llm_request
+from ragtools.llm import MODELS
 
 logger = logging.getLogger(__name__)
 
@@ -191,20 +191,12 @@ def classify_thread_with_llm(
             exam_year=exam_year,
         )
 
-        messages = [
-            {"role": "system", "content": CLASSIFY_THREAD_SYSTEM_PROMPT},
-            {"role": "user", "content": user_content},
-        ]
-
-        classification = send_llm_request(
-            model,
-            messages,
-            response_format=ThreadClassification,
+        classification = MODELS[(model, "thinking")].structured(
+            user_content,
+            ThreadClassification,
+            system=CLASSIFY_THREAD_SYSTEM_PROMPT,
             name=f"classify-thread/{model}",
         )
-
-        if classification is None:
-            return None
 
         if classification.catalogue_id is not None and not (0 <= classification.catalogue_id < len(catalogue)):
             logger.warning(f"Catalogue id {classification.catalogue_id} out of range, discarding")

@@ -57,6 +57,7 @@ MODELS: dict[tuple[str, str], RCPClient] = {
 # One entry per concern, chosen from the catalog
 _TASKS: dict[str, tuple[str, str]] = {
     "ocr": ("Qwen/Qwen3.6-35B-A3B", "instruct"),
+    "classify_slides": ("Qwen/Qwen3.6-35B-A3B", "instruct"),
     "judge": ("Qwen/Qwen3.6-35B-A3B", "thinking"),
     "split_exercises": ("Qwen/Qwen3.6-35B-A3B", "thinking"),
     "stitch": ("Qwen/Qwen3.6-35B-A3B", "instruct"),
@@ -70,7 +71,3 @@ def get_model(task: str) -> RCPClient:
         return MODELS[_TASKS[task]]
     except KeyError:
         raise ValueError(f"Unknown task '{task}': add it to ragtools/llm/defaults.py") from None
-
-
-# Legacy: send_llm_request keys parameters by (model, mode)
-DEFAULT_LLM_PARAMS: dict[tuple[str, str], dict] = {key: client.params for key, client in MODELS.items()}

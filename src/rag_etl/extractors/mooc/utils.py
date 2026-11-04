@@ -10,10 +10,9 @@ from urllib.parse import unquote, urlparse
 import unicodedata
 from pydantic import BaseModel, Field
 
-from rag_etl.config import CONFIG
-from rag_etl.utils.llms import send_llm_request
 from ragtools.encoding import sanitize_for_filename
-from ragtools.pdf import downscale_if_needed, render_pdf_pages, to_data_uri
+from ragtools.llm import get_model
+from ragtools.pdf import downscale_if_needed, render_pdf_pages
 
 logger = logging.getLogger(__name__)
 
@@ -286,23 +285,12 @@ def pdf_is_slides(pdf_path: Path) -> bool:
     pages = render_pdf_pages(str(pdf_path))
     first_page = downscale_if_needed(pages[0])
 
-    messages = [
-        {"role": "system", "content": SLIDES_SYSTEM_PROMPT},
-        {
-            "role": "user",
-            "content": [
-                {"type": "text", "text": SLIDES_USER_PROMPT},
-                {"type": "image_url", "image_url": {"url": to_data_uri(first_page)}},
-            ],
-        },
-    ]
-
-    classification = send_llm_request(
-        CONFIG["RCP_VISION_MODEL"],
-        messages,
-        response_format=SlidesClassification,
+    classification = get_model("classify_slides").structured_vision(
+        SLIDES_USER_PROMPT,
+        [first_page],
+        SlidesClassification,
+        system=SLIDES_SYSTEM_PROMPT,
         name="classify-pdf-slides",
-        enable_thinking=False,
     )
 
     return classification.is_slides

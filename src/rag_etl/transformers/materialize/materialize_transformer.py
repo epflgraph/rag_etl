@@ -7,10 +7,11 @@ extracted straight from the video's url, every frame is read, and the
 words spoken over the segment are appended to it.
 
 Everything read by a model is cached as a Merkle tree: the transcripts
-are leaves stored once under their own content hash, and each pdf adds a
-small node record of its ordered page leaves — a node hit adopts the
-whole subtree without rendering anything, while a miss falls back to the
-per-page leaves, so only the pages that changed are read again.
+are leaves stored once under their own content hash, and each pdf and
+video adds a small node record of its ordered leaves — a node hit adopts
+the whole subtree without rendering or detecting anything, while a miss
+falls back to the per-page or per-frame leaves, so only what changed is
+read again.
 
 This module is the facade the pipeline holds: a thin dispatch over the
 three materializers, which own their own caching conventions.
@@ -43,7 +44,7 @@ class MaterializeTransformer(Transformer):
     """
 
     cache: Cache
-    # The scratch bench for rendered pages, extracted frames and read
+    # The scratch work area for rendered pages, extracted frames and read
     # transcripts: outside every source tree (generated files must never
     # sit next to the sources they came from), wiped by the pipeline at
     # every run start — everything in it is re-derivable

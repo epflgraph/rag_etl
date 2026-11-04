@@ -1,7 +1,18 @@
-"""Video materialization: slide changes detected, one frame per segment read."""
+"""Video materialization: slide changes detected, one frame per segment read.
+
+Cached as a Merkle tree, like the pdf: the leaves are the per-segment
+transcripts, each stored exactly once under its frame's hash; the video's
+node (`children.json`, keyed by the video's entry and language) is a small
+record of its ordered slide leaves. A node hit adopts the whole subtree —
+no slide detection, no frame extraction, no read; a miss detects, extracts
+and falls back to the leaves, so an unchanged frame is never read again.
+Either way the node is written back, so the run after a miss hits at the
+top again. The frames themselves are scratch: re-derivable, never cached.
+"""
 
 from __future__ import annotations
 
+import json
 import logging
 import shutil
 
@@ -15,7 +26,9 @@ from ragtools.video import SlideDetector, extract_frame, filter_close_timestamps
 
 from rag_etl.cache import Cache
 from rag_etl.core import Resource
+from rag_etl.core.resource import hash_bytes, hash_text
 from rag_etl.transformers.materialize.ocr import MAX_CONCURRENT_OCR, ocr_cached
+from rag_etl.transformers.materialize.pdf import NODE_NAME
 from rag_etl.transformers.materialize.videos import KalturaVideoResolver, entry_id_of
 from ragtools.graphai import GraphAIError
 from ragtools.kaltura import build_entry_url
@@ -24,6 +37,22 @@ logger = logging.getLogger(__name__)
 
 # The transcript is quoted rather than put under a heading
 TRANSCRIPT_PREFIX = "> "
+
+# Bumped whenever detecting or extracting changes what the same video
+# means (detector, min slide seconds, frame naming): nodes written under
+# an older recipe are stale and never adopted, and their frames are read
+# again wholesale
+FINGERPRINT = "video-slides-1"
+
+
+def _node_key(entry_id: str, language: str | None) -> str:
+    """The video node's key: the video's identity plus the language it is detected in.
+
+    The descriptor is deliberately not part of it: its bytes churn on every
+    re-export while the video itself stays the same, and a re-export must
+    not re-detect, re-extract and re-read a lecture nobody touched.
+    """
+    return hash_text(f"{entry_id}|{language}")
 
 
 @dataclass(frozen=True)
@@ -45,17 +74,23 @@ class VideoMaterializer:
             logger.warning(f"Leaving {node.title} as it is: no Kaltura entry id to reach the video with")
             return
 
-        # Frames live in the work area of the video's content
+        # The slides are built in the work area of the video's content
         if node.path is None:
             return
-        frames_path = self.work_root / node.content_hash
-        content_hash = node.content_hash
+        work_dir = self.work_root / node.content_hash
 
-        # A crashed run can leave frames behind: they must not survive into
-        # the new slides
-        shutil.rmtree(frames_path, ignore_errors=True)
+        # A crashed run can leave slides behind: they must not survive into
+        # the new ones
+        shutil.rmtree(work_dir, ignore_errors=True)
 
-        if not self.cache.get(content_hash, frames_path):
+        key = _node_key(entry_id, self.language)
+        record = self._node(key)
+        md_paths = self._adopt(record, work_dir)
+        if md_paths is None:
+            # A stale recipe means the leaves are not trusted either: they
+            # are keyed by frame bytes alone, so every frame is read again
+            stale = record is not None and record.get("fingerprint") != FINGERPRINT
+
             video_url = resolver.url(entry_id)
             if not video_url:
                 logger.warning(f"Dropping {node.title}: no video file for entry {entry_id}")
@@ -77,59 +112,122 @@ class VideoMaterializer:
 
             logger.info(f"Entry {entry_id}: {len(timestamps)} slide changes detected")
 
-            self._write_frames(video_url, timestamps, frames_path)
-            self.cache.set(content_hash, frames_path)
+            frames = self._extract(video_url, timestamps, work_dir, stale)
+            self._write_node(key, frames)
+            md_paths = [md_path for _, md_path in frames]
 
-        self._build_slides(node, entry_id, frames_path)
+        self._build_slides(node, entry_id, md_paths)
 
         if not any(child.mime_type == mt.MARKDOWN for child in node.children):
             logger.warning(f"Dropping {node.title}: no frames were extracted from it")
             if node.parent is not None:
                 node.parent.children.remove(node)
 
-    def _write_frames(self, video_url: str, timestamps: list[int], frames_path: Path) -> None:
-        """Extract one frame per interval into frames_path.
+    def _node(self, key: str) -> dict | None:
+        """The video's node record, or None when there is none or it is malformed."""
+        text = self.cache.read(key, NODE_NAME)
+        if text is None:
+            return None
+
+        try:
+            record = json.loads(text)
+            if not isinstance(record, dict) or not isinstance(record.get("children"), list):
+                return None
+        except json.JSONDecodeError:
+            return None
+
+        return record
+
+    def _adopt(self, record: dict | None, work_dir: Path) -> list[Path] | None:
+        """The slide transcripts adopted from the node, or None to detect instead.
+
+        Adoption needs the current fingerprint and every leaf it names
+        still in the cache — anything less falls back to detection, which
+        re-fills what is missing. Copies already made before the gap are
+        harmless: the detection path re-reads them from the same leaves.
+        """
+        if record is None or record.get("fingerprint") != FINGERPRINT:
+            return None
+
+        work_dir.mkdir(parents=True, exist_ok=True)
+        md_paths: list[Path] = []
+        try:
+            for name, frame_hash in record["children"]:
+                md_path = work_dir / name
+                if not self.cache.get(frame_hash, md_path):
+                    return None
+                md_paths.append(md_path)
+        except (TypeError, ValueError):
+            return None
+
+        return md_paths
+
+    def _extract(
+        self, video_url: str, timestamps: list[int], work_dir: Path, stale: bool
+    ) -> list[tuple[Path, Path]]:
+        """Extract one frame per interval and read it, refilling the leaves.
 
         The last reported timestamp is the end of the video rather than a
-        slide, so it only bounds the final interval.
+        slide, so it only bounds the final interval. The frames are scratch:
+        read once here, never cached — the transcripts outlive them.
         """
 
         kept = filter_close_timestamps(timestamps, self.min_slide_seconds)
 
         if len(kept) < 2:
             logger.warning(f"Only {len(kept)} slide timestamps, nothing to cut into intervals")
-            return
+            return []
 
-        frames_path.mkdir(parents=True, exist_ok=True)
+        work_dir.mkdir(parents=True, exist_ok=True)
 
+        frames: list[Path] = []
         for position in range(len(kept) - 1):
             start = kept[position]
             end = kept[position + 1]
 
             # Each frame is named after the second its interval starts at,
             # which is where the slides and their deep links are read back
-            # from. Keeping it in the name means the cached folder is enough
-            # on its own, with no extra file listing which frame belongs to
-            # which moment. Six digits so that sorting the names sorts them
-            # chronologically.
-            output_path = frames_path / f"{start:06d}.jpg"
-            if not extract_frame(video_url, frame_time(start, end), output_path):
+            # from. Keeping it in the name means the node record is enough
+            # to adopt the slides, with no extra file listing which frame
+            # belongs to which moment. Six digits so that sorting the names
+            # sorts them chronologically.
+            frame_path = work_dir / f"{start:06d}.jpg"
+            if extract_frame(video_url, frame_time(start, end), frame_path):
+                frames.append(frame_path)
+            else:
                 logger.warning(f"Could not extract the frame for the interval starting at {start}s")
 
-    def _build_slides(self, node: Resource, entry_id: str, frames_path: Path) -> None:
-        """Turn the frames on disk into one slide child each, read and captioned."""
-
-        frame_paths = sorted(frames_path.glob("*.jpg"))
-
         with ThreadPoolExecutor(max_workers=MAX_CONCURRENT_OCR) as executor:
-            md_paths = list(executor.map(self._ocr_frame, frame_paths))
+            md_paths = list(
+                executor.map(
+                    lambda frame: ocr_cached(
+                        self.cache,
+                        frame,
+                        SLIDE_SYSTEM_PROMPT,
+                        SLIDE_USER_PROMPT,
+                        frame.with_suffix(".md"),
+                        bypass=stale,
+                    ),
+                    frames,
+                )
+            )
 
-        for frame_path, md_path in zip(frame_paths, md_paths):
+        return list(zip(frames, md_paths))
+
+    def _write_node(self, key: str, frames: list[tuple[Path, Path]]) -> None:
+        """Write the video's node record: its fingerprint and ordered slide leaves."""
+        children = [[md_path.name, hash_bytes(frame_path.read_bytes())] for frame_path, md_path in frames]
+        self.cache.write(key, NODE_NAME, json.dumps({"fingerprint": FINGERPRINT, "children": children}))
+
+    def _build_slides(self, node: Resource, entry_id: str, md_paths: list[Path]) -> None:
+        """Turn the read slides into one slide child each, captioned."""
+
+        for md_path in sorted(md_paths, key=lambda path: int(path.stem)):
             if not md_path.read_text(encoding="utf-8").strip():
-                logger.debug(f"Dropping {frame_path.name} of {node.title}: no readable content")
+                logger.debug(f"Dropping {md_path.name} of {node.title}: no readable content")
                 continue
 
-            start_seconds = int(frame_path.stem)
+            start_seconds = int(md_path.stem)
 
             # Each slide carries the public watch url of its own moment, so a
             # chunk cut from it links straight into that moment of the lecture
@@ -142,11 +240,6 @@ class VideoMaterializer:
             )
 
         self._merge_captions(node)
-
-    def _ocr_frame(self, frame_path: Path) -> Path:
-        return ocr_cached(
-            self.cache, frame_path, SLIDE_SYSTEM_PROMPT, SLIDE_USER_PROMPT, frame_path.with_suffix(".md")
-        )
 
     def _merge_captions(self, node: Resource) -> None:
         """Append the words spoken over each slide to it.

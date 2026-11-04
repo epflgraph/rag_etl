@@ -121,8 +121,8 @@ def test_warm_pdf_rerun_adopts_the_whole_subtree(tmp_path, transformer, monkeypa
         lambda self, prompt, images, **kwargs: calls.append(kwargs.get("name")) or "slide text",
     )
 
-    # As the pipeline does at every run start: the bench is scratch, so the
-    # warm run must rebuild it from the cache alone
+    # As the pipeline does at every run start: the work area is scratch, so
+    # the warm run must rebuild it from the cache alone
     shutil.rmtree(transformer.work_root)
 
     root = Resource(title="root", children=[Resource(title="lecture", path=pdf_path, mime_type=mt.PDF)])
@@ -132,9 +132,9 @@ def test_warm_pdf_rerun_adopts_the_whole_subtree(tmp_path, transformer, monkeypa
     assert [child.title for child in root.children[0].children] == ["page 1", "page 2"]
     # Only the transcripts are staged back into the work area: no page is
     # rendered, so no png exists at all
-    bench = tmp_path / "material" / "work" / hash_bytes(pdf_path.read_bytes())
-    assert (bench / "page_1.md").is_file()
-    assert not (bench / "page_1.png").exists()
+    work_dir = tmp_path / "material" / "work" / hash_bytes(pdf_path.read_bytes())
+    assert (work_dir / "page_1.md").is_file()
+    assert not (work_dir / "page_1.png").exists()
 
 
 def test_fingerprint_bump_reOCRs_every_page(tmp_path, transformer, monkeypatch):
@@ -261,8 +261,9 @@ def test_video_with_no_frames_dropped(tmp_path, transformer):
     assert root.children == []
 
 
-def test_changed_video_leaves_no_stale_frames(tmp_path, transformer):
-    """A video that changed detects fewer frames: the old ones must not survive as slides."""
+def test_video_reexport_churn_keeps_the_cached_slides(tmp_path, transformer, monkeypatch):
+    """The video is its entry, not its descriptor: a re-export that rewrites the
+    descriptor's bytes must not re-detect, re-extract and re-read the lecture."""
     descriptor_path = tmp_path / "0_abc.json"
     descriptor_path.write_text('{"entry_id": "0_abc"}', encoding="utf-8")
     video = Resource(title="lecture 1", url="https://mediaspace.epfl.ch/watch/0_abc", path=descriptor_path, mime_type=mt.MP4)
@@ -271,16 +272,54 @@ def test_changed_video_leaves_no_stale_frames(tmp_path, transformer):
     transformer.transform([root])
     assert len(root.children[0].children) == 2
 
-    # The video changed: same path, new content, so the cache misses
-    descriptor_path.write_text('{"entry_id": "0_abc", "version": 2}', encoding="utf-8")
-    shorter = MaterializeTransformer(
+    def no_detect(*args, **kwargs):
+        raise AssertionError("detection must not run for an unchanged entry")
+
+    monkeypatch.setattr(
+        "rag_etl.transformers.materialize.video.extract_frame",
+        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("no frame may be extracted either")),
+    )
+    reexported = MaterializeTransformer(
         cache=transformer.cache,
+        work_root=transformer.work_root,
+        detector=SimpleNamespace(detect=no_detect),
+    )
+    descriptor_path.write_text('{"entry_id": "0_abc", "version": 2}', encoding="utf-8")
+    root = Resource(
+        title="root",
+        children=[Resource(title="lecture 1", url="https://mediaspace.epfl.ch/watch/0_abc", path=descriptor_path, mime_type=mt.MP4)],
+    )
+
+    reexported.transform([root])
+
+    # The whole subtree is adopted: the same slides, nothing re-done
+    assert [child.title for child in root.children[0].children] == ["0:00", "0:40"]
+
+
+def test_refreshed_video_redetects_and_leaves_no_stale_frames(tmp_path, transformer):
+    """`--refresh materialize` re-detects from scratch: the run's slides are
+    only what the new detection found, nothing survives from the old video."""
+    descriptor_path = tmp_path / "0_abc.json"
+    descriptor_path.write_text('{"entry_id": "0_abc"}', encoding="utf-8")
+    root = Resource(
+        title="root",
+        children=[Resource(title="lecture 1", url="https://mediaspace.epfl.ch/watch/0_abc", path=descriptor_path, mime_type=mt.MP4)],
+    )
+
+    transformer.transform([root])
+    assert len(root.children[0].children) == 2
+
+    refreshed = MaterializeTransformer(
+        cache=Cache("micro303", "materialize", refresh=True),
         work_root=transformer.work_root,
         detector=SimpleNamespace(detect=lambda *args, **kwargs: [0]),
     )
-    root = Resource(title="root", children=[Resource(title="lecture 1", url="https://mediaspace.epfl.ch/watch/0_abc", path=descriptor_path, mime_type=mt.MP4)])
+    root = Resource(
+        title="root",
+        children=[Resource(title="lecture 1", url="https://mediaspace.epfl.ch/watch/0_abc", path=descriptor_path, mime_type=mt.MP4)],
+    )
 
-    shorter.transform([root])
+    refreshed.transform([root])
 
-    # No new frames detected: nothing must be left over from the old video
+    # No frames detected this time: nothing must be left over from the old video
     assert root.children == []

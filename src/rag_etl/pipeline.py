@@ -45,8 +45,8 @@ def run_pipeline(spec: ProjectSpec, dry: bool = False, refresh: str | None = Non
     material = material_dir(spec)
 
     # The work area is pure scratch: everything in it is re-derivable from
-    # the sources and the cache, so every run starts from a clean bench —
-    # and a crashed run's leftovers never survive into the new one
+    # the sources and the cache, so every run starts from a clean work
+    # area — and a crashed run's leftovers never survive into the new one
     shutil.rmtree(material / "work", ignore_errors=True)
 
     roots = extract(spec.sources)

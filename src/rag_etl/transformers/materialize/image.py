@@ -30,9 +30,9 @@ class ImageMaterializer:
         if image_path is None:
             return
 
-        bench = self.work_root / hash_bytes(image_path.read_bytes())
+        work_dir = self.work_root / hash_bytes(image_path.read_bytes())
         md_path = ocr_cached(
-            self.cache, image_path, SLIDE_SYSTEM_PROMPT, SLIDE_USER_PROMPT, bench / f"{image_path.stem}.md"
+            self.cache, image_path, SLIDE_SYSTEM_PROMPT, SLIDE_USER_PROMPT, work_dir / f"{image_path.stem}.md"
         )
 
         if not md_path.read_text(encoding="utf-8").strip():

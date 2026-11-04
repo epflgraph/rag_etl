@@ -49,15 +49,15 @@ class PdfMaterializer:
             return
 
         pdf_hash = node.content_hash
-        bench = self.work_root / pdf_hash
+        work_dir = self.work_root / pdf_hash
 
         record = self._node(pdf_hash)
-        pages = self._adopt(record, bench)
+        pages = self._adopt(record, work_dir)
         if pages is None:
             # A stale recipe means the leaves are not trusted either: they
             # are keyed by pixels alone, so every page is read again
             stale = record is not None and record.get("fingerprint") != FINGERPRINT
-            pages = self._render(pdf_path, pdf_hash, bench, stale)
+            pages = self._render(pdf_path, pdf_hash, work_dir, stale)
 
         for page_number, md_path in pages:
             if not md_path.read_text(encoding="utf-8").strip():
@@ -83,8 +83,8 @@ class PdfMaterializer:
 
         return record
 
-    def _adopt(self, record: dict | None, bench: Path) -> list[tuple[int, Path]] | None:
-        """The bench pages adopted from the node, or None to render instead.
+    def _adopt(self, record: dict | None, work_dir: Path) -> list[tuple[int, Path]] | None:
+        """The page transcripts adopted from the node, or None to render instead.
 
         Adoption needs the current fingerprint and every leaf it names
         still in the cache — anything less falls back to rendering, which
@@ -94,11 +94,11 @@ class PdfMaterializer:
         if record is None or record.get("fingerprint") != FINGERPRINT:
             return None
 
-        bench.mkdir(parents=True, exist_ok=True)
+        work_dir.mkdir(parents=True, exist_ok=True)
         pages: list[tuple[int, Path]] = []
         try:
             for name, leaf_hash in record["children"]:
-                md_path = bench / name
+                md_path = work_dir / name
                 if not self.cache.get(leaf_hash, md_path):
                     return None
                 pages.append((int(Path(name).stem.removeprefix("page_")), md_path))
@@ -107,9 +107,9 @@ class PdfMaterializer:
 
         return pages
 
-    def _render(self, pdf_path: Path, pdf_hash: str, bench: Path, stale: bool) -> list[tuple[int, Path]]:
+    def _render(self, pdf_path: Path, pdf_hash: str, work_dir: Path, stale: bool) -> list[tuple[int, Path]]:
         """Render every page and read it, refilling the leaves and the node."""
-        page_paths = save_pdf_pages(pdf_path, bench)
+        page_paths = save_pdf_pages(pdf_path, work_dir)
 
         with ThreadPoolExecutor(max_workers=MAX_CONCURRENT_OCR) as executor:
             md_paths = list(

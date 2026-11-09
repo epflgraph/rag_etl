@@ -1,9 +1,10 @@
 from __future__ import annotations
 
+import json
 import logging
+import os
 import re
 import shutil
-import json
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime
@@ -12,7 +13,6 @@ from pathlib import Path
 import requests
 
 import ragtools.mime_types as mt
-from rag_etl.config import CONFIG
 from rag_etl.core import Resource
 from rag_etl.extractors.base_extractor import Extractor, SourceUnavailable
 from ragtools.encoding import sanitize_for_filename
@@ -98,10 +98,10 @@ class MoodleExtractor(Extractor):
         """
 
         # Build Moodle endpoint and parameters
-        moodle_endpoint = f"{CONFIG['MOODLE_URL']}/webservice/rest/server.php"
+        moodle_endpoint = f"{os.environ['MOODLE_URL']}/webservice/rest/server.php"
 
         params = {
-            "wstoken": CONFIG["MOODLE_TOKEN"],
+            "wstoken": os.environ["MOODLE_TOKEN"],
             "wsfunction": "core_course_get_contents",
             "moodlewsrestformat": "json",
             "courseid": self.course_id,
@@ -122,7 +122,7 @@ class MoodleExtractor(Extractor):
 
         logging.info(f"Moodle course {self.course_id}: {len(sections)} sections")
 
-        course_url = f"{CONFIG['MOODLE_URL']}/course/view.php?id={self.course_id}"
+        course_url = f"{os.environ['MOODLE_URL']}/course/view.php?id={self.course_id}"
         course = Resource(title=f"Moodle course {self.course_id}", url=course_url)
 
         # Empty dir if it exists
@@ -176,7 +176,7 @@ class MoodleExtractor(Extractor):
 
                     # Download file from url, failing loud when it fails
                     try:
-                        response = requests.get(f"{module_contents['fileurl']}&token={CONFIG['MOODLE_TOKEN']}")
+                        response = requests.get(f"{module_contents['fileurl']}&token={os.environ['MOODLE_TOKEN']}")
                         response.raise_for_status()
                     except requests.RequestException as error:
                         raise SourceUnavailable(

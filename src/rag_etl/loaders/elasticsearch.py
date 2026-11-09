@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 
 from datetime import datetime
 from pathlib import Path
@@ -19,7 +20,6 @@ from typing import Any
 from elasticsearch import Elasticsearch, NotFoundError
 from elasticsearch.helpers import bulk
 
-from rag_etl.config import config_value
 from rag_etl.core import Resource
 
 logger = logging.getLogger(__name__)
@@ -47,9 +47,9 @@ def index_settings(language: str | None) -> dict[str, Any]:
 def _client() -> Elasticsearch:
     """The shared instance, configured from the environment."""
     return Elasticsearch(
-        hosts=[f"https://{config_value('ES_HOST')}:{config_value('ES_PORT')}"],
-        basic_auth=(config_value("ES_USERNAME"), config_value("ES_PASSWORD")),
-        ca_certs=config_value("ES_CAFILE"),
+        hosts=[f"https://{os.environ['ES_HOST']}:{os.environ['ES_PORT']}"],
+        basic_auth=(os.environ["ES_USERNAME"], os.environ["ES_PASSWORD"]),
+        ca_certs=os.environ["ES_CAFILE"],
         request_timeout=3600,
     )
 

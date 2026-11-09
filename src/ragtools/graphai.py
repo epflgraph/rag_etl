@@ -1,9 +1,8 @@
 import logging
+import os
 import time
 
 import requests
-
-from ragtools.config import required
 
 logger = logging.getLogger(__name__)
 
@@ -50,12 +49,12 @@ def get_access_token() -> str:
 
     payload = request_json(
         "POST",
-        f"{required('GRAPH_AI_URL')}/token",
+        f"{os.environ['GRAPH_AI_URL']}/token",
         headers={"accept": "application/json", "Content-Type": "application/x-www-form-urlencoded"},
         data={
             "grant_type": "",
-            "username": required('GRAPH_AI_USERNAME'),
-            "password": required('GRAPH_AI_PASSWORD'),
+            "username": os.environ['GRAPH_AI_USERNAME'],
+            "password": os.environ['GRAPH_AI_PASSWORD'],
             "scope": "",
             "client_id": "",
             "client_secret": "",
@@ -88,7 +87,7 @@ def poll_task(endpoint: str, task_id: str, token: str) -> dict:
     deadline = time.time() + MAX_WAIT_SECONDS
 
     while time.time() < deadline:
-        payload = request_json("GET", f"{required('GRAPH_AI_URL')}/{endpoint}/status/{task_id}", headers=headers)
+        payload = request_json("GET", f"{os.environ['GRAPH_AI_URL']}/{endpoint}/status/{task_id}", headers=headers)
 
         if payload["task_status"] != "PENDING":
             return payload
@@ -104,7 +103,7 @@ def retrieve_video(video_url: str, token: str) -> str:
 
     response = request_json(
         "POST",
-        f"{required('GRAPH_AI_URL')}/video/retrieve_url",
+        f"{os.environ['GRAPH_AI_URL']}/video/retrieve_url",
         headers=json_headers(token),
         json={"url": video_url, "force": False, "playlist": False},
     )
@@ -131,7 +130,7 @@ def detect_slides(video_token: str, token: str, language: str | None = None) -> 
 
     response = request_json(
         "POST",
-        f"{required('GRAPH_AI_URL')}/video/detect_slides",
+        f"{os.environ['GRAPH_AI_URL']}/video/detect_slides",
         headers=json_headers(token),
         json={"token": video_token, "force_non_self": True, "force": False, "language": language or "en"},
     )

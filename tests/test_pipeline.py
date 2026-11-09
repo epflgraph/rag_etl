@@ -88,11 +88,8 @@ def test_transform_bypasses_only_the_refreshed_cache(tmp_path, monkeypatch):
 
 
 def test_run_pipeline_writes_a_manifest(tmp_path, monkeypatch):
-    monkeypatch.setattr(
-        "rag_etl.config.CONFIG",
-        {"CACHE_DIR": str(tmp_path / "cache"), "BASE_PATH": str(tmp_path / "base")},
-        raising=False,
-    )
+    monkeypatch.setenv("CACHE_DIR", str(tmp_path / "cache"))
+    monkeypatch.setenv("BASE_PATH", str(tmp_path / "base"))
     monkeypatch.setattr("rag_etl.pipeline.extract", lambda sources: [Resource(title="root")])
     monkeypatch.setattr("rag_etl.pipeline.transform", lambda roots, spec, refresh=None: roots)
     monkeypatch.setattr(
@@ -110,11 +107,8 @@ def test_run_pipeline_writes_a_manifest(tmp_path, monkeypatch):
 
 
 def test_run_pipeline_marks_dry_manifests(tmp_path, monkeypatch):
-    monkeypatch.setattr(
-        "rag_etl.config.CONFIG",
-        {"CACHE_DIR": str(tmp_path / "cache"), "BASE_PATH": str(tmp_path / "base")},
-        raising=False,
-    )
+    monkeypatch.setenv("CACHE_DIR", str(tmp_path / "cache"))
+    monkeypatch.setenv("BASE_PATH", str(tmp_path / "base"))
     monkeypatch.setattr("rag_etl.pipeline.extract", lambda sources: [Resource(title="root")])
     monkeypatch.setattr("rag_etl.pipeline.transform", lambda roots, spec, refresh=None: roots)
 

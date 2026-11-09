@@ -16,11 +16,10 @@ itself stays agnostic: node or leaf, every entry is content keyed.
 
 from __future__ import annotations
 
+import os
 import shutil
 
 from pathlib import Path
-
-from rag_etl.config import config_value
 
 
 class Cache:
@@ -31,7 +30,7 @@ class Cache:
         self.transform = transform
         self.refresh = refresh
 
-        cache_path = Path(config_value("CACHE_DIR"))
+        cache_path = Path(os.environ["CACHE_DIR"])
         if not cache_path.exists():
             raise ValueError(f"Cache path {cache_path} does not exist.")
         self.cache_path = cache_path / project / transform

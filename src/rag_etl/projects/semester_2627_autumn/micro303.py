@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+import os
+
 from pathlib import Path
 
 import ragtools.mime_types as mt
 
-from rag_etl.config import config_value
 from rag_etl.extractors import LocalFolderExtractor, MOOCExtractor, MoodleExtractor  # , EdDiscussionExtractor
 from rag_etl.projects.spec import ProjectSpec
 
@@ -41,7 +42,7 @@ MOOC_TAG_METADATA = {
     },
 }
 
-course_path = Path(config_value("BASE_PATH")) / "MICRO303"
+course_path = Path(os.environ["BASE_PATH"]) / "MICRO303"
 
 MICRO303 = ProjectSpec(
     id="micro303",

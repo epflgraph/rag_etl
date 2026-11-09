@@ -9,13 +9,13 @@ stops loud.
 from __future__ import annotations
 
 import logging
+import os
 import shutil
 
 from datetime import UTC, datetime
 from pathlib import Path
 
 from rag_etl.cache import Cache
-from rag_etl.config import CONFIG, config_value
 from rag_etl.core import Resource
 from rag_etl.extractors import Extractor
 from rag_etl.loaders import ElasticsearchLoader, ManifestLoader
@@ -33,7 +33,7 @@ logger = logging.getLogger(__name__)
 
 def material_dir(spec: ProjectSpec) -> Path:
     """The project's material folder: sources, work area and manifests."""
-    return spec.dir or Path(config_value("BASE_PATH")) / spec.id
+    return spec.dir or Path(os.environ["BASE_PATH"]) / spec.id
 
 
 def run_pipeline(spec: ProjectSpec, dry: bool = False, refresh: str | None = None) -> None:
@@ -80,7 +80,7 @@ def transform(roots: list[Resource], spec: ProjectSpec, refresh: str | None = No
         cache=Cache(spec.id, "materialize", refresh=refresh == "materialize"),
         work_root=material_dir(spec) / "work",
         detector=GraphAISlideDetector(),
-        mediaspace_url=CONFIG.get("DEFAULT_MEDIASPACE_BASE_URL"),
+        mediaspace_url=os.environ.get("DEFAULT_MEDIASPACE_BASE_URL"),
         language=spec.language,
     )
     judge = JudgeTransformer(exceptions=spec.exceptions)

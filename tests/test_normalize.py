@@ -16,7 +16,7 @@ from rag_etl.transformers.normalize.normalize_transformer import NormalizeTransf
 
 @pytest.fixture
 def transformer(tmp_path, monkeypatch):
-    monkeypatch.setattr("rag_etl.config.CONFIG", {"CACHE_DIR": str(tmp_path / "cache")}, raising=False)
+    monkeypatch.setenv("CACHE_DIR", str(tmp_path / "cache"))
     (tmp_path / "cache").mkdir()
     return NormalizeTransformer(cache=Cache("micro303", "normalize"))
 

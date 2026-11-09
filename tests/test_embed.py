@@ -11,7 +11,7 @@ from rag_etl.transformers.embed.embed import BATCH_SIZE, REQUEST_CHAR_BUDGET, Em
 
 @pytest.fixture
 def cache(tmp_path, monkeypatch):
-    monkeypatch.setattr("rag_etl.config.CONFIG", {"CACHE_DIR": str(tmp_path / "cache")}, raising=False)
+    monkeypatch.setenv("CACHE_DIR", str(tmp_path / "cache"))
     (tmp_path / "cache").mkdir()
     return Cache("micro303", "embed")
 

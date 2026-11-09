@@ -1,12 +1,12 @@
 import json
 import logging
+import os
 import shutil
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date, datetime
 from pathlib import Path
 
-from rag_etl.config import config_value
 from rag_etl.core import Resource
 from rag_etl.extractors.base_extractor import Extractor, SourceUnavailable
 from rag_etl.extractors.mediaspace.utils import (
@@ -184,11 +184,11 @@ class MediaspaceExtractor(Extractor):
         # Reaching the source, failing loud when it cannot be reached
         try:
             client = create_kaltura_session(
-                api_url=config_value("SWITCH_API_URL"),
-                kaltura_app_token_id=config_value("KALTURA_APP_TOKEN_ID"),
-                kaltura_user_id=config_value("KALTURA_USER_ID"),
-                kaltura_token=config_value("KALTURA_TOKEN"),
-                kaltura_partner_id=int(config_value("KALTURA_PARTNER_ID")),
+                api_url=os.environ["SWITCH_API_URL"],
+                kaltura_app_token_id=os.environ["KALTURA_APP_TOKEN_ID"],
+                kaltura_user_id=os.environ["KALTURA_USER_ID"],
+                kaltura_token=os.environ["KALTURA_TOKEN"],
+                kaltura_partner_id=int(os.environ["KALTURA_PARTNER_ID"]),
             )
         except Exception as error:
             raise SourceUnavailable(f"Kaltura session could not be created: {error}") from error

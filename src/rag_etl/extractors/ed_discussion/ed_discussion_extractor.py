@@ -1,8 +1,8 @@
 import json
 import logging
+import os
 from pathlib import Path
 
-from rag_etl.config import CONFIG
 from rag_etl.core import Resource
 from rag_etl.extractors.base_extractor import Extractor
 from rag_etl.extractors.ed_discussion.catalogue import build_catalogue, find_entry, render_catalogue_entry
@@ -61,11 +61,11 @@ class EdDiscussionExtractor(Extractor):
         """Build the juror model list from config: the required model plus any optional jurors."""
 
         models: list[str] = []
-        first_model = CONFIG["RCP_EDSTEM_EXTRACTOR_MODEL"]
+        first_model = os.environ["RCP_EDSTEM_EXTRACTOR_MODEL"]
         if first_model:
             models.append(first_model)
         for key in ("RCP_EDSTEM_EXTRACTOR_MODEL_2", "RCP_EDSTEM_EXTRACTOR_MODEL_3"):
-            extra_model = CONFIG.get(key)
+            extra_model = os.environ.get(key)
             if extra_model:
                 models.append(extra_model)
         return models

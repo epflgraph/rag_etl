@@ -1,5 +1,6 @@
 import hashlib
 import logging
+import os
 from pathlib import Path
 from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 
@@ -8,7 +9,6 @@ from KalturaClient import KalturaClient, KalturaConfiguration
 from KalturaClient.exceptions import KalturaException
 from KalturaClient.Plugins.Caption import KalturaCaptionAssetFilter, KalturaCaptionAssetStatus, KalturaCaptionType
 
-from ragtools.config import required
 import ragtools.mime_types as mt
 from KalturaClient.Plugins.Core import (
     KalturaBaseEntryFilter,
@@ -182,7 +182,7 @@ def build_entry_url(entry_id: str, base_url: str | None = None, start_seconds: i
     if parsed.scheme and parsed.netloc:
         instance_url = f"{parsed.scheme}://{parsed.netloc}"
     else:
-        instance_url = required("DEFAULT_MEDIASPACE_BASE_URL")
+        instance_url = os.environ["DEFAULT_MEDIASPACE_BASE_URL"]
 
     url = f"{instance_url}/media/t/{entry_id}"
 

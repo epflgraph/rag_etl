@@ -9,12 +9,12 @@ from rag_etl.cache import Cache
 def cache_dir(tmp_path, monkeypatch):
     directory = tmp_path / "cache"
     directory.mkdir()
-    monkeypatch.setattr("rag_etl.config.CONFIG", {"CACHE_DIR": str(directory)}, raising=False)
+    monkeypatch.setenv("CACHE_DIR", str(directory))
     return directory
 
 
 def test_missing_cache_dir_fails(tmp_path, monkeypatch):
-    monkeypatch.setattr("rag_etl.config.CONFIG", {"CACHE_DIR": str(tmp_path / "nowhere")}, raising=False)
+    monkeypatch.setenv("CACHE_DIR", str(tmp_path / "nowhere"))
     with pytest.raises(ValueError):
         Cache("micro303", "materialize")
 

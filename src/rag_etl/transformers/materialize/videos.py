@@ -9,8 +9,8 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 
-from rag_etl.config import config_value
 from rag_etl.core import Resource
 from ragtools.graphai import GraphAIError, detect_slides, get_access_token, retrieve_video
 from ragtools.kaltura import (
@@ -44,11 +44,11 @@ class KalturaVideoResolver:
     def url(self, entry_id: str) -> str | None:
         if self._client is None:
             self._client = create_kaltura_session(
-                api_url=config_value("SWITCH_API_URL"),
-                kaltura_app_token_id=config_value("KALTURA_APP_TOKEN_ID"),
-                kaltura_user_id=config_value("KALTURA_USER_ID"),
-                kaltura_token=config_value("KALTURA_TOKEN"),
-                kaltura_partner_id=int(config_value("KALTURA_PARTNER_ID")),
+                api_url=os.environ["SWITCH_API_URL"],
+                kaltura_app_token_id=os.environ["KALTURA_APP_TOKEN_ID"],
+                kaltura_user_id=os.environ["KALTURA_USER_ID"],
+                kaltura_token=os.environ["KALTURA_TOKEN"],
+                kaltura_partner_id=int(os.environ["KALTURA_PARTNER_ID"]),
             )
 
         slides_entry_id = find_slides_entry_id(self._client, entry_id)

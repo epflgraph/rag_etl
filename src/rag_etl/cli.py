@@ -2,6 +2,8 @@ import argparse
 import logging
 import sys
 
+from dotenv import find_dotenv, load_dotenv
+
 from rag_etl.projects import from_code
 from rag_etl.pipeline import run_pipeline
 
@@ -31,6 +33,10 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> None:
     parser = build_parser()
     args = parser.parse_args(argv)
+
+    # The settings and secrets come from the environment; a .env found from
+    # the working directory upwards fills in what the environment lacks
+    load_dotenv(find_dotenv(usecwd=True))
 
     logging.basicConfig(
         level=logging.INFO,

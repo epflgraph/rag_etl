@@ -3,7 +3,6 @@ from __future__ import annotations
 import json
 import logging
 import os
-import re
 import shutil
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -15,12 +14,10 @@ import requests
 import ragtools.mime_types as mt
 from rag_etl.core import Resource
 from rag_etl.extractors.base import Extractor, SourceUnavailable
+from rag_etl.extractors.markers import NO_BOT, split_tag_text
 from ragtools.encoding import sanitize_for_filename
-from rag_etl.utils.tags import split_tag_text
 
-
-# A module or file marked NO_BOT is not for the bots; everything else is extracted
-NO_BOT = re.compile(r"\[NO_BOT\]")
+logger = logging.getLogger(__name__)
 
 
 def display(name: str) -> str:
@@ -120,7 +117,7 @@ class MoodleExtractor(Extractor):
         if self.sections is not None:
             sections = sections[: self.sections]
 
-        logging.info(f"Moodle course {self.course_id}: {len(sections)} sections")
+        logger.info(f"Moodle course {self.course_id}: {len(sections)} sections")
 
         course_url = f"{os.environ['MOODLE_URL']}/course/view.php?id={self.course_id}"
         course = Resource(title=f"Moodle course {self.course_id}", url=course_url)
@@ -137,11 +134,11 @@ class MoodleExtractor(Extractor):
             for module in section.get("modules", []):
                 # Skip if not a 'resource' (filter Forum modules, URL modules, etc.)
                 if module["modname"] not in ("resource", "folder"):
-                    logging.debug(f"Skipping module {module['name']} because of modname {module['modname']}")
+                    logger.debug(f"Skipping module {module['name']} because of modname {module['modname']}")
                     continue
 
                 if NO_BOT.search(module["name"]):
-                    logging.debug(f"Skipping module {module['name']} because it is marked NO_BOT")
+                    logger.debug(f"Skipping module {module['name']} because it is marked NO_BOT")
                     continue
 
                 module_title = display(module["name"])
@@ -164,12 +161,12 @@ class MoodleExtractor(Extractor):
 
                     # Skip if mime type not in list
                     if mime_type not in self.mime_types:
-                        logging.debug(f"Skipping file {module_contents['filename']} because of mime type {mime_type}")
+                        logger.debug(f"Skipping file {module_contents['filename']} because of mime type {mime_type}")
                         continue
 
                     # A file marked NO_BOT is not for the bots
                     if NO_BOT.search(module_contents["filename"]):
-                        logging.debug(f"Skipping file {module_contents['filename']} because it is marked NO_BOT")
+                        logger.debug(f"Skipping file {module_contents['filename']} because it is marked NO_BOT")
                         continue
 
                     title = display(module_contents["filename"])
@@ -198,7 +195,7 @@ class MoodleExtractor(Extractor):
                     module_contents_path.parent.mkdir(parents=True, exist_ok=True)
                     module_contents_path.write_bytes(response.content)
                     extracted += 1
-                    logging.info(f"Downloaded {module_title} > {title}")
+                    logger.info(f"Downloaded {module_title} > {title}")
 
                     if section_node is None:
                         section_node = course.add_child(title=section.get("name") or "")
@@ -212,6 +209,6 @@ class MoodleExtractor(Extractor):
                         until=until,
                     )
 
-        logging.info(f"Moodle course {self.course_id}: extracted {extracted} files")
+        logger.info(f"Moodle course {self.course_id}: extracted {extracted} files")
 
         return course

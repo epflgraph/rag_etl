@@ -93,32 +93,3 @@ def ensure_utf8(path: Path) -> bool:
         return True
 
     return False
-
-
-if __name__ == "__main__":
-    examples = [
-        "résumé 2026: final version?.pdf",
-        "../../etc/passwd",
-        "/absolute/path/to/file.txt",
-        r"C:\Windows\system32\file.txt",
-        ".. / . / .. file ../.. 2 .pdf",
-        "Slides for session 3/4",
-        ".",
-        "..",
-        "////",
-        "é.txt",
-        "e\u0301.txt",
-        r'<>:"/\|?*',
-        "file name. ",
-        "",
-        "my\nfile\tname.txt",
-        "CON.txt",
-        "NUL",
-        "LPT1.doc",
-    ]
-
-    for example in examples:
-        try:
-            print(f"{example!r} -> {sanitize_for_filename(example)}")
-        except Exception as e:
-            print(f"{example!r} -> ERROR: {e}")

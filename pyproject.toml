@@ -20,12 +20,13 @@ dependencies = [
     "requests",
     "openai",
     "lxml",
-    "bs4",
+    "beautifulsoup4",
     "nbformat",
     "nbconvert",
     "pymupdf",
     "Pillow",
     "pathvalidate",     # sanitise user-input strings to use as filenames
+    "pydantic",
     "langfuse",
     "KalturaApiClient",
     "elasticsearch>=8,<9",
@@ -48,7 +49,6 @@ where = ["src"]
 [project.optional-dependencies]
 dev = [
     "pytest",
-    "black",
     "ruff",
     "mypy",
 ]
@@ -63,18 +63,9 @@ line-length = 120
 [tool.ruff.lint]
 ignore = [
     "I001",   # avoids import reordering
-    "RUF012", # avoids linting in course_info and tag_metadata
     "RUF022", # avoids expecting alphabetical order
 ]
 
 [tool.mypy]
 python_version = "3.12"
 ignore_missing_imports = true
-
-# Legacy-but-alive, pre-refactor: Ed's LLM cascade, awaiting its migration
-# into ragtools. Remove this entry when it moves so mypy gates it.
-[[tool.mypy.overrides]]
-module = [
-    "rag_etl.utils.llms",
-]
-ignore_errors = true

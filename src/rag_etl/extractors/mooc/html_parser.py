@@ -24,7 +24,7 @@ from rag_etl.extractors.mooc.utils import (
 )
 
 from ragtools.encoding import sanitize_for_filename
-from rag_etl.utils.tags import split_tag_number_text, split_tag_text
+from rag_etl.extractors.markers import split_tag_number_text, split_tag_text
 
 import ragtools.mime_types as mt
 

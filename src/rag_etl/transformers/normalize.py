@@ -76,7 +76,7 @@ class NormalizeTransformer(Transformer):
             if not is_archive(node) or node.path is None:
                 continue
 
-            logging.info(f"Extracting {node.title}")
+            logger.info(f"Extracting {node.title}")
 
             if node.mime_type == mt.ZIP:
                 extract_dir = unzip_file(node.path)

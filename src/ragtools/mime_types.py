@@ -38,7 +38,6 @@ mimetypes.add_type(IPYNB, ".ipynb")
 mimetypes.add_type("text/x-asm", ".v")
 mimetypes.add_type("text/x-asm", ".ld")
 mimetypes.add_type(MATLAB_SOURCE, ".m")
-# ToDo: Support (.tar.gz) for CS-200
 
 DEFAULT_MIME_TYPES = [
     MARKDOWN,

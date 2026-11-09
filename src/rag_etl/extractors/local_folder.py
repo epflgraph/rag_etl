@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 import os
-import re
 from collections.abc import Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -10,9 +9,9 @@ from pathlib import Path
 from ragtools.mime_types import DEFAULT_MIME_TYPES, guess_mime_type
 from rag_etl.core import Resource
 from rag_etl.extractors.base import Extractor, SourceUnavailable
+from rag_etl.extractors.markers import NO_BOT
 
-# A module or file marked NO_BOT is not for the bots; everything else is extracted
-NO_BOT = re.compile(r"\[NO_BOT\]")
+logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -63,23 +62,23 @@ class LocalFolderExtractor(Extractor):
 
                 # A file under a NO_BOT-marked folder, or marked itself, is not for the bots
                 if any(NO_BOT.search(part) for part in relative.parts):
-                    logging.info(f"Skipping file {str(file_path)} because it is marked NO_BOT.")
+                    logger.info(f"Skipping file {str(file_path)} because it is marked NO_BOT.")
                     continue
 
                 # Skip if hidden file (e.g. .DS_STORE, .git, .idea, etc.)
                 if file_path.name.startswith("."):
-                    logging.info(f"Skipping file {str(file_path)} because we consider it to be metadata.")
+                    logger.info(f"Skipping file {str(file_path)} because we consider it to be metadata.")
                     continue
 
                 # Skip if metadata file
                 if file_path.name in self.METADATA_FILES:
-                    logging.info(f"Skipping file {str(file_path)} because we consider it to be metadata.")
+                    logger.info(f"Skipping file {str(file_path)} because we consider it to be metadata.")
                     continue
 
                 # Skip if unexpected mime type
                 mime_type = guess_mime_type(str(file_path))
                 if mime_type not in self.mime_types:
-                    logging.info(
+                    logger.info(
                         f"Skipping file {str(file_path)} because its mime type ({mime_type}) is not expected ({self.mime_types})."
                     )
                     continue

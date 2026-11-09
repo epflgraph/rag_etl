@@ -1,7 +1,20 @@
+"""Markers sources write into names: `[NO_BOT]` to exclude, `[TAG_N]` to tag.
+
+`[NO_BOT]` is the one marker staff still set: a file or folder carrying it
+is not for the bots. `[TAG]` and `[TAG_N]` prefixes are what MOOC exports
+label their material with, and what older Moodle courses still carry in
+their file names.
+"""
+
+from __future__ import annotations
+
 import re
 
+# A module, folder or file marked NO_BOT is not for the bots; everything else is extracted
+NO_BOT = re.compile(r"\[NO_BOT\]")
 
-def split_tag_text(text):
+
+def split_tag_text(text: str) -> tuple[str | None, str]:
     """
     Split tag from text (e.g. for "[SERIE_3] Serie 3" returns ("SERIE_3", "Serie 3")).
     """
@@ -16,7 +29,7 @@ def split_tag_text(text):
     return (None, text)
 
 
-def split_tag_number_text(text):
+def split_tag_number_text(text: str) -> tuple[str | None, str | None, str]:
     """
     Extract tag and number from text.
 
@@ -46,7 +59,7 @@ def split_tag_number_text(text):
     # Try to cast to int and then to string ("05" -> "5" but "5A" -> "5A")
     try:
         number = str(int(number))
-    except Exception:
+    except ValueError:
         pass
 
     return (tag, number, text)

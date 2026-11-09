@@ -23,7 +23,7 @@ def build_parser() -> argparse.ArgumentParser:
     commands = parser.add_subparsers(dest="command", required=True)
 
     run = commands.add_parser("run", help="Run the pipeline for a project.")
-    run.add_argument("--project", required=True, help="Project code, e.g. COM202 (as in the class name).")
+    run.add_argument("--project", required=True, help="Project id, e.g. micro303.")
     run.add_argument("--dry", action="store_true", help="Dry run: process resources without publishing anything.")
     run.add_argument("--refresh", choices=CACHED_STEPS, help="Reprocess the named step, bypassing its cache.")
 

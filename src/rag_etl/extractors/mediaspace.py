@@ -1,5 +1,4 @@
 import logging
-import re
 import shutil
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -8,6 +7,7 @@ from pathlib import Path
 
 from rag_etl.core import Resource
 from rag_etl.extractors.base import Extractor, SourceUnavailable
+from ragtools.encoding import sanitize_for_filename
 from ragtools.kaltura import (
     build_entry_url,
     caption_mime_type,
@@ -98,13 +98,6 @@ def entry_created_after(entry, created_after: str | date | datetime | float | No
         return True
 
     return int(created_at) > to_timestamp(created_after)
-
-
-def safe_filename(text: str, max_length: int = 80) -> str:
-    """Collapse arbitrary text into something usable as a file name."""
-
-    cleaned = re.sub(r"[^\w\-]+", "_", text or "", flags=re.UNICODE).strip("_")
-    return cleaned[:max_length] or "untitled"
 
 
 @dataclass(frozen=True)
@@ -210,18 +203,15 @@ class MediaspaceExtractor(Extractor):
         # Kaltura fills either field depending on the entry, so both are tried
         language = caption_info.get("language_code") or caption_info.get("language") or ""
 
-        # The entry id leads, since it is the only part guaranteed unique
+        # The entry id leads, since it is the only part guaranteed unique, and
+        # never empty, so the sanitized name never is either
         name_parts = [entry_id]
         if entry_name:
-            name_parts.append(safe_filename(entry_name))
+            name_parts.append(entry_name)
         if language:
-            name_parts.append(safe_filename(str(language), max_length=16))
+            name_parts.append(str(language))
 
-        file_stem = "_".join(name_parts)
-        file_name = f"{file_stem}.{file_ext}"
-        caption_path = self.dir / file_name
-
-        return caption_path
+        return self.dir / sanitize_for_filename(f"{'_'.join(name_parts)}.{file_ext}")
 
     def extract(self) -> Resource:
         """

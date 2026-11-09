@@ -8,7 +8,8 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 
 import ragtools.mime_types as mt
-from ragtools.archives import iter_files, untar_file, unzip_file
+from ragtools.archives import untar_file, unzip_file
+from ragtools.files import iter_files
 from ragtools.encoding import ensure_utf8
 from ragtools.notebooks import convert_ipynb_to_md
 

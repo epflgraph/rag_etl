@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import logging
-import os
 import re
 import shutil
 import subprocess
@@ -11,6 +10,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import ragtools.mime_types as mt
+from ragtools.files import iter_files
 from rag_etl.core import Resource
 from rag_etl.extractors.base import Extractor, SourceUnavailable
 
@@ -89,20 +89,12 @@ class GitExtractor(Extractor):
         repo = Path(clone_url).stem
         base = Resource(title=f"{repo}@{branch}", url=self.repo_url)
 
-        for dir_path, dir_names, file_names in os.walk(self.dir, topdown=True):
-            dir_names[:] = [d for d in dir_names if not d.startswith(".")]
-
-            for file_name in file_names:
-                file_path = Path(dir_path) / file_name
-
-                if file_path.name.startswith("."):
-                    logger.debug(f"Skipping file {str(file_path)} because it is hidden.")
-                    continue
-
-                base.add_child(
-                    title=str(file_path.relative_to(self.dir)),
-                    path=file_path,
-                    mime_type=mt.guess_mime_type(str(file_path)),
-                )
+        # Every file of the checkout, hidden ones (.git among them) aside
+        for file_path in iter_files(self.dir):
+            base.add_child(
+                title=str(file_path.relative_to(self.dir)),
+                path=file_path,
+                mime_type=mt.guess_mime_type(str(file_path)),
+            )
 
         return base

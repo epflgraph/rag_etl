@@ -1,11 +1,10 @@
 from __future__ import annotations
 
 import logging
-import os
 from collections.abc import Sequence
 from dataclasses import dataclass
-from pathlib import Path
 
+from ragtools.files import iter_files
 from ragtools.mime_types import DEFAULT_MIME_TYPES, guess_mime_type
 from rag_etl.core import Resource
 from rag_etl.extractors.base import Extractor, SourceUnavailable
@@ -51,52 +50,40 @@ class LocalFolderExtractor(Extractor):
 
         base = Resource(title=f"Local folder {self.dir.name}")
 
-        # Iterate over all files in folder and subfolders
-        for dir_path, dir_names, file_names in os.walk(self.dir, topdown=True):
-            # Drop hidden directories to prevent descending into them
-            dir_names[:] = [d for d in dir_names if not d.startswith(".")]
+        # Every file in the folder and its subfolders, hidden ones aside
+        for file_path in iter_files(self.dir):
+            relative = file_path.relative_to(self.dir)
 
-            for file_name in file_names:
-                file_path = Path(dir_path) / file_name
-                relative = file_path.relative_to(self.dir)
+            # A file under a NO_BOT-marked folder, or marked itself, is not for the bots
+            if any(NO_BOT.search(part) for part in relative.parts):
+                logger.info(f"Skipping file {str(file_path)} because it is marked NO_BOT.")
+                continue
 
-                # A file under a NO_BOT-marked folder, or marked itself, is not for the bots
-                if any(NO_BOT.search(part) for part in relative.parts):
-                    logger.info(f"Skipping file {str(file_path)} because it is marked NO_BOT.")
-                    continue
+            # Skip if metadata file
+            if file_path.name in self.METADATA_FILES:
+                logger.info(f"Skipping file {str(file_path)} because we consider it to be metadata.")
+                continue
 
-                # Skip if hidden file (e.g. .DS_STORE, .git, .idea, etc.)
-                if file_path.name.startswith("."):
-                    logger.info(f"Skipping file {str(file_path)} because we consider it to be metadata.")
-                    continue
-
-                # Skip if metadata file
-                if file_path.name in self.METADATA_FILES:
-                    logger.info(f"Skipping file {str(file_path)} because we consider it to be metadata.")
-                    continue
-
-                # Skip if unexpected mime type
-                mime_type = guess_mime_type(str(file_path))
-                if mime_type not in self.mime_types:
-                    logger.info(
-                        f"Skipping file {str(file_path)} because its mime type ({mime_type}) is not expected ({self.mime_types})."
-                    )
-                    continue
-
-                title = str(relative)
-
-                # Extract metadata from files
-                from_ = self.extract_closest_metadata(file_path.parent, "from")
-                until = self.extract_closest_metadata(file_path.parent, "until")
-                url = self.extract_closest_metadata(file_path.parent, "url")
-
-                base.add_child(
-                    title=title,
-                    url=url,
-                    path=file_path,
-                    mime_type=mime_type,
-                    from_=from_,
-                    until=until,
+            # Skip if unexpected mime type
+            mime_type = guess_mime_type(str(file_path))
+            if mime_type not in self.mime_types:
+                logger.info(
+                    f"Skipping file {str(file_path)} because its mime type ({mime_type}) is not expected ({self.mime_types})."
                 )
+                continue
+
+            # Extract metadata from files
+            from_ = self.extract_closest_metadata(file_path.parent, "from")
+            until = self.extract_closest_metadata(file_path.parent, "until")
+            url = self.extract_closest_metadata(file_path.parent, "url")
+
+            base.add_child(
+                title=str(relative),
+                url=url,
+                path=file_path,
+                mime_type=mime_type,
+                from_=from_,
+                until=until,
+            )
 
         return base

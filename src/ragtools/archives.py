@@ -14,7 +14,6 @@ import tarfile
 import unicodedata
 import zipfile
 
-from collections.abc import Iterator
 from pathlib import Path
 
 from ragtools.encoding import zip_entry_filename
@@ -65,15 +64,3 @@ def untar_file(tar_path: str | Path) -> Path:
         tar_ref.extractall(extract_dir, filter="data")
 
     return extract_dir
-
-
-def iter_files(root: str | Path) -> Iterator[Path]:
-    """Yield every file under root, skipping macOS metadata."""
-    root = Path(root)
-    for path in root.rglob("*"):
-        if path.is_file():
-            # Skip macOS metadata
-            parts = set(path.parts)
-            if "__MACOSX" in parts or ".ipynb_checkpoints" in parts or path.name == ".DS_Store":
-                continue
-            yield path

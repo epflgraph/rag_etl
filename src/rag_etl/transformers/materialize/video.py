@@ -21,7 +21,15 @@ from pathlib import Path
 
 import ragtools.mime_types as mt
 from ragtools.images import SLIDE_SYSTEM_PROMPT, SLIDE_USER_PROMPT
-from ragtools.video import SlideDetector, extract_frame, filter_close_timestamps, frame_time, parse_srt, text_between
+from ragtools.video import (
+    Cue,
+    SlideDetector,
+    extract_frame,
+    filter_close_timestamps,
+    frame_time,
+    parse_srt,
+    text_between,
+)
 
 from rag_etl.cache import Cache
 from rag_etl.core import Resource
@@ -44,12 +52,7 @@ CACHE_VERSION = "video-slides-1"
 
 
 def _node_key(entry_id: str, language: str | None) -> str:
-    """The video node's key: the video's identity plus the language it is detected in.
-
-    The descriptor is deliberately not part of it: its bytes churn on every
-    re-export while the video itself stays the same, and a re-export must
-    not re-detect, re-extract and re-read a lecture nobody touched.
-    """
+    """The video's key, for its cache node and its work folder: its entry plus the detection language."""
     return hash_text(f"{entry_id}|{language}")
 
 
@@ -72,17 +75,14 @@ class VideoMaterializer:
             logger.warning(f"Leaving {node.title} as it is: no Kaltura entry id to reach the video with")
             return
 
-        # The slides are built in the work area of the video's content
-        if node.path is None:
-            return
-        work_dir = self.work_root / node.content_hash
+        key = _node_key(entry_id, self.language)
+        work_dir = self.work_root / key
 
         # A crashed run can leave slides behind: they must not survive into
         # the new ones
         shutil.rmtree(work_dir, ignore_errors=True)
 
         cache = self.cache.scope(CACHE_VERSION)
-        key = _node_key(entry_id, self.language)
         md_paths = cache.adopt(key, work_dir)
         if md_paths is None:
             video_url = resolver.url(entry_id)
@@ -160,86 +160,60 @@ class VideoMaterializer:
         return list(zip(frames, md_paths))
 
     def _build_slides(self, node: Resource, entry_id: str, md_paths: list[Path]) -> None:
-        """Turn the read slides into one slide child each, captioned."""
+        """Turn the read frames into one slide child each, with what was said over it.
 
+        Slides carry only what is written on them, which is the scaffold of
+        the lecture rather than its substance; appending the words spoken
+        over each slide puts both in the same chunk, so a question answered
+        out loud retrieves the slide it was answered on.
+        """
+        cues = self._take_subtitles(node)
+
+        # Frames are named after the second their slide starts at; a frame
+        # that reads to nothing is dropped, its neighbour's span covering it
+        slides: list[tuple[int, Path, str]] = []
         for md_path in sorted(md_paths, key=lambda path: int(path.stem)):
-            if not md_path.read_text(encoding="utf-8").strip():
+            markdown = md_path.read_text(encoding="utf-8").strip()
+            if markdown:
+                slides.append((int(md_path.stem), md_path, markdown))
+            else:
                 logger.debug(f"Dropping {md_path.name} of {node.title}: no readable content")
-                continue
 
-            start_seconds = int(md_path.stem)
+        for position, (start, md_path, markdown) in enumerate(slides):
+            # A slide runs until the next one starts; the last one runs to the
+            # end of the recording, which text_between reads as open
+            end = slides[position + 1][0] if position + 1 < len(slides) else None
+            spoken = text_between(cues, start, end)
+            if spoken:
+                md_path.write_text(f"{markdown}\n\n{TRANSCRIPT_PREFIX}{spoken}\n", encoding="utf-8")
 
             # Each slide carries the public watch url of its own moment, so a
             # chunk cut from it links straight into that moment of the lecture
             node.add_child(
-                title=f"{start_seconds // 60}:{start_seconds % 60:02d}",
+                title=f"{start // 60}:{start % 60:02d}",
                 path=md_path,
                 mime_type=mt.MARKDOWN,
-                url=build_entry_url(entry_id, self.mediaspace_url, start_seconds),
+                url=build_entry_url(entry_id, self.mediaspace_url, start),
                 cut="whole_document",
             )
 
-        self._merge_captions(node)
+    def _take_subtitles(self, node: Resource) -> list[Cue]:
+        """Detach the video's subtitles leaf and return its cues; none when absent or unreadable.
 
-    def _merge_captions(self, node: Resource) -> None:
-        """Append the words spoken over each slide to it.
-
-        Slides carry only what is written on them, which is the scaffold of
-        the lecture rather than its substance; appending the matching stretch
-        of transcript puts both in the same chunk, so a question answered out
-        loud retrieves the slide it was answered on.
+        The subtitles end up inside the slides, and their file is never
+        loaded itself, so the leaf goes either way.
         """
+        subtitles = next((child for child in node.children if child.mime_type == mt.SRT), None)
+        if subtitles is None:
+            return []
 
-        caption = next((child for child in node.children if child.mime_type == mt.SRT), None)
-        if caption is None or caption.path is None:
-            return
+        subtitles.detach()
+        if subtitles.path is None:
+            return []
 
         try:
-            cues = parse_srt(caption.path)
+            return parse_srt(subtitles.path)
         except OSError as error:
-            # Without the transcript there is nothing to append, so the
-            # slides keep the text generated by the vision model
-            logger.warning(f"Could not read {caption.path}: {error}. Leaving its slides unchanged.")
-            return
-
-        # Chronological order is what lets each slide be bounded by the next;
-        # slides are named after the second their interval starts at
-        slide_paths = sorted(
-            (child.path for child in node.children if child is not caption and child.path is not None),
-            key=lambda path: int(path.stem),
-        )
-
-        for position, md_path in enumerate(slide_paths):
-            # A slide runs from its own start to the start of the next one.
-            # The last slide has no successor, so it runs to the end of the
-            # recording, which text_between reads as an open interval
-            start = int(md_path.stem)
-            if position + 1 < len(slide_paths):
-                end = int(slide_paths[position + 1].stem)
-            else:
-                end = None
-
-            # Everything said while this slide was on screen
-            spoken = text_between(cues, start, end)
-
-            if not spoken:
-                # A silent stretch, so the slide is left as it is rather
-                # than gaining an empty heading
-                logger.debug(f"Nothing spoken over {md_path.name}")
-                continue
-
-            # The Markdown is rewritten in place, so a second run over an
-            # already-merged file must not append the transcript twice
-            slide_markdown = md_path.read_text(encoding="utf-8").rstrip()
-            starts_quoted = slide_markdown.startswith(TRANSCRIPT_PREFIX)
-            contains_quote = f"\n{TRANSCRIPT_PREFIX}" in slide_markdown
-
-            if not starts_quoted and not contains_quote:
-                md_path.write_text(
-                    f"{slide_markdown}\n\n{TRANSCRIPT_PREFIX}{spoken}\n",
-                    encoding="utf-8",
-                )
-        # The subtitles are now part of the slides, and the file they came
-        # from is never loaded, so the caption leaf only leaves a reference
-        # that resolves nowhere
-        caption.detach()
+            # Without the subtitles the slides keep what the vision model read
+            logger.warning(f"Could not read {subtitles.path}: {error}. Leaving its slides unchanged.")
+            return []

@@ -331,8 +331,9 @@ def test_mediaspace(monkeypatch, tmp_path):
     assert video.title == "Lecture 1"
     assert video.mime_type == mt.MP4
     assert video.type == "theory" and video.subtype == "video_lecture" and video.cut == "per_child"
+    # The watch url names the entry; nothing is written to stand for the video
     assert video.url == "https://mediaspace.epfl.ch/playlist/1/0_abc"
-    assert video.path and json.loads(video.path.read_text())["entry_id"] == "0_abc"
+    assert video.path is None
 
     # the placeholder entry (no duration) is skipped, captions travel beside the video
     assert len(video.children) == 1

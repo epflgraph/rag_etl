@@ -204,16 +204,19 @@ def test_unreadable_image_dropped(tmp_path, transformer, monkeypatch):
     assert root.children == []
 
 
+def mediaspace_video() -> Resource:
+    """A Mediaspace video node as the extractor builds it: its watch url names the entry."""
+    return Resource(title="lecture 1", url="https://mediaspace.epfl.ch/media/t/0_abc", mime_type=mt.MP4)
+
+
 def test_video_gains_one_slide_child_per_segment(tmp_path, transformer, monkeypatch):
-    descriptor_path = tmp_path / "0_abc.json"
-    descriptor_path.write_text('{"entry_id": "0_abc"}', encoding="utf-8")
     srt_path = tmp_path / "0_abc_fr.srt"
     srt_path.write_text(
         "1\n00:00:00,000 --> 00:00:10,000\nhello\n\n2\n00:00:45,000 --> 00:00:60,000\nworld\n",
         encoding="utf-8",
     )
 
-    video = Resource(title="lecture 1", url="https://mediaspace.epfl.ch/watch/0_abc", path=descriptor_path, mime_type=mt.MP4)
+    video = mediaspace_video()
     video.add_child(path=srt_path, mime_type=mt.SRT)
     root = Resource(title="root", children=[video])
 
@@ -231,6 +234,21 @@ def test_video_gains_one_slide_child_per_segment(tmp_path, transformer, monkeypa
     # Slides carry the deep link into their own moment and a per-slide cut
     assert lecture.children[0].url.startswith("https://")
     assert lecture.children[0].cut == "whole_document"
+
+
+def test_slide_holding_a_quote_still_gets_its_speech(tmp_path, transformer, monkeypatch):
+    monkeypatch.setattr(
+        "ragtools.llm.RCPClient.vision", lambda self, prompt, images, **kwargs: "# Motto\n\n> Measure twice"
+    )
+    srt_path = tmp_path / "0_abc_fr.srt"
+    srt_path.write_text("1\n00:00:00,000 --> 00:00:10,000\nhello\n", encoding="utf-8")
+    video = mediaspace_video()
+    video.add_child(path=srt_path, mime_type=mt.SRT)
+    root = Resource(title="root", children=[video])
+
+    transformer.transform([root])
+
+    assert root.children[0].children[0].path.read_text(encoding="utf-8").endswith("> hello\n")
 
 
 def test_youtube_video_left_untouched(tmp_path, transformer):
@@ -251,23 +269,16 @@ def test_video_with_no_frames_dropped(tmp_path, transformer):
         work_root=transformer.work_root,
         detector=SimpleNamespace(detect=lambda *args, **kwargs: [0]),
     )
-    descriptor_path = tmp_path / "0_abc.json"
-    descriptor_path.write_text('{"entry_id": "0_abc"}', encoding="utf-8")
-    video = Resource(title="lecture 1", url="https://mediaspace.epfl.ch/watch/0_abc", path=descriptor_path, mime_type=mt.MP4)
-    root = Resource(title="root", children=[video])
+    root = Resource(title="root", children=[mediaspace_video()])
 
     one_timestamp.transform([root])
 
     assert root.children == []
 
 
-def test_video_reexport_churn_keeps_the_cached_slides(tmp_path, transformer, monkeypatch):
-    """The video is its entry, not its descriptor: a re-export that rewrites the
-    descriptor's bytes must not re-detect, re-extract and re-read the lecture."""
-    descriptor_path = tmp_path / "0_abc.json"
-    descriptor_path.write_text('{"entry_id": "0_abc"}', encoding="utf-8")
-    video = Resource(title="lecture 1", url="https://mediaspace.epfl.ch/watch/0_abc", path=descriptor_path, mime_type=mt.MP4)
-    root = Resource(title="root", children=[video])
+def test_warm_video_rerun_adopts_the_cached_slides(tmp_path, transformer, monkeypatch):
+    """An entry already materialized is neither detected, extracted nor read again."""
+    root = Resource(title="root", children=[mediaspace_video()])
 
     transformer.transform([root])
     assert len(root.children[0].children) == 2
@@ -279,18 +290,14 @@ def test_video_reexport_churn_keeps_the_cached_slides(tmp_path, transformer, mon
         "rag_etl.transformers.materialize.video.extract_frame",
         lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("no frame may be extracted either")),
     )
-    reexported = MaterializeTransformer(
+    warm = MaterializeTransformer(
         cache=transformer.cache,
         work_root=transformer.work_root,
         detector=SimpleNamespace(detect=no_detect),
     )
-    descriptor_path.write_text('{"entry_id": "0_abc", "version": 2}', encoding="utf-8")
-    root = Resource(
-        title="root",
-        children=[Resource(title="lecture 1", url="https://mediaspace.epfl.ch/watch/0_abc", path=descriptor_path, mime_type=mt.MP4)],
-    )
+    root = Resource(title="root", children=[mediaspace_video()])
 
-    reexported.transform([root])
+    warm.transform([root])
 
     # The whole subtree is adopted: the same slides, nothing re-done
     assert [child.title for child in root.children[0].children] == ["0:00", "0:40"]
@@ -299,12 +306,7 @@ def test_video_reexport_churn_keeps_the_cached_slides(tmp_path, transformer, mon
 def test_refreshed_video_redetects_and_leaves_no_stale_frames(tmp_path, transformer):
     """`--refresh materialize` re-detects from scratch: the run's slides are
     only what the new detection found, nothing survives from the old video."""
-    descriptor_path = tmp_path / "0_abc.json"
-    descriptor_path.write_text('{"entry_id": "0_abc"}', encoding="utf-8")
-    root = Resource(
-        title="root",
-        children=[Resource(title="lecture 1", url="https://mediaspace.epfl.ch/watch/0_abc", path=descriptor_path, mime_type=mt.MP4)],
-    )
+    root = Resource(title="root", children=[mediaspace_video()])
 
     transformer.transform([root])
     assert len(root.children[0].children) == 2
@@ -314,10 +316,7 @@ def test_refreshed_video_redetects_and_leaves_no_stale_frames(tmp_path, transfor
         work_root=transformer.work_root,
         detector=SimpleNamespace(detect=lambda *args, **kwargs: [0]),
     )
-    root = Resource(
-        title="root",
-        children=[Resource(title="lecture 1", url="https://mediaspace.epfl.ch/watch/0_abc", path=descriptor_path, mime_type=mt.MP4)],
-    )
+    root = Resource(title="root", children=[mediaspace_video()])
 
     refreshed.transform([root])
 

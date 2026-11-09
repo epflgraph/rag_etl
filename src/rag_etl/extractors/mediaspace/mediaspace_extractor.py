@@ -1,4 +1,3 @@
-import json
 import logging
 import os
 import shutil
@@ -37,12 +36,12 @@ class MediaspaceExtractor(Extractor):
     Extractor for retrieving videos from an EPFL Mediaspace (Kaltura)
     playlist or channel.
 
-    One resource is produced per video entry, pointing at a small descriptor
-    naming the entry. The video itself is never downloaded.
-    VideoToFramesTransformer reads it over HTTP
+    One resource is produced per video entry, its watch url naming the
+    entry. The video itself is never downloaded: materialize reads its
+    frames over HTTP.
 
     Subtitles are downloaded (when available) and travel beside the video as
-    caption leaves.
+    a subtitles leaf.
 
     Note that mime_types filters caption assets. The resources themselves are
     videos and carry mt.MP4
@@ -147,34 +146,6 @@ class MediaspaceExtractor(Extractor):
 
         return caption_path
 
-    def build_descriptor_path(self, entry_id: str, entry_name: str) -> Path:
-        """Build the path of the file standing for an entry's video."""
-
-        # Same shape as build_caption_path, minus the language, so an entry's
-        # descriptor and its subtitle sit next to each other under one name
-        name_parts = [entry_id]
-        if entry_name:
-            name_parts.append(safe_filename(entry_name))
-
-        file_stem = "_".join(name_parts)
-        descriptor_path = self.dir / f"{file_stem}.json"
-
-        return descriptor_path
-
-    def write_descriptor(self, entry_id: str, entry_name: str) -> Path:
-        """
-        Write the file an entry's resource points at, and return its path.
-
-        It holds the entry id and nothing else on purpose. Transformers key
-        their cache on the bytes of the file a resource points at.
-        """
-
-        descriptor_path = self.build_descriptor_path(entry_id, entry_name)
-        descriptor_path.parent.mkdir(parents=True, exist_ok=True)
-        descriptor_path.write_text(json.dumps({"entry_id": entry_id}), encoding="utf-8")
-
-        return descriptor_path
-
     def extract(self) -> Resource:
         """
         Extract video resources for this course from Mediaspace into a
@@ -226,7 +197,7 @@ class MediaspaceExtractor(Extractor):
             # without them in this course's language, still uses its extracted slide frames
             caption = self.select_caption(get_subtitle_urls(client, entry_id), entry_id)
 
-            srt_path = None
+            subtitles_path = None
 
             if caption is not None:
                 caption_path = self.build_caption_path(caption, entry_id, entry_name)
@@ -235,14 +206,13 @@ class MediaspaceExtractor(Extractor):
                 # rather than dropping it
                 if download_caption(client, caption, caption_path):
                     logger.info(f"Entry {entry_id}: wrote {caption_path}")
-                    srt_path = str(caption_path)
+                    subtitles_path = caption_path
 
-            descriptor_path = self.write_descriptor(entry_id, entry_name)
-
+            # The watch url names the entry: it is all materialize needs to
+            # reach the video
             video = resources.add_child(
                 title=entry_name,
                 url=build_entry_url(entry_id, self.playlist_or_channel_url),
-                path=descriptor_path,
                 mime_type=mt.MP4,
                 type=self.type,
                 subtype=self.subtype,
@@ -250,9 +220,9 @@ class MediaspaceExtractor(Extractor):
                 cut=self.cut,
             )
 
-            # Subtitles travel beside the video as a caption leaf
-            if srt_path is not None:
-                video.add_child(title="subtitles", path=Path(srt_path), mime_type=mt.SRT)
+            # Subtitles travel beside the video as a subtitles leaf
+            if subtitles_path is not None:
+                video.add_child(title="subtitles", path=subtitles_path, mime_type=mt.SRT)
 
         if not resources.children:
             logger.warning(f"No videos extracted from {self.playlist_or_channel_url}")

@@ -150,19 +150,21 @@ def extract_entry_id_from_url(url: str) -> str | None:
     """
     Pull the Kaltura entry id out of any URL that embeds one.
 
-    MOOC video descriptors point at a playManifest such as
+    Two shapes carry it: a playManifest, where the id follows an "entryId"
+    segment, as MOOC videos point at
       https://api.cast.switch.ch/p/113/sp/11300/playManifest/entryId/0_0caer0s6/...
-    so the id follows an "entryId" path segment.
+    and a Mediaspace watch page, where it follows "media/t", as built by
+    build_entry_url
+      https://mediaspace.epfl.ch/media/t/0_0caer0s6?kalturaStartTime=95
     """
 
-    segments = str(url).split("/")
+    segments = urlparse(str(url)).path.split("/")
 
-    # The id is the segment right after the one reading "entryId", so the last
-    # segment is never a candidate and is left out of the walk
-    for position, segment in enumerate(segments[:-1]):
-        next_segment = segments[position + 1]
-        if segment == "entryId" and is_kaltura_id(next_segment):
-            return next_segment
+    for position, segment in enumerate(segments):
+        follows_entry_id = segments[position - 1 : position] == ["entryId"]
+        follows_media_t = segments[max(position - 2, 0) : position] == ["media", "t"]
+        if (follows_entry_id or follows_media_t) and is_kaltura_id(segment):
+            return segment
 
     return None
 

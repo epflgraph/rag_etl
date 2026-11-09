@@ -7,7 +7,6 @@ config values — not business logic, which lives in ragtools
 
 from __future__ import annotations
 
-import json
 import logging
 import os
 
@@ -56,21 +55,9 @@ class KalturaVideoResolver:
 
 
 def entry_id_of(node: Resource) -> str | None:
+    """Return the Kaltura entry id a video node stands for, read from its url.
+
+    Mediaspace videos carry it in their watch url, MOOC videos in their
+    playManifest url; a YouTube video carries none.
     """
-    Return the Kaltura entry id a video node stands for.
-
-    Mediaspace videos point at a descriptor naming the entry; MOOC videos
-    carry the entry id in their playManifest url.
-    """
-
-    if node.path is not None and node.path.suffix == ".json":
-        try:
-            descriptor = json.loads(node.path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
-            return None
-        return descriptor.get("entry_id")
-
-    if node.url:
-        return extract_entry_id_from_url(node.url)
-
-    return None
+    return extract_entry_id_from_url(node.url) if node.url else None

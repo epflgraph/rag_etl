@@ -43,6 +43,8 @@ class MaterializeTransformer(Transformer):
     - videos gain one slide child per slide segment, captions appended.
     """
 
+    name = "materialize"
+
     cache: Cache
     # The scratch work area for rendered pages, extracted frames and read
     # transcripts: outside every source tree (generated files must never

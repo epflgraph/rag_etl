@@ -11,6 +11,8 @@ from __future__ import annotations
 import json
 import logging
 
+from dataclasses import dataclass
+
 from ragtools.llm import get_model
 
 from rag_etl.cache import Cache
@@ -30,11 +32,13 @@ BATCH_SIZE = 32
 REQUEST_CHAR_BUDGET = 96_000
 
 
+@dataclass(frozen=True)
 class EmbedTransformer(Transformer):
     """Annotates every chunk with its vector, in place."""
 
-    def __init__(self, cache: Cache):
-        self.cache = cache
+    name = "embed"
+
+    cache: Cache
 
     def _embed_batch(self, batch: list[Resource]) -> None:
         """One request for the batch; each vector cached by its chunk's content hash."""

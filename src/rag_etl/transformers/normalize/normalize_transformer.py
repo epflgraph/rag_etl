@@ -59,6 +59,8 @@ class NormalizeTransformer(Transformer):
     - files bigger than their mime family's size limit are dropped.
     """
 
+    name = "normalize"
+
     cache: Cache
     mime_types: Sequence[str] = field(default_factory=lambda: list(mt.DEFAULT_MIME_TYPES))
 

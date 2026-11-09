@@ -210,6 +210,8 @@ CUTS: dict[str, CutFunction] = {
 class CutTransformer(Transformer):
     """Cuts the labelled trees into chunk leaves, one registry entry per kind of cut."""
 
+    name = "cut"
+
     cache: Cache
     stitch_fallback: bool = False  # the LLM stitch fallback, off by default
 

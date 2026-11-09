@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from typing import ClassVar
 
 from rag_etl.core import Resource
 
@@ -16,6 +17,9 @@ class Transformer(ABC):
     the same trees back; the pipeline runs these in order, so the output
     of one is the input of the next.
     """
+
+    # The step's name: its cache scope, its `--refresh` value, its log label
+    name: ClassVar[str]
 
     @abstractmethod
     def transform(self, roots: list[Resource]) -> list[Resource]:

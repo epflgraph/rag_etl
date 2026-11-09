@@ -41,6 +41,13 @@ def test_run_flags_parse():
     assert args.refresh == "materialize"
 
 
+def test_misspelled_refresh_is_rejected(capsys):
+    with pytest.raises(SystemExit) as e:
+        build_parser().parse_args(["run", "--project", "COM202", "--refresh", "materialise"])
+    assert e.value.code == 2
+    assert "materialise" in capsys.readouterr().err
+
+
 def test_unknown_project_errors(capsys):
     with pytest.raises(SystemExit) as e:
         main(["run", "--project", "NOPE"])

@@ -13,6 +13,7 @@ import json
 import logging
 import os
 
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -21,6 +22,7 @@ from elasticsearch import Elasticsearch, NotFoundError
 from elasticsearch.helpers import bulk
 
 from rag_etl.core import Resource, iter_chunks
+from rag_etl.loaders.base import Loader
 
 logger = logging.getLogger(__name__)
 
@@ -54,25 +56,36 @@ def _client() -> Elasticsearch:
     )
 
 
-class ElasticsearchLoader:
+@dataclass(frozen=True)
+class ElasticsearchLoader(Loader):
     """Publishes one run's chunks into a fresh index, then shifts the alias."""
 
-    def __init__(self, project: str, timestamp: datetime, language: str | None, client: Elasticsearch | None = None):
-        self.alias = alias_name(project)
-        self.index = index_name(project, timestamp)
-        self.language = language
-        self.client = client if client is not None else _client()
+    project: str
+    timestamp: datetime
+    language: str | None
+    # The shared instance is reached only when loading: building the loader
+    # reads no connection settings
+    client: Elasticsearch | None = None
+
+    @property
+    def alias(self) -> str:
+        return alias_name(self.project)
+
+    @property
+    def index(self) -> str:
+        return index_name(self.project, self.timestamp)
 
     def load(self, roots: list[Resource]) -> None:
         """Create the run's index, bulk-load the chunks, shift the alias."""
-        self._create_index()
-        bulk(self.client, self._actions(roots))
-        self.client.indices.refresh(index=self.index)
-        self._shift_alias()
+        client = self.client if self.client is not None else _client()
+        self._create_index(client)
+        bulk(client, self._actions(roots))
+        client.indices.refresh(index=self.index)
+        self._shift_alias(client)
 
-    def _create_index(self) -> None:
+    def _create_index(self, client: Elasticsearch) -> None:
         body = index_settings(self.language)
-        self.client.indices.create(index=self.index, settings=body["settings"], mappings=body["mappings"])
+        client.indices.create(index=self.index, settings=body["settings"], mappings=body["mappings"])
 
     def _actions(self, roots: list[Resource]) -> list[dict[str, Any]]:
         """One index action per chunk, with a strictly increasing per-document number."""
@@ -102,14 +115,14 @@ class ElasticsearchLoader:
         }
         return {key: value for key, value in document.items() if value is not None}
 
-    def _shift_alias(self) -> None:
+    def _shift_alias(self, client: Elasticsearch) -> None:
         """Point the alias at the fresh index in one atomic update."""
         actions: list[dict[str, Any]] = []
         try:
-            current = self.client.indices.get_alias(name=self.alias)
+            current = client.indices.get_alias(name=self.alias)
             actions.extend({"remove": {"index": name, "alias": self.alias}} for name in current)
         except NotFoundError:
             pass
 
         actions.append({"add": {"index": self.index, "alias": self.alias}})
-        self.client.indices.update_aliases(actions=actions)
+        client.indices.update_aliases(actions=actions)

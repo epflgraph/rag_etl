@@ -45,6 +45,8 @@ def test_transform_runs_the_sequence(tmp_path, monkeypatch):
     ran = []
 
     class FakeStep:
+        name = "fake"
+
         def __init__(self, *args, **kwargs):
             pass
 
@@ -71,15 +73,23 @@ def test_transform_bypasses_only_the_refreshed_cache(tmp_path, monkeypatch):
         def __init__(self, project, transform, refresh=False):
             caches.append((transform, refresh))
 
-    def stub(**kwargs):
-        return SimpleNamespace(transform=lambda roots: roots)
+    def stub(name: str):
+        class Stub:
+            def __init__(self, **kwargs):
+                pass
+
+            def transform(self, roots):
+                return roots
+
+        Stub.name = name
+        return Stub
 
     monkeypatch.setattr("rag_etl.pipeline.Cache", RecordingCache)
-    monkeypatch.setattr("rag_etl.pipeline.NormalizeTransformer", stub)
-    monkeypatch.setattr("rag_etl.pipeline.MaterializeTransformer", stub)
-    monkeypatch.setattr("rag_etl.pipeline.JudgeTransformer", stub)
-    monkeypatch.setattr("rag_etl.pipeline.CutTransformer", stub)
-    monkeypatch.setattr("rag_etl.pipeline.EmbedTransformer", stub)
+    monkeypatch.setattr("rag_etl.pipeline.NormalizeTransformer", stub("normalize"))
+    monkeypatch.setattr("rag_etl.pipeline.MaterializeTransformer", stub("materialize"))
+    monkeypatch.setattr("rag_etl.pipeline.JudgeTransformer", stub("judge"))
+    monkeypatch.setattr("rag_etl.pipeline.CutTransformer", stub("cut"))
+    monkeypatch.setattr("rag_etl.pipeline.EmbedTransformer", stub("embed"))
 
     transform([Resource(title="root")], make_spec(), refresh="materialize")
 

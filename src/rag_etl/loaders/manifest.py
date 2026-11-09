@@ -15,12 +15,14 @@ from __future__ import annotations
 import json
 import logging
 
+from dataclasses import dataclass
 from datetime import datetime
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 from typing import Any
 
 from rag_etl.core import Resource, iter_chunks
+from rag_etl.loaders.base import Loader
 from rag_etl.loaders.elasticsearch import alias_name, index_name
 
 logger = logging.getLogger(__name__)
@@ -84,14 +86,14 @@ def _summary(rows: list[dict[str, Any]], keys: tuple[str, ...]) -> dict[str, Any
     return node
 
 
-class ManifestLoader:
+@dataclass(frozen=True)
+class ManifestLoader(Loader):
     """Writes one manifest per run into the directory it is given."""
 
-    def __init__(self, path: Path, project: str, timestamp: datetime, dry: bool):
-        self.path = Path(path)
-        self.project = project
-        self.timestamp = timestamp
-        self.dry = dry
+    path: Path
+    project: str
+    timestamp: datetime
+    dry: bool
 
     def load(self, roots: list[Resource]) -> None:
         """Write the manifest for one run's trees."""

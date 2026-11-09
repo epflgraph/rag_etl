@@ -5,7 +5,7 @@ import sys
 from dotenv import find_dotenv, load_dotenv
 
 from rag_etl.projects import from_code
-from rag_etl.pipeline import run_pipeline
+from rag_etl.pipeline import CACHED_STEPS, run_pipeline
 
 
 class _DropMediaUploadErrors(logging.Filter):
@@ -25,7 +25,7 @@ def build_parser() -> argparse.ArgumentParser:
     run = commands.add_parser("run", help="Run the pipeline for a project.")
     run.add_argument("--project", required=True, help="Project code, e.g. COM202 (as in the class name).")
     run.add_argument("--dry", action="store_true", help="Dry run: process resources without publishing anything.")
-    run.add_argument("--refresh", metavar="TRANSFORM", help="Reprocess the named transform, bypassing its cache.")
+    run.add_argument("--refresh", choices=CACHED_STEPS, help="Reprocess the named step, bypassing its cache.")
 
     return parser
 

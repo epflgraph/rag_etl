@@ -68,6 +68,8 @@ class JudgeTransformer(Transformer):
     inference lands later.
     """
 
+    name = "judge"
+
     overrides: tuple[Override, ...] = ()
 
     def transform(self, roots: list[Resource]) -> list[Resource]:

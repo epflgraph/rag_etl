@@ -132,6 +132,6 @@ class VideoParser:
 
         # A transcript found in the export travels beside the video as a caption leaf
         if srt_path is not None:
-            video.add_child(title="subtitles", path=Path(srt_path), mime_type=mt.SRT)
+            video.add_child(title="subtitles", path=Path(srt_path), mime_type=mt.SRT, cut=None)
 
         return video

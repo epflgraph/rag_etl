@@ -158,9 +158,12 @@ def per_exercise(transformer: "CutTransformer", node: Resource) -> None:
 
     node.children = []
     for exercise in found:
+        # A chunk is text alone: no file behind it, nothing left to cut
         chunk = node.add_child(
             title=f"Exercise {exercise.number} ({exercise.parts})",
             text=exercise.text,
+            path=None,
+            mime_type=mt.MARKDOWN,
             number=exercise.number,
             exercise_parts=exercise.parts,
             cut=None,
@@ -194,7 +197,8 @@ def text(transformer: "CutTransformer", node: Resource) -> None:
             logger.warning(f"Dropping part {position} of {node.title}: over the {MAX_CHUNK_CHARS:,}-char chunk limit")
             continue
 
-        node.add_child(title=f"part {position}", text=section, cut=None)
+        # A chunk is text alone: no file behind it, nothing left to cut
+        node.add_child(title=f"part {position}", text=section, path=None, mime_type=mt.MARKDOWN, cut=None)
 
 
 # The one cut catalogue; new cuts join here via PR

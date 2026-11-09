@@ -1,8 +1,9 @@
 # Python cache
 __pycache__/
 
-# Package installed in editing mode
+# Package installed in editing mode, and the staging folder of a regular install
 *.egg-info/
+build/
 
 # Pycharm project files
 .idea/

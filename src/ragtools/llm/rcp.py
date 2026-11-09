@@ -49,12 +49,24 @@ def _pil_data_uri(img: Image.Image) -> str:
     return f"data:image/png;base64,{base64.b64encode(buf.getvalue()).decode('utf-8')}"
 
 
+def _json_schema(response_format: type[BaseModel]) -> dict[str, Any]:
+    """The strict JSON-schema response format asking the model for this pydantic schema."""
+    return {
+        "type": "json_schema",
+        "json_schema": {
+            "name": response_format.__name__,
+            "schema": response_format.model_json_schema(),
+            "strict": True,
+        },
+    }
+
+
 @dataclass(frozen=True)
 class RCPClient:
     """One configured model invocation: endpoint, key, model and its params.
 
     The model and its parameters are one pairing, chosen in
-    ``ragtools.llm.defaults``; the endpoint and key come from the
+    ``ragtools.llm.catalog``; the endpoint and key come from the
     environment unless passed in. A failed request is retried a few times
     by the underlying client and then raised: a page that cannot be read
     stops the run rather than leaving a silent gap in the index.
@@ -80,51 +92,33 @@ class RCPClient:
         self,
         messages: list[dict[str, Any]],
         *,
-        response_format: type[BaseModel] | None = None,
         system: str | None = None,
         name: str,
+        response_format: type[BaseModel] | None = None,
+        max_chars: int | None = None,
     ) -> str:
+        """Send one chat request, traced in Langfuse, and return the answer's text.
+
+        With ``max_chars`` the answer is streamed and cut the moment it
+        passes the limit; otherwise it is received whole. Either way a
+        failure is raised loud, and a thinking trace left inline is dropped.
+        """
         if system:
             messages = [{"role": "system", "content": system}, *messages]
 
-        if response_format:
-            response_format_schema = {
-                "type": "json_schema",
-                "json_schema": {
-                    "name": response_format.__name__,
-                    "schema": response_format.model_json_schema(),
-                    "strict": True,
-                },
-            }
-        else:
-            response_format_schema = None
-
         client = self._client()
-        with get_client().start_as_current_observation(as_type="generation", name=name, model=self.model, input=messages) as generation:
+        with get_client().start_as_current_observation(
+            as_type="generation", name=name, model=self.model, input=messages
+        ) as generation:
             try:
-                response = client.chat.completions.create(
-                    model=self.model,
-                    messages=messages,
-                    response_format=response_format_schema,
-                    **self.params,
-                )  # type: ignore[call-overload]
+                if max_chars is None:
+                    content = self._complete(client, messages, response_format, generation)
+                else:
+                    content = self._stream(client, messages, max_chars, generation)
+            except AnswerTooLong:
+                raise
             except Exception as e:
                 raise RuntimeError(f"RCP request '{name}' with model {self.model} failed: {e}") from e
-
-            message = response.choices[0].message
-            content = message.content.strip()
-
-            # Capture reasoning / thinking tokens if present (modern vLLM uses `reasoning`, current RCP uses `reasoning_content`)
-            reasoning = getattr(message, "reasoning", None) or getattr(message, "reasoning_content", None)
-            update_kwargs: dict = {"output": content}
-            if reasoning:
-                update_kwargs["metadata"] = {"reasoning": reasoning}
-            if response.usage:
-                update_kwargs["usage_details"] = {
-                    "input": response.usage.prompt_tokens,
-                    "output": response.usage.completion_tokens,
-                }
-            generation.update(**update_kwargs)
 
         # Some models still leave the thinking trace inline in the content
         if THINKING_CLOSER in content:
@@ -132,14 +126,39 @@ class RCPClient:
 
         return content
 
-    def _send_streaming(
+    def _complete(
         self,
+        client: OpenAI,
         messages: list[dict[str, Any]],
-        *,
-        max_chars: int,
-        system: str | None = None,
-        name: str,
+        response_format: type[BaseModel] | None,
+        generation: Any,
     ) -> str:
+        """Receive the answer whole, recording its usage and reasoning in the trace."""
+        response = client.chat.completions.create(
+            model=self.model,
+            messages=messages,
+            response_format=_json_schema(response_format) if response_format else None,
+            **self.params,
+        )  # type: ignore[call-overload]
+
+        message = response.choices[0].message
+        content = message.content.strip()
+
+        # Capture reasoning / thinking tokens if present (modern vLLM uses `reasoning`, current RCP uses `reasoning_content`)
+        reasoning = getattr(message, "reasoning", None) or getattr(message, "reasoning_content", None)
+        update_kwargs: dict = {"output": content}
+        if reasoning:
+            update_kwargs["metadata"] = {"reasoning": reasoning}
+        if response.usage:
+            update_kwargs["usage_details"] = {
+                "input": response.usage.prompt_tokens,
+                "output": response.usage.completion_tokens,
+            }
+        generation.update(**update_kwargs)
+
+        return content
+
+    def _stream(self, client: OpenAI, messages: list[dict[str, Any]], max_chars: int, generation: Any) -> str:
         """Stream the answer and cut it the moment it passes ``max_chars``.
 
         A non-streaming request has a total-duration timeout: a generation
@@ -148,44 +167,30 @@ class RCPClient:
         ceiling — chunks keep flowing — so the answer is read incrementally
         and cut as soon as it grows past the limit.
         """
-        if system:
-            messages = [{"role": "system", "content": system}, *messages]
+        parts: list[str] = []
+        try:
+            stream: Stream[ChatCompletionChunk] = client.chat.completions.create(  # type: ignore[assignment]
+                model=self.model,
+                messages=messages,  # type: ignore[arg-type]
+                stream=True,
+                **self.params,
+            )
+            total = 0
+            for chunk in stream:
+                if not chunk.choices:
+                    continue
+                piece = chunk.choices[0].delta.content
+                if not piece:
+                    continue
+                parts.append(piece)
+                total += len(piece)
+                if total > max_chars:
+                    stream.close()
+                    raise AnswerTooLong(f"the answer was cut off at {total:,} chars")
+        finally:
+            generation.update(output="".join(parts).strip())
 
-        client = self._client()
-        with get_client().start_as_current_observation(as_type="generation", name=name, model=self.model, input=messages) as generation:
-            parts: list[str] = []
-            try:
-                stream: Stream[ChatCompletionChunk] = client.chat.completions.create(  # type: ignore[assignment]
-                    model=self.model,
-                    messages=messages,  # type: ignore[arg-type]
-                    stream=True,
-                    **self.params,
-                )
-                total = 0
-                for chunk in stream:
-                    if not chunk.choices:
-                        continue
-                    piece = chunk.choices[0].delta.content
-                    if not piece:
-                        continue
-                    parts.append(piece)
-                    total += len(piece)
-                    if total > max_chars:
-                        stream.close()
-                        raise AnswerTooLong(f"the answer was cut off at {total:,} chars")
-            except AnswerTooLong:
-                raise
-            except Exception as e:
-                raise RuntimeError(f"RCP request '{name}' with model {self.model} failed: {e}") from e
-            finally:
-                generation.update(output="".join(parts).strip())
-
-        # Some models still leave the thinking trace inline in the content
-        content = "".join(parts).strip()
-        if THINKING_CLOSER in content:
-            content = content.split(THINKING_CLOSER)[-1].strip()
-
-        return content
+        return "".join(parts).strip()
 
     def text(
         self,
@@ -241,9 +246,7 @@ class RCPClient:
         passes the limit, instead of being waited out to the end.
         """
         messages: list[dict[str, Any]] = [{"role": "user", "content": self._image_content(prompt, images, detail)}]
-        if max_chars is not None:
-            return self._send_streaming(messages, max_chars=max_chars, system=system, name=name)
-        return self._send(messages, system=system, name=name)
+        return self._send(messages, system=system, name=name, max_chars=max_chars)
 
     def structured_vision(
         self,

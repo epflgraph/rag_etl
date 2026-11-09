@@ -8,9 +8,6 @@ they are handed to a vision model.
 
 from __future__ import annotations
 
-import base64
-import io
-
 from pathlib import Path
 
 import pymupdf
@@ -61,14 +58,6 @@ def downscale_if_needed(img: Image.Image, max_w: int = MAX_PAGE_WIDTH, max_h: in
     new_size = (int(w * scale), int(h * scale))
 
     return img.resize(new_size, Image.Resampling.LANCZOS)
-
-
-def to_data_uri(img: Image.Image) -> str:
-    """Encode a PIL Image as a base64 data URI."""
-    buf = io.BytesIO()
-    img.save(buf, format="PNG")
-    b64 = base64.b64encode(buf.getvalue()).decode("utf-8")
-    return f"data:image/png;base64,{b64}"
 
 
 def save_pdf_pages(pdf_path: str | Path, out_dir: str | Path, dpi: int | None = None) -> list[Path]:

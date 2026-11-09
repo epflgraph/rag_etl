@@ -1,4 +1,4 @@
-"""The settled models: one pairing per concern, chosen per semester.
+"""The model catalog: the settled models, one pairing per task, chosen per semester.
 
 A model name means nothing without its parameters — the same Qwen with or
 without thinking behaves in many ways — so each entry below IS a model: an
@@ -70,4 +70,4 @@ def get_model(task: str) -> RCPClient:
     try:
         return MODELS[_TASKS[task]]
     except KeyError:
-        raise ValueError(f"Unknown task '{task}': add it to ragtools/llm/defaults.py") from None
+        raise ValueError(f"Unknown task '{task}': add it to ragtools/llm/catalog.py") from None

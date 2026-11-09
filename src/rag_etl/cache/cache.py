@@ -7,19 +7,29 @@ directories (nested), copied in and out as they are. A per-run
 `--refresh TRANSFORM` flag bypasses lookups for the named transform;
 there is no eviction — the cache grows until cleaned.
 
-One convention lives above this layer, in the transformers: a parent
-value may be a small node record (e.g. `children.json`) listing its
-children's hashes, so a node hit adopts a whole subtree while the
-children stay the single copy of the content — a Merkle tree. The cache
-itself stays agnostic: node or leaf, every entry is content keyed.
+A transform whose output depends on a recipe (prompts, model, rendering
+settings) works in a scope named after the recipe's version: bumping the
+version starts a fresh scope, so nothing made under the old recipe is ever
+served again.
+
+Subtrees are cached as Merkle trees: the leaves are ordinary entries, keyed
+by their own content, and a parent's entry is a small node record listing
+its ordered (name, leaf hash) children. A node hit adopts the whole subtree
+while the leaves stay the single copy of the content.
 """
 
 from __future__ import annotations
 
+import copy
+import json
 import os
 import shutil
 
+from collections.abc import Sequence
 from pathlib import Path
+
+# The file a node record is stored under, next to nothing else in its entry
+NODE_FILE = "children.json"
 
 
 class Cache:
@@ -34,6 +44,12 @@ class Cache:
         if not cache_path.exists():
             raise ValueError(f"Cache path {cache_path} does not exist.")
         self.cache_path = cache_path / project / transform
+
+    def scope(self, name: str) -> Cache:
+        """The cache nested under this one in its own folder, e.g. one per recipe version."""
+        scoped = copy.copy(self)
+        scoped.cache_path = self.cache_path / name
+        return scoped
 
     def _entry_path(self, content_hash: str, value: Path) -> Path:
         return self.cache_path / content_hash / value.name
@@ -97,3 +113,33 @@ class Cache:
         entry = self.cache_path / content_hash / name
         entry.parent.mkdir(parents=True, exist_ok=True)
         entry.write_text(text, encoding="utf-8")
+
+    def adopt(self, key: str, work_dir: Path) -> list[Path] | None:
+        """Copy the subtree recorded under `key` into work_dir, its leaves in order.
+
+        None — so the caller recomputes — when there is no node record, it
+        is malformed, or any leaf it names is missing (refresh included).
+        Leaves already copied before a gap are harmless: the recompute
+        reads them back from the same entries.
+        """
+        text = self.read(key, NODE_FILE)
+        if text is None:
+            return None
+
+        try:
+            children = [(str(name), str(leaf_hash)) for name, leaf_hash in json.loads(text)]
+        except (json.JSONDecodeError, TypeError, ValueError):
+            return None
+
+        paths: list[Path] = []
+        for name, leaf_hash in children:
+            path = work_dir / name
+            if not self.get(leaf_hash, path):
+                return None
+            paths.append(path)
+
+        return paths
+
+    def write_node(self, key: str, children: Sequence[tuple[str, str]]) -> None:
+        """Record the subtree under `key`: its ordered (name, leaf hash) children."""
+        self.write(key, NODE_FILE, json.dumps([[name, leaf_hash] for name, leaf_hash in children]))

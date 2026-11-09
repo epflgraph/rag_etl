@@ -17,6 +17,10 @@ from rag_etl.transformers.materialize.ocr import ocr_cached
 
 logger = logging.getLogger(__name__)
 
+# The cache scope the transcripts live in. Bumped whenever reading changes
+# what the same image means (prompts, model): the new scope starts empty
+CACHE_VERSION = "image-ocr-1"
+
 
 @dataclass(frozen=True)
 class ImageMaterializer:
@@ -32,7 +36,7 @@ class ImageMaterializer:
 
         work_dir = self.work_root / hash_bytes(image_path.read_bytes())
         md_path = ocr_cached(
-            self.cache, image_path, SLIDE_SYSTEM_PROMPT, SLIDE_USER_PROMPT, work_dir / f"{image_path.stem}.md"
+            self.cache.scope(CACHE_VERSION), image_path, SLIDE_SYSTEM_PROMPT, SLIDE_USER_PROMPT, work_dir / f"{image_path.stem}.md"
         )
 
         if not md_path.read_text(encoding="utf-8").strip():

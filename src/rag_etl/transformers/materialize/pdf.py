@@ -1,17 +1,15 @@
 """PDF materialization: one child per page, cached as a Merkle tree.
 
 The leaves are the per-page transcripts, each stored exactly once under
-its own rendered-page hash; the pdf's node (`children.json`, keyed by the
-pdf's hash) is a small record of its ordered page leaves. A node hit
-adopts the whole subtree — nothing is rendered, no page is read again; a
-node miss renders and falls back to the leaves, so one edited page re-OCRs
-one page. Either way the node is written back, so the run after a miss
-hits at the top again.
+its own rendered-page hash; the pdf's node record, keyed by the pdf's
+hash, lists its ordered page leaves. A node hit adopts the whole subtree —
+nothing is rendered, no page is read again; a node miss renders and falls
+back to the leaves, so one edited page re-OCRs one page. Either way the
+node is written back, so the run after a miss hits at the top again.
 """
 
 from __future__ import annotations
 
-import json
 import logging
 
 from concurrent.futures import ThreadPoolExecutor
@@ -28,12 +26,15 @@ from rag_etl.transformers.materialize.ocr import MAX_CONCURRENT_OCR, ocr_cached
 
 logger = logging.getLogger(__name__)
 
-NODE_NAME = "children.json"
+# The cache scope the transcripts live in. Bumped whenever rendering or
+# reading changes what the same page pixels mean (dpi, prompts, model): the
+# new scope starts empty, so every page is read again
+CACHE_VERSION = "pdf-ocr-1"
 
-# Bumped whenever rendering or reading changes what the same page pixels
-# mean (dpi, prompts, model): nodes written under an older recipe are
-# stale and never adopted, and their pages are read again wholesale
-FINGERPRINT = "pdf-ocr-1"
+
+def _page_number(md_path: Path) -> int:
+    """The page a transcript belongs to, read back from its name (page_3.md → 3)."""
+    return int(md_path.stem.removeprefix("page_"))
 
 
 @dataclass(frozen=True)
@@ -48,82 +49,38 @@ class PdfMaterializer:
         if pdf_path is None:
             return
 
+        cache = self.cache.scope(CACHE_VERSION)
         pdf_hash = node.content_hash
         work_dir = self.work_root / pdf_hash
 
-        record = self._node(pdf_hash)
-        pages = self._adopt(record, work_dir)
-        if pages is None:
-            # A stale recipe means the leaves are not trusted either: they
-            # are keyed by pixels alone, so every page is read again
-            stale = record is not None and record.get("fingerprint") != FINGERPRINT
-            pages = self._render(pdf_path, pdf_hash, work_dir, stale)
+        md_paths = cache.adopt(pdf_hash, work_dir)
+        if md_paths is None:
+            md_paths = self._render(cache, pdf_path, pdf_hash, work_dir)
 
-        for page_number, md_path in pages:
+        for md_path in md_paths:
             if not md_path.read_text(encoding="utf-8").strip():
-                logger.debug(f"Dropping page {page_number} of {node.title}: no readable content")
+                logger.debug(f"Dropping page {_page_number(md_path)} of {node.title}: no readable content")
                 continue
 
-            node.add_child(title=f"page {page_number}", path=md_path, mime_type=mt.MARKDOWN)
+            node.add_child(title=f"page {_page_number(md_path)}", path=md_path, mime_type=mt.MARKDOWN)
 
         logger.info(f"{node.title}: {len(node.children)} pages")
 
-    def _node(self, pdf_hash: str) -> dict | None:
-        """The pdf's node record, or None when there is none or it is malformed."""
-        text = self.cache.read(pdf_hash, NODE_NAME)
-        if text is None:
-            return None
-
-        try:
-            record = json.loads(text)
-            if not isinstance(record, dict) or not isinstance(record.get("children"), list):
-                return None
-        except json.JSONDecodeError:
-            return None
-
-        return record
-
-    def _adopt(self, record: dict | None, work_dir: Path) -> list[tuple[int, Path]] | None:
-        """The page transcripts adopted from the node, or None to render instead.
-
-        Adoption needs the current fingerprint and every leaf it names
-        still in the cache — anything less falls back to rendering, which
-        re-fills what is missing. Copies already made before the gap are
-        harmless: the render path re-reads them from the same leaves.
-        """
-        if record is None or record.get("fingerprint") != FINGERPRINT:
-            return None
-
-        work_dir.mkdir(parents=True, exist_ok=True)
-        pages: list[tuple[int, Path]] = []
-        try:
-            for name, leaf_hash in record["children"]:
-                md_path = work_dir / name
-                if not self.cache.get(leaf_hash, md_path):
-                    return None
-                pages.append((int(Path(name).stem.removeprefix("page_")), md_path))
-        except (TypeError, ValueError):
-            return None
-
-        return pages
-
-    def _render(self, pdf_path: Path, pdf_hash: str, work_dir: Path, stale: bool) -> list[tuple[int, Path]]:
+    def _render(self, cache: Cache, pdf_path: Path, pdf_hash: str, work_dir: Path) -> list[Path]:
         """Render every page and read it, refilling the leaves and the node."""
         page_paths = save_pdf_pages(pdf_path, work_dir)
 
         with ThreadPoolExecutor(max_workers=MAX_CONCURRENT_OCR) as executor:
             md_paths = list(
                 executor.map(
-                    lambda page: ocr_cached(
-                        self.cache, page, PDF_SYSTEM_PROMPT, PDF_USER_PROMPT, page.with_suffix(".md"), bypass=stale
-                    ),
+                    lambda page: ocr_cached(cache, page, PDF_SYSTEM_PROMPT, PDF_USER_PROMPT, page.with_suffix(".md")),
                     page_paths,
                 )
             )
 
-        children = [
-            [md_path.name, hash_bytes(page_path.read_bytes())] for page_path, md_path in zip(page_paths, md_paths)
-        ]
-        self.cache.write(pdf_hash, NODE_NAME, json.dumps({"fingerprint": FINGERPRINT, "children": children}))
+        cache.write_node(
+            pdf_hash,
+            [(md_path.name, hash_bytes(page_path.read_bytes())) for page_path, md_path in zip(page_paths, md_paths)],
+        )
 
-        return [(int(page_path.stem.removeprefix("page_")), md_path) for page_path, md_path in zip(page_paths, md_paths)]
+        return md_paths

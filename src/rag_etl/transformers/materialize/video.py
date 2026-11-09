@@ -2,8 +2,8 @@
 
 Cached as a Merkle tree, like the pdf: the leaves are the per-segment
 transcripts, each stored exactly once under its frame's hash; the video's
-node (`children.json`, keyed by the video's entry and language) is a small
-record of its ordered slide leaves. A node hit adopts the whole subtree —
+node record, keyed by the video's entry and language, lists its ordered
+slide leaves. A node hit adopts the whole subtree —
 no slide detection, no frame extraction, no read; a miss detects, extracts
 and falls back to the leaves, so an unchanged frame is never read again.
 Either way the node is written back, so the run after a miss hits at the
@@ -12,7 +12,6 @@ top again. The frames themselves are scratch: re-derivable, never cached.
 
 from __future__ import annotations
 
-import json
 import logging
 import shutil
 
@@ -28,7 +27,6 @@ from rag_etl.cache import Cache
 from rag_etl.core import Resource
 from rag_etl.core.resource import hash_bytes, hash_text
 from rag_etl.transformers.materialize.ocr import MAX_CONCURRENT_OCR, ocr_cached
-from rag_etl.transformers.materialize.pdf import NODE_NAME
 from rag_etl.transformers.materialize.videos import KalturaVideoResolver, entry_id_of
 from ragtools.graphai import GraphAIError
 from ragtools.kaltura import build_entry_url
@@ -38,11 +36,11 @@ logger = logging.getLogger(__name__)
 # The transcript is quoted rather than put under a heading
 TRANSCRIPT_PREFIX = "> "
 
-# Bumped whenever detecting or extracting changes what the same video
-# means (detector, min slide seconds, frame naming): nodes written under
-# an older recipe are stale and never adopted, and their frames are read
-# again wholesale
-FINGERPRINT = "video-slides-1"
+# The cache scope the slides live in. Bumped whenever detecting, extracting
+# or reading changes what the same video means (detector, min slide seconds,
+# frame naming, prompts, model): the new scope starts empty, so every video
+# is detected and every frame read again
+CACHE_VERSION = "video-slides-1"
 
 
 def _node_key(entry_id: str, language: str | None) -> str:
@@ -83,14 +81,10 @@ class VideoMaterializer:
         # the new ones
         shutil.rmtree(work_dir, ignore_errors=True)
 
+        cache = self.cache.scope(CACHE_VERSION)
         key = _node_key(entry_id, self.language)
-        record = self._node(key)
-        md_paths = self._adopt(record, work_dir)
+        md_paths = cache.adopt(key, work_dir)
         if md_paths is None:
-            # A stale recipe means the leaves are not trusted either: they
-            # are keyed by frame bytes alone, so every frame is read again
-            stale = record is not None and record.get("fingerprint") != FINGERPRINT
-
             video_url = resolver.url(entry_id)
             if not video_url:
                 logger.warning(f"Dropping {node.title}: no video file for entry {entry_id}")
@@ -110,8 +104,8 @@ class VideoMaterializer:
 
             logger.info(f"Entry {entry_id}: {len(timestamps)} slide changes detected")
 
-            frames = self._extract(video_url, timestamps, work_dir, stale)
-            self._write_node(key, frames)
+            frames = self._extract(cache, video_url, timestamps, work_dir)
+            cache.write_node(key, [(md_path.name, hash_bytes(frame.read_bytes())) for frame, md_path in frames])
             md_paths = [md_path for _, md_path in frames]
 
         self._build_slides(node, entry_id, md_paths)
@@ -120,48 +114,7 @@ class VideoMaterializer:
             logger.warning(f"Dropping {node.title}: no frames were extracted from it")
             node.detach()
 
-    def _node(self, key: str) -> dict | None:
-        """The video's node record, or None when there is none or it is malformed."""
-        text = self.cache.read(key, NODE_NAME)
-        if text is None:
-            return None
-
-        try:
-            record = json.loads(text)
-            if not isinstance(record, dict) or not isinstance(record.get("children"), list):
-                return None
-        except json.JSONDecodeError:
-            return None
-
-        return record
-
-    def _adopt(self, record: dict | None, work_dir: Path) -> list[Path] | None:
-        """The slide transcripts adopted from the node, or None to detect instead.
-
-        Adoption needs the current fingerprint and every leaf it names
-        still in the cache — anything less falls back to detection, which
-        re-fills what is missing. Copies already made before the gap are
-        harmless: the detection path re-reads them from the same leaves.
-        """
-        if record is None or record.get("fingerprint") != FINGERPRINT:
-            return None
-
-        work_dir.mkdir(parents=True, exist_ok=True)
-        md_paths: list[Path] = []
-        try:
-            for name, frame_hash in record["children"]:
-                md_path = work_dir / name
-                if not self.cache.get(frame_hash, md_path):
-                    return None
-                md_paths.append(md_path)
-        except (TypeError, ValueError):
-            return None
-
-        return md_paths
-
-    def _extract(
-        self, video_url: str, timestamps: list[int], work_dir: Path, stale: bool
-    ) -> list[tuple[Path, Path]]:
+    def _extract(self, cache: Cache, video_url: str, timestamps: list[int], work_dir: Path) -> list[tuple[Path, Path]]:
         """Extract one frame per interval and read it, refilling the leaves.
 
         The last reported timestamp is the end of the video rather than a
@@ -198,23 +151,13 @@ class VideoMaterializer:
             md_paths = list(
                 executor.map(
                     lambda frame: ocr_cached(
-                        self.cache,
-                        frame,
-                        SLIDE_SYSTEM_PROMPT,
-                        SLIDE_USER_PROMPT,
-                        frame.with_suffix(".md"),
-                        bypass=stale,
+                        cache, frame, SLIDE_SYSTEM_PROMPT, SLIDE_USER_PROMPT, frame.with_suffix(".md")
                     ),
                     frames,
                 )
             )
 
         return list(zip(frames, md_paths))
-
-    def _write_node(self, key: str, frames: list[tuple[Path, Path]]) -> None:
-        """Write the video's node record: its fingerprint and ordered slide leaves."""
-        children = [[md_path.name, hash_bytes(frame_path.read_bytes())] for frame_path, md_path in frames]
-        self.cache.write(key, NODE_NAME, json.dumps({"fingerprint": FINGERPRINT, "children": children}))
 
     def _build_slides(self, node: Resource, entry_id: str, md_paths: list[Path]) -> None:
         """Turn the read slides into one slide child each, captioned."""

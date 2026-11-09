@@ -137,8 +137,8 @@ def test_warm_pdf_rerun_adopts_the_whole_subtree(tmp_path, transformer, monkeypa
     assert not (work_dir / "page_1.png").exists()
 
 
-def test_fingerprint_bump_reOCRs_every_page(tmp_path, transformer, monkeypatch):
-    """A bumped fingerprint means the recipe changed: every page is read again."""
+def test_cache_version_bump_reOCRs_every_page(tmp_path, transformer, monkeypatch):
+    """A bumped cache version starts an empty scope: every page is read again."""
     pdf_path = make_pdf(tmp_path / "lecture.pdf", ["alpha", "beta"])
     root = Resource(title="root", children=[Resource(title="lecture", path=pdf_path, mime_type=mt.PDF)])
     transformer.transform([root])
@@ -148,7 +148,7 @@ def test_fingerprint_bump_reOCRs_every_page(tmp_path, transformer, monkeypatch):
         "ragtools.llm.RCPClient.vision",
         lambda self, prompt, images, **kwargs: calls.append(kwargs.get("name")) or "slide text",
     )
-    monkeypatch.setattr("rag_etl.transformers.materialize.pdf.FINGERPRINT", "pdf-ocr-2")
+    monkeypatch.setattr("rag_etl.transformers.materialize.pdf.CACHE_VERSION", "pdf-ocr-2")
 
     root = Resource(title="root", children=[Resource(title="lecture", path=pdf_path, mime_type=mt.PDF)])
     transformer.transform([root])
@@ -163,7 +163,7 @@ def test_missing_leaf_self_heals(tmp_path, transformer, monkeypatch):
     root = Resource(title="root", children=[Resource(title="lecture", path=pdf_path, mime_type=mt.PDF)])
     transformer.transform([root])
 
-    shutil.rmtree(next((tmp_path / "cache" / "micro303" / "materialize").glob("*/page_1.md")).parent)
+    shutil.rmtree(next((tmp_path / "cache" / "micro303" / "materialize").glob("*/*/page_1.md")).parent)
 
     calls = []
     monkeypatch.setattr(

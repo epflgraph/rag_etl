@@ -54,3 +54,8 @@ DEFAULT_MIME_TYPES = [
 def guess_mime_type(path):
     mime_type, _ = mimetypes.guess_type(path)
     return mime_type
+
+
+def is_text(mime_type: str | None) -> bool:
+    """Whether a mime type names text, which is read as it is (Markdown included)."""
+    return mime_type is not None and mime_type.startswith("text/")

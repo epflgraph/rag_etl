@@ -14,7 +14,7 @@ import logging
 from ragtools.llm import get_model
 
 from rag_etl.cache import Cache
-from rag_etl.core import Resource
+from rag_etl.core import Resource, iter_chunks
 from rag_etl.transformers.base import Transformer
 
 logger = logging.getLogger(__name__)
@@ -28,11 +28,6 @@ EMBEDDING_FILE = "embedding.json"
 # pessimistic 3 chars per token)
 BATCH_SIZE = 32
 REQUEST_CHAR_BUDGET = 96_000
-
-
-def chunks_of(roots: list[Resource]) -> list[Resource]:
-    """Every chunk in the trees: a node with text."""
-    return [node for root in roots for node in root.walk() if node.text is not None]
 
 
 class EmbedTransformer(Transformer):
@@ -50,7 +45,7 @@ class EmbedTransformer(Transformer):
             chunk.embedding = vector
 
     def transform(self, roots: list[Resource]) -> list[Resource]:
-        chunks = chunks_of(roots)
+        chunks = list(iter_chunks(roots))
         missing: list[Resource] = []
 
         for chunk in chunks:

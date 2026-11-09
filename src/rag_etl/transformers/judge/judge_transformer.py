@@ -14,7 +14,7 @@ from dataclasses import dataclass
 
 import ragtools.mime_types as mt
 
-from rag_etl.core import Resource, is_text_node
+from rag_etl.core import Resource
 from rag_etl.core.rules import Rule, apply
 from rag_etl.transformers.base import Transformer
 
@@ -91,7 +91,7 @@ class JudgeTransformer(Transformer):
             return
 
         if node.is_leaf:
-            if is_text_node(node):
+            if mt.is_text(node.mime_type):
                 node.cut = "whole_document"
         elif any(child.mime_type == mt.MARKDOWN for child in node.children):
             node.cut = "per_child"

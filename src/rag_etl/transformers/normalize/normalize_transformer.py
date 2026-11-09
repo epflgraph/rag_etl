@@ -98,8 +98,7 @@ class NormalizeTransformer(Transformer):
 
             if not node.children:
                 logger.warning(f"Dropping {node.title}: archive holds no supported file")
-                if node.parent is not None:
-                    node.parent.children.remove(node)
+                node.detach()
 
     def _convert_notebooks(self, root: Resource) -> None:
         for node in list(root.walk()):
@@ -125,5 +124,4 @@ class NormalizeTransformer(Transformer):
             limit = size_limit(node.mime_type)
             if limit is not None and node.path.stat().st_size > limit:
                 logger.warning(f"Dropping {node.title}: over the {node.mime_type} size limit")
-                if node.parent is not None:
-                    node.parent.children.remove(node)
+                node.detach()

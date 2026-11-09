@@ -37,8 +37,7 @@ class ImageMaterializer:
 
         if not md_path.read_text(encoding="utf-8").strip():
             logger.info(f"Dropping {node.title}: no readable content on it")
-            if node.parent is not None:
-                node.parent.children.remove(node)
+            node.detach()
             return
 
         node.path = md_path

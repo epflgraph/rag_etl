@@ -1,8 +1,8 @@
 """Cut: the trees the judge labelled become chunk leaves.
 
 A cut consumes the node it applies to: the node is replaced by chunk
-leaves (a chunk is a leaf with text), which the embed step then turns
-into (chunk, embedding) pairs for the loader. The cuts live in one
+leaves (a chunk is a leaf with text), which the embed step then
+annotates with their vectors. The cuts live in one
 registry; new kinds of cuts join via PR, never course-local code.
 """
 
@@ -15,8 +15,10 @@ import re
 from collections.abc import Callable
 from dataclasses import asdict, dataclass
 
+import ragtools.mime_types as mt
+
 from rag_etl.cache import Cache
-from rag_etl.core import Resource, is_text_node
+from rag_etl.core import Resource
 from rag_etl.core.resource import hash_text
 from rag_etl.transformers.base import Transformer
 from ragtools.documents import (
@@ -47,7 +49,7 @@ def document_texts(node: Resource) -> list[str]:
         return [
             child.path.read_text(encoding="utf-8")
             for child in node.children
-            if is_text_node(child) and child.path is not None
+            if mt.is_text(child.mime_type) and child.path is not None
         ]
     if node.path is not None:
         return [node.path.read_text(encoding="utf-8")]
@@ -55,10 +57,9 @@ def document_texts(node: Resource) -> list[str]:
 
 
 def _drop(node: Resource) -> None:
-    """Remove a node from its parent, its content gone with it; a root is left in place, inert."""
+    """Remove a node from its tree, its content gone with it, so nothing below it is cut."""
     node.children = []
-    if node.parent is not None:
-        node.parent.children.remove(node)
+    node.detach()
 
 
 def exercises(cache: Cache, text: str) -> list[ExerciseSnippet]:
@@ -119,13 +120,13 @@ def per_child(transformer: "CutTransformer", node: Resource) -> None:
     for child in list(node.children):
         if child.cut not in (None, "per_child"):
             continue
-        if not is_text_node(child) or child.path is None:
+        if not mt.is_text(child.mime_type) or child.path is None:
             continue
 
         text = child.path.read_text(encoding="utf-8")
         if not text.strip():
             logger.debug(f"Dropping {child.title}: no readable content")
-            node.children.remove(child)
+            child.detach()
             continue
 
         child.text = text

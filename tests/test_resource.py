@@ -2,7 +2,7 @@ from pathlib import Path
 
 import hashlib
 
-from rag_etl.core.resource import Resource, hash_bytes, hash_text
+from rag_etl.core.resource import Resource, hash_bytes, hash_text, iter_chunks
 
 
 def test_hash_helpers():
@@ -121,3 +121,24 @@ def test_add_child_overrides_win_and_attachments_stay_as_they_are():
     assert built.url == "https://built/z"
     assert built.cut is None
     assert built in pdf.children
+
+
+def test_iter_chunks_finds_text_nodes():
+    root = Resource(title="root")
+    chunk = root.add_child(title="chunk", text="hello")
+    container = root.add_child(title="container")
+    container.add_child(title="page")
+
+    assert list(iter_chunks([root])) == [chunk]
+
+
+def test_detach_removes_the_subtree_and_spares_a_root():
+    root = Resource(title="root")
+    child = root.add_child(title="child")
+    child.add_child(title="grandchild")
+
+    child.detach()
+    root.detach()
+
+    assert root.children == []
+    assert [node.title for node in child.walk()] == ["child", "grandchild"]

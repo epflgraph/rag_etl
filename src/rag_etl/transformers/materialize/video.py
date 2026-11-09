@@ -94,8 +94,7 @@ class VideoMaterializer:
             video_url = resolver.url(entry_id)
             if not video_url:
                 logger.warning(f"Dropping {node.title}: no video file for entry {entry_id}")
-                if node.parent is not None:
-                    node.parent.children.remove(node)
+                node.detach()
                 return
 
             logger.info(f"Detecting slides in {node.title} (entry {entry_id})")
@@ -106,8 +105,7 @@ class VideoMaterializer:
                 timestamps = self.detector.detect(video_url, self.language)
             except GraphAIError as error:
                 logger.warning(f"Dropping {node.title}: {error}")
-                if node.parent is not None:
-                    node.parent.children.remove(node)
+                node.detach()
                 return
 
             logger.info(f"Entry {entry_id}: {len(timestamps)} slide changes detected")
@@ -120,8 +118,7 @@ class VideoMaterializer:
 
         if not any(child.mime_type == mt.MARKDOWN for child in node.children):
             logger.warning(f"Dropping {node.title}: no frames were extracted from it")
-            if node.parent is not None:
-                node.parent.children.remove(node)
+            node.detach()
 
     def _node(self, key: str) -> dict | None:
         """The video's node record, or None when there is none or it is malformed."""
@@ -302,4 +299,4 @@ class VideoMaterializer:
         # The subtitles are now part of the slides, and the file they came
         # from is never loaded, so the caption leaf only leaves a reference
         # that resolves nowhere
-        node.children.remove(caption)
+        caption.detach()

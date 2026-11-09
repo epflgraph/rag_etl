@@ -3,12 +3,10 @@
 from __future__ import annotations
 
 import hashlib
-from collections.abc import Iterator
+from collections.abc import Iterable, Iterator
 from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
-
-import ragtools.mime_types as mt
 
 
 def hash_bytes(data: bytes) -> str:
@@ -69,6 +67,11 @@ class Resource:
         return not self.children
 
     @property
+    def is_chunk(self) -> bool:
+        """Whether this node is a chunk: a node with text."""
+        return self.text is not None
+
+    @property
     def content_hash(self) -> str:
         """sha256 of the content this node represents, computed fresh on every access."""
         if self.text is not None:
@@ -98,6 +101,11 @@ class Resource:
         self.children.append(child)
         return child
 
+    def detach(self) -> None:
+        """Remove this node, and its subtree with it, from its parent; a root stays as it is."""
+        if self.parent is not None:
+            self.parent.children.remove(self)
+
     def walk(self) -> Iterator[Resource]:
         """Yield this node, then its subtree, depth-first."""
         yield self
@@ -115,6 +123,7 @@ class Resource:
         return chain
 
 
-def is_text_node(node: Resource) -> bool:
-    """Whether a node's content is text the pipeline can read."""
-    return node.mime_type == mt.MARKDOWN or (node.mime_type is not None and node.mime_type.startswith("text/"))
+def iter_chunks(roots: Iterable[Resource]) -> Iterator[Resource]:
+    """Yield every chunk in the trees, depth-first."""
+    for root in roots:
+        yield from (node for node in root.walk() if node.is_chunk)

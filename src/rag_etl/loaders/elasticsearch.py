@@ -20,7 +20,7 @@ from typing import Any
 from elasticsearch import Elasticsearch, NotFoundError
 from elasticsearch.helpers import bulk
 
-from rag_etl.core import Resource
+from rag_etl.core import Resource, iter_chunks
 
 logger = logging.getLogger(__name__)
 
@@ -76,24 +76,15 @@ class ElasticsearchLoader:
 
     def _actions(self, roots: list[Resource]) -> list[dict[str, Any]]:
         """One index action per chunk, with a strictly increasing per-document number."""
-        number = 0
-        actions: list[dict[str, Any]] = []
-
-        for root in roots:
-            for node in root.walk():
-                if node.text is None:
-                    continue
-                number += 1
-                actions.append(
-                    {
-                        "_op_type": "index",
-                        "_index": self.index,
-                        "_id": f"{number}-{node.content_hash}",
-                        "_source": self._source(node),
-                    }
-                )
-
-        return actions
+        return [
+            {
+                "_op_type": "index",
+                "_index": self.index,
+                "_id": f"{number}-{chunk.content_hash}",
+                "_source": self._source(chunk),
+            }
+            for number, chunk in enumerate(iter_chunks(roots), start=1)
+        ]
 
     def _source(self, node: Resource) -> dict[str, Any]:
         """One document: content, vector, breadcrumb lineage, deep link."""

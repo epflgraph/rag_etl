@@ -6,7 +6,7 @@ import pytest
 
 from rag_etl.cache import Cache
 from rag_etl.core import Resource
-from rag_etl.transformers.embed.embed import BATCH_SIZE, REQUEST_CHAR_BUDGET, EmbedTransformer, chunks_of
+from rag_etl.transformers.embed.embed import BATCH_SIZE, REQUEST_CHAR_BUDGET, EmbedTransformer
 
 
 @pytest.fixture
@@ -99,12 +99,3 @@ def test_non_chunks_are_left_alone(cache, monkeypatch):
 
     assert calls == []
     assert root.embedding is None
-
-
-def test_chunks_of_finds_text_nodes():
-    root = Resource(title="root")
-    chunk = root.add_child(title="chunk", text="hello")
-    container = root.add_child(title="container")
-    container.add_child(title="page")
-
-    assert chunks_of([root]) == [chunk]

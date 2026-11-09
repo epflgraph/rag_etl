@@ -20,7 +20,7 @@ from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 from typing import Any
 
-from rag_etl.core import Resource
+from rag_etl.core import Resource, iter_chunks
 from rag_etl.loaders.elasticsearch import alias_name, index_name
 
 logger = logging.getLogger(__name__)
@@ -40,11 +40,6 @@ def _pipeline_version() -> str:
         return "unknown"
 
 
-def _chunks(roots: list[Resource]) -> list[tuple[Resource, Resource]]:
-    """Every chunk, paired with the root of its tree."""
-    return [(root, node) for root in roots for node in root.walk() if node.text is not None]
-
-
 def _node(node: Resource) -> dict[str, Any]:
     """One tree node: metadata and a content-hash pointer, no text, no vector."""
     return {
@@ -62,7 +57,7 @@ def _node(node: Resource) -> dict[str, Any]:
         "has_solution": node.has_solution,
         "from": node.from_,
         "until": node.until,
-        "chunk": node.text is not None,
+        "chunk": node.is_chunk,
         "content_hash": node.content_hash,
         "children": [_node(child) for child in node.children],
     }
@@ -108,7 +103,6 @@ class ManifestLoader:
 
     def load(self, roots: list[Resource]) -> None:
         """Write the manifest for one run's trees."""
-        chunks = _chunks(roots)
         manifest = {
             "header": {
                 "project": self.project,
@@ -121,7 +115,7 @@ class ManifestLoader:
             "summary": _summary(
                 [
                     {
-                        "source": root.title,
+                        "source": chunk.lineage()[0].title,
                         "type": chunk.type,
                         "subtype": chunk.subtype,
                         "number": chunk.number,
@@ -132,7 +126,7 @@ class ManifestLoader:
                         "from": chunk.from_,
                         "until": chunk.until,
                     }
-                    for root, chunk in chunks
+                    for chunk in iter_chunks(roots)
                 ],
                 SUMMARY_LEVELS,
             ),

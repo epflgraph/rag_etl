@@ -4,7 +4,7 @@ import sys
 
 from dotenv import find_dotenv, load_dotenv
 
-from rag_etl.projects import from_code
+from rag_etl.projects import load_project
 from rag_etl.pipeline import CACHED_STEPS, run_pipeline
 
 
@@ -49,11 +49,11 @@ def main(argv: list[str] | None = None) -> None:
         logging.info(f"Run configuration: project={args.project}, dry={args.dry}, refresh={args.refresh or 'none'}")
 
         try:
-            spec = from_code(args.project)
+            project = load_project(args.project)
         except ValueError as e:
             parser.error(str(e))
 
-        run_pipeline(spec, dry=args.dry, refresh=args.refresh)
+        run_pipeline(project, dry=args.dry, refresh=args.refresh)
 
 
 if __name__ == "__main__":

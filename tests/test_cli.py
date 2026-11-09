@@ -52,13 +52,13 @@ def test_unknown_project_errors(capsys):
     with pytest.raises(SystemExit) as e:
         main(["run", "--project", "NOPE"])
     assert e.value.code == 2
-    assert "Unknown project code" in capsys.readouterr().err
+    assert "Unknown project" in capsys.readouterr().err
 
 
 def test_known_project_runs(monkeypatch):
     ran = []
 
-    monkeypatch.setattr("rag_etl.cli.run_pipeline", lambda spec, dry=False, refresh=None: ran.append(spec.id))
+    monkeypatch.setattr("rag_etl.cli.run_pipeline", lambda project, dry=False, refresh=None: ran.append(project.id))
 
     main(["run", "--project", "MICRO303"])
 

@@ -28,7 +28,7 @@ class Override:
 
     `Override('title="*[[]HOMEWORK*]*"', type="practice", cut="per_exercise")`
     — any metadata field can be set; a name that is not one fails here, when
-    the spec is loaded, rather than silently never applying.
+    the project is loaded, rather than silently never applying.
     """
 
     def __init__(self, where: str, cut: str | None = None, **metadata: Any):

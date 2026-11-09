@@ -1,15 +1,13 @@
-"""The spec of the MICRO-303 project (Microfabrication I)."""
+"""The MICRO-303 project (Microfabrication I)."""
 
 from __future__ import annotations
-
-import os
 
 from pathlib import Path
 
 import ragtools.mime_types as mt
 
 from rag_etl.extractors import LocalFolderExtractor, MOOCExtractor, MoodleExtractor  # , EdDiscussionExtractor
-from rag_etl.projects.spec import ProjectSpec
+from rag_etl.projects import Project
 
 # The MOOC export's own labels: type/subtype/cut the export itself infers
 # (unlike Moodle files, these are inferred source-side on purpose). THEORY
@@ -42,16 +40,14 @@ MOOC_TAG_METADATA = {
     },
 }
 
-course_path = Path(os.environ["BASE_PATH"]) / "MICRO303"
-
-MICRO303 = ProjectSpec(
+MICRO303 = Project(
     id="micro303",
     language="en",
-    dir=course_path,
+    dir=Path("MICRO303"),
     sources=(
-        MoodleExtractor(dir=course_path / "moodle", course_id=19283),
+        MoodleExtractor(dir=Path("moodle"), course_id=19283),
         MOOCExtractor(
-            dir=course_path / "mooc",
+            dir=Path("mooc"),
             tag_metadata=MOOC_TAG_METADATA,
             mime_types=tuple(mt.DEFAULT_MIME_TYPES + [mt.MP4, mt.JSON]),
             # Week one opens at chapter 2 of the course, the ones
@@ -64,7 +60,7 @@ MICRO303 = ProjectSpec(
             theory_slides_tag="THEORY_SLIDES",
             language="en",
         ),
-        LocalFolderExtractor(dir=course_path / "local"),
+        LocalFolderExtractor(dir=Path("local")),
         # Ed Discussion waits until its catalogue reads the new pipeline's
         # manifest (refactor plan). Its configuration, for when it returns:
         # EdDiscussionExtractor(

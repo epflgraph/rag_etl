@@ -1,7 +1,7 @@
 """Judge: labels the trees the materializer produced.
 
 The judge fills type, subtype and the cut for every resource
-— or drops it — and the spec's overrides correct on top of its output.
+— or drops it — and the project's overrides correct on top of its output.
 There is no type/subtype → cut mapping here: how the judge decides is
 Javier's business; this is a stub for his inference.
 """

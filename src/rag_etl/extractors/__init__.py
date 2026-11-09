@@ -1,4 +1,4 @@
-from rag_etl.extractors.base_extractor import Extractor, SourceUnavailable
+from rag_etl.extractors.base import Extractor, SourceUnavailable
 from rag_etl.extractors.moodle import MoodleExtractor
 from rag_etl.extractors.mooc import MOOCExtractor
 from rag_etl.extractors.ed_discussion import EdDiscussionExtractor

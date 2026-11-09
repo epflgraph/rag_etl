@@ -12,7 +12,7 @@ from pathlib import Path
 
 import ragtools.mime_types as mt
 from rag_etl.core import Resource
-from rag_etl.extractors.base_extractor import Extractor, SourceUnavailable
+from rag_etl.extractors.base import Extractor, SourceUnavailable
 
 logger = logging.getLogger(__name__)
 

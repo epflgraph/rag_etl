@@ -8,7 +8,7 @@ from types import SimpleNamespace
 import pytest
 
 from rag_etl.core import Resource
-from rag_etl.extractors.base_extractor import Extractor, SourceUnavailable
+from rag_etl.extractors.base import Extractor, SourceUnavailable
 from rag_etl.pipeline import extract, run_pipeline, transform
 from rag_etl.projects.spec import ProjectSpec
 

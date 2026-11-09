@@ -2,7 +2,7 @@
 
 import ragtools.mime_types as mt
 from rag_etl.core import Override, Resource
-from rag_etl.transformers.judge.judge_transformer import JudgeTransformer
+from rag_etl.transformers.judge import JudgeTransformer
 
 
 def test_readable_leaf_cuts_whole():

@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from rag_etl.core import Resource
-from rag_etl.extractors.base_extractor import Extractor
+from rag_etl.extractors.base import Extractor
 
 import ragtools.mime_types as mt
 from rag_etl.extractors.mooc.course_parser import CourseParser

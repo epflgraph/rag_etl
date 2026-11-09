@@ -11,7 +11,7 @@ import pytest
 import ragtools.mime_types as mt
 from rag_etl.cache import Cache
 from rag_etl.core import Resource
-from rag_etl.transformers.normalize.normalize_transformer import NormalizeTransformer
+from rag_etl.transformers.normalize import NormalizeTransformer
 
 
 @pytest.fixture

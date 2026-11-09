@@ -7,7 +7,7 @@ import pytest
 import ragtools.mime_types as mt
 from rag_etl.cache import Cache
 from rag_etl.core import Resource
-from rag_etl.transformers.cut.cut_transformer import CutTransformer
+from rag_etl.transformers.cut import CutTransformer
 from ragtools.documents import MAX_SECTION_LINES, Exercise, ExerciseList, ExerciseSnippet, split_exercises, stitch
 
 
@@ -111,7 +111,7 @@ def test_per_exercise_cuts_at_markers(tmp_path, transformer, monkeypatch):
         ExerciseSnippet(number="1", parts="statement", text="<!-- page 1 -->\nExercise 1"),
         ExerciseSnippet(number="1", parts="solution", text="<!-- page 1 -->\nSolution 1"),
     ]
-    monkeypatch.setattr("rag_etl.transformers.cut.cut_transformer.split_exercises", lambda *args, **kwargs: snippets)
+    monkeypatch.setattr("rag_etl.transformers.cut.split_exercises", lambda *args, **kwargs: snippets)
 
     root = Resource(title="root")
     doc = root.add_child(title="sheet", cut="per_exercise", url="https://moodle/x.pdf")
@@ -130,7 +130,7 @@ def test_per_exercise_cuts_at_markers(tmp_path, transformer, monkeypatch):
 def test_per_exercise_statement_only_sheet_has_no_solution(tmp_path, transformer, monkeypatch):
     """A sheet with only statements: every chunk is a statement, has_solution False."""
     snippets = [ExerciseSnippet(number="1", parts="statement", text="Exercise 1")]
-    monkeypatch.setattr("rag_etl.transformers.cut.cut_transformer.split_exercises", lambda *args, **kwargs: snippets)
+    monkeypatch.setattr("rag_etl.transformers.cut.split_exercises", lambda *args, **kwargs: snippets)
 
     root = Resource(title="root")
     doc = root.add_child(title="sheet", cut="per_exercise")
@@ -147,7 +147,7 @@ def test_per_exercise_statement_only_sheet_has_no_solution(tmp_path, transformer
 def test_per_exercise_solution_only_sheet(tmp_path, transformer, monkeypatch):
     """A corrigé: every chunk is a solution and has_solution."""
     snippets = [ExerciseSnippet(number="1", parts="solution", text="Solution 1")]
-    monkeypatch.setattr("rag_etl.transformers.cut.cut_transformer.split_exercises", lambda *args, **kwargs: snippets)
+    monkeypatch.setattr("rag_etl.transformers.cut.split_exercises", lambda *args, **kwargs: snippets)
 
     root = Resource(title="root")
     doc = root.add_child(title="corrigé", cut="per_exercise")
@@ -164,7 +164,7 @@ def test_per_exercise_solution_only_sheet(tmp_path, transformer, monkeypatch):
 def test_per_exercise_joined_statement_and_solution(tmp_path, transformer, monkeypatch):
     """A sheet cut in n: each chunk holds statement and solution together."""
     snippets = [ExerciseSnippet(number="1", parts="statement + solution", text="Exercise 1\nSolution 1")]
-    monkeypatch.setattr("rag_etl.transformers.cut.cut_transformer.split_exercises", lambda *args, **kwargs: snippets)
+    monkeypatch.setattr("rag_etl.transformers.cut.split_exercises", lambda *args, **kwargs: snippets)
 
     root = Resource(title="root")
     doc = root.add_child(title="sheet", cut="per_exercise")
@@ -191,7 +191,7 @@ def test_solution_file_chunks_catch_up_has_solution(tmp_path, transformer):
 
 
 def test_per_exercise_drops_when_no_exercises(tmp_path, transformer, monkeypatch):
-    monkeypatch.setattr("rag_etl.transformers.cut.cut_transformer.split_exercises", lambda *args, **kwargs: [])
+    monkeypatch.setattr("rag_etl.transformers.cut.split_exercises", lambda *args, **kwargs: [])
 
     root = Resource(title="root")
     doc = root.add_child(title="sheet", cut="per_exercise")

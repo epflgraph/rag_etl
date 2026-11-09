@@ -21,13 +21,15 @@ from rag_etl.core import Resource
 from rag_etl.extractors import Extractor
 from rag_etl.loaders import ElasticsearchLoader, Loader, ManifestLoader
 from rag_etl.projects.spec import ProjectSpec
-from rag_etl.transformers.base import Transformer
-from rag_etl.transformers.cut.cut_transformer import CutTransformer
-from rag_etl.transformers.embed.embed import EmbedTransformer
-from rag_etl.transformers.judge.judge_transformer import JudgeTransformer
-from rag_etl.transformers.materialize.materialize_transformer import MaterializeTransformer
+from rag_etl.transformers import (
+    CutTransformer,
+    EmbedTransformer,
+    JudgeTransformer,
+    MaterializeTransformer,
+    NormalizeTransformer,
+    Transformer,
+)
 from rag_etl.transformers.materialize.videos import GraphAISlideDetector
-from rag_etl.transformers.normalize.normalize_transformer import NormalizeTransformer
 
 logger = logging.getLogger(__name__)
 

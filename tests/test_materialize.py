@@ -12,7 +12,7 @@ import ragtools.mime_types as mt
 from rag_etl.cache import Cache
 from rag_etl.core import Resource
 from rag_etl.core.resource import hash_bytes
-from rag_etl.transformers.materialize.materialize_transformer import MaterializeTransformer
+from rag_etl.transformers.materialize import MaterializeTransformer
 
 
 class FakeResolver:
@@ -33,7 +33,7 @@ def transformer(tmp_path, monkeypatch):
 
     fake_resolver = FakeResolver()
     monkeypatch.setattr(
-        "rag_etl.transformers.materialize.materialize_transformer.KalturaVideoResolver", lambda: fake_resolver
+        "rag_etl.transformers.materialize.KalturaVideoResolver", lambda: fake_resolver
     )
     monkeypatch.setattr(
         "rag_etl.transformers.materialize.video.extract_frame", fake_extract_frame

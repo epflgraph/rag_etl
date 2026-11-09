@@ -11,14 +11,14 @@ import pytest
 import requests
 
 import ragtools.mime_types as mt
-from rag_etl.extractors.base_extractor import Extractor, SourceUnavailable
+from rag_etl.extractors.base import Extractor, SourceUnavailable
 from rag_etl.extractors.ed_discussion.ed_discussion_extractor import EdDiscussionExtractor
 from rag_etl.extractors.ed_discussion.utils import ThreadClassification
-from rag_etl.extractors.git.git_extractor import GitExtractor, branch_from_url, repo_from_url
-from rag_etl.extractors.local_folder.local_folder_extractor import LocalFolderExtractor
-from rag_etl.extractors.mediaspace.mediaspace_extractor import MediaspaceExtractor
+from rag_etl.extractors.git import GitExtractor, branch_from_url, repo_from_url
+from rag_etl.extractors.local_folder import LocalFolderExtractor
+from rag_etl.extractors.mediaspace import MediaspaceExtractor
 from rag_etl.extractors.mooc.mooc_extractor import MOOCExtractor
-from rag_etl.extractors.moodle.moodle_extractor import MoodleExtractor
+from rag_etl.extractors.moodle import MoodleExtractor
 
 
 MOODLE_SECTIONS = [
@@ -73,7 +73,7 @@ def fake_moodle_get(monkeypatch, sections):
             return SimpleNamespace(json=lambda: sections, raise_for_status=lambda: None, content=b"")
         return SimpleNamespace(json=lambda: {}, raise_for_status=lambda: None, content=b"file")
 
-    monkeypatch.setattr("rag_etl.extractors.moodle.moodle_extractor.requests.get", fake_get)
+    monkeypatch.setattr("rag_etl.extractors.moodle.requests.get", fake_get)
 
 
 def test_moodle_tree(monkeypatch, tmp_path):
@@ -151,7 +151,7 @@ def test_moodle_unreachable(monkeypatch, tmp_path):
     def fake_get(url, params=None, **kwargs):
         raise requests.ConnectionError("down")
 
-    monkeypatch.setattr("rag_etl.extractors.moodle.moodle_extractor.requests.get", fake_get)
+    monkeypatch.setattr("rag_etl.extractors.moodle.requests.get", fake_get)
 
     with pytest.raises(SourceUnavailable):
         MoodleExtractor(course_id=1, dir=tmp_path / "moodle").extract()
@@ -291,7 +291,7 @@ def test_mooc_untagged_needs_both_tags(tmp_path):
 
 
 def test_mediaspace(monkeypatch, tmp_path):
-    module = "rag_etl.extractors.mediaspace.mediaspace_extractor"
+    module = "rag_etl.extractors.mediaspace"
     client = SimpleNamespace()
     entries = [
         SimpleNamespace(id="0_abc", name="Lecture 1", duration=100),

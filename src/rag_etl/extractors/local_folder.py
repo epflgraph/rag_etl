@@ -9,7 +9,7 @@ from pathlib import Path
 
 from ragtools.mime_types import DEFAULT_MIME_TYPES, guess_mime_type
 from rag_etl.core import Resource
-from rag_etl.extractors.base_extractor import Extractor, SourceUnavailable
+from rag_etl.extractors.base import Extractor, SourceUnavailable
 
 # A module or file marked NO_BOT is not for the bots; everything else is extracted
 NO_BOT = re.compile(r"\[NO_BOT\]")

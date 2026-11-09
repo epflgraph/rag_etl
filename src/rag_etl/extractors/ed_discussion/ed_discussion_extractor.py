@@ -4,7 +4,7 @@ import os
 from pathlib import Path
 
 from rag_etl.core import Resource
-from rag_etl.extractors.base_extractor import Extractor
+from rag_etl.extractors.base import Extractor
 from rag_etl.extractors.ed_discussion.catalogue import build_catalogue, find_entry, render_catalogue_entry
 from rag_etl.extractors.ed_discussion.utils import (
     MESSAGE_TYPES,

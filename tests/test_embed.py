@@ -6,7 +6,7 @@ import pytest
 
 from rag_etl.cache import Cache
 from rag_etl.core import Resource
-from rag_etl.transformers.embed.embed import BATCH_SIZE, REQUEST_CHAR_BUDGET, EmbedTransformer
+from rag_etl.transformers.embed import BATCH_SIZE, REQUEST_CHAR_BUDGET, EmbedTransformer
 
 
 @pytest.fixture
@@ -21,7 +21,7 @@ def fake_llm(monkeypatch, calls: list):
         calls.append(list(texts))
         return [[1.0, 0.0] for _ in texts]
 
-    monkeypatch.setattr("rag_etl.transformers.embed.embed.get_model", lambda task: SimpleNamespace(embeddings=embed_texts))
+    monkeypatch.setattr("rag_etl.transformers.embed.get_model", lambda task: SimpleNamespace(embeddings=embed_texts))
 
 
 def test_one_vector_per_chunk_in_order(cache, monkeypatch):

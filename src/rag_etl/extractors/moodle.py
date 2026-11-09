@@ -14,7 +14,7 @@ import requests
 
 import ragtools.mime_types as mt
 from rag_etl.core import Resource
-from rag_etl.extractors.base_extractor import Extractor, SourceUnavailable
+from rag_etl.extractors.base import Extractor, SourceUnavailable
 from ragtools.encoding import sanitize_for_filename
 from rag_etl.utils.tags import split_tag_text
 

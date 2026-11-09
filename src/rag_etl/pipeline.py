@@ -83,7 +83,7 @@ def transform(roots: list[Resource], spec: ProjectSpec, refresh: str | None = No
         mediaspace_url=os.environ.get("DEFAULT_MEDIASPACE_BASE_URL"),
         language=spec.language,
     )
-    judge = JudgeTransformer(exceptions=spec.exceptions)
+    judge = JudgeTransformer(overrides=spec.overrides)
     cut = CutTransformer(
         cache=Cache(spec.id, "cut", refresh=refresh == "cut"),
     )

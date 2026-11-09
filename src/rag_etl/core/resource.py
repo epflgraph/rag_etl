@@ -8,6 +8,21 @@ from dataclasses import dataclass, field, replace
 from pathlib import Path
 from typing import Any
 
+# The descriptive metadata every chunk carries into the index, declared once:
+# overrides set and match them, the judge inherits them down the tree, and the
+# manifest and the Elasticsearch documents are built from them
+METADATA_FIELDS = (
+    "type",
+    "subtype",
+    "number",
+    "subnumber",
+    "week",
+    "exercise_parts",
+    "has_solution",
+    "from_",
+    "until",
+)
+
 
 def hash_bytes(data: bytes) -> str:
     """Return the sha256 hex digest of raw bytes."""
@@ -40,10 +55,12 @@ class Resource:
     parent: Resource | None = None
     children: list[Resource] = field(default_factory=list)
 
-    # descriptive metadata (extractors fill some; the judge fills type/subtype/cut; exceptions correct)
+    # processing: how the node is cut into chunks (filled by the judge, corrected by overrides; never indexed)
+    cut: str | None = None         # whole_document | per_child | per_exercise | text
+
+    # descriptive metadata, the METADATA_FIELDS (extractors fill some; the judge the rest; overrides correct)
     type: str | None = None        # theory / practice / ... (inferred by the judge)
     subtype: str | None = None     # lecture_slides / homework / ...
-    cut: str | None = None         # whole_document | per_child | per_exercise | text (inferred by the judge)
     number: str | None = None      # exercise number
     subnumber: str | None = None   # exercise subnumber
     week: int | None = None        # lecture week (slides, recordings)
@@ -72,6 +89,15 @@ class Resource:
         return self.text is not None
 
     @property
+    def metadata(self) -> dict[str, Any]:
+        """The node's descriptive metadata, keyed by field name.
+
+        A trailing underscore that only dodges a Python keyword is dropped
+        (`from_` reads as `from`), which is how documents and overrides name it.
+        """
+        return {name.rstrip("_"): getattr(self, name) for name in METADATA_FIELDS}
+
+    @property
     def content_hash(self) -> str:
         """sha256 of the content this node represents, computed fresh on every access."""
         if self.text is not None:
@@ -85,17 +111,17 @@ class Resource:
             return hash_bytes(self.path.read_bytes())
         return hash_text("")
 
-    def add_child(self, child: Resource | None = None, **overrides: Any) -> Resource:
+    def add_child(self, child: Resource | None = None, **fields: Any) -> Resource:
         """Attach a child under this node and return it.
 
         Without a child, one is built as a copy of this node — every
-        field comes down as it is, and the overrides name what differs:
+        field comes down as it is, and the fields given name what differs:
         `pdf.add_child(title="page 1", path=md, mime_type=mt.MARKDOWN)`.
         A child passed in — typically a subtree an extractor built — is
         attached as it is.
         """
         if child is None:
-            child = replace(self, **overrides, parent=self, children=[])
+            child = replace(self, **fields, parent=self, children=[])
         else:
             child.parent = self
         self.children.append(child)

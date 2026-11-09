@@ -87,28 +87,18 @@ class ElasticsearchLoader:
         ]
 
     def _source(self, node: Resource) -> dict[str, Any]:
-        """One document: content, vector, breadcrumb lineage, deep link."""
-        embedding = node.embedding
-        if embedding is None:
+        """One document: content, vector, breadcrumb lineage, deep link and metadata."""
+        if node.embedding is None:
             raise ValueError(f"chunk {node.title!r} is not embedded")
         if node.type is None or node.subtype is None:
             raise ValueError(f"chunk {node.title!r} is unlabelled: every indexed chunk needs a type and a subtype")
 
-        url = node.url
         document: dict[str, Any] = {
             "content": node.text,
-            "embedding": embedding,
+            "embedding": node.embedding,
             "lineage": [ancestor.title or ancestor.url or "unknown" for ancestor in node.lineage()],
-            "url": url,
-            "type": node.type,
-            "subtype": node.subtype,
-            "number": node.number,
-            "subnumber": node.subnumber,
-            "week": node.week,
-            "exercise_parts": node.exercise_parts,
-            "has_solution": node.has_solution,
-            "from": node.from_,
-            "until": node.until,
+            "url": node.url,
+            **node.metadata,
         }
         return {key: value for key, value in document.items() if value is not None}
 

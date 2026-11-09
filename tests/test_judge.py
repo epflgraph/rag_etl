@@ -1,8 +1,7 @@
-"""Unit tests for the judge stub: default cuts, exceptions on top. No LLM."""
+"""Unit tests for the judge stub: default cuts, overrides on top. No LLM."""
 
 import ragtools.mime_types as mt
-from rag_etl.core import Resource
-from rag_etl.core.rules import Rule
+from rag_etl.core import Override, Resource
 from rag_etl.transformers.judge.judge_transformer import JudgeTransformer
 
 
@@ -52,12 +51,12 @@ def test_containers_without_text_children_stay_unlabelled():
     assert folder.cut is None
 
 
-def test_exceptions_correct_the_labels():
-    rule = Rule(where='title="big notes"', cut="text")
+def test_overrides_correct_the_labels():
+    override = Override('title="big notes"', cut="text")
     root = Resource(title="root")
     leaf = root.add_child(title="big notes", mime_type=mt.MARKDOWN)
 
-    JudgeTransformer(exceptions=(rule,)).transform([root])
+    JudgeTransformer(overrides=(override,)).transform([root])
 
     assert leaf.cut == "text"
 
@@ -180,11 +179,11 @@ def test_a_childs_own_cues_beat_the_inherited_ones():
     assert page.type == "practice" and page.subtype == "quiz"
 
 
-def test_exceptions_win_over_the_defaults():
-    rule = Rule(where='title="recap"', subtype="recap")
+def test_overrides_win_over_the_defaults():
+    override = Override('title="recap"', subtype="recap")
     root = Resource(title="root")
     leaf = root.add_child(title="recap", mime_type=mt.MARKDOWN)
 
-    JudgeTransformer(exceptions=(rule,)).transform([root])
+    JudgeTransformer(overrides=(override,)).transform([root])
 
     assert leaf.subtype == "recap"

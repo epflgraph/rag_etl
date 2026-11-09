@@ -1,7 +1,7 @@
 """Judge: labels the trees the materializer produced.
 
 The judge fills type, subtype and the cut for every resource
-— or drops it — and the spec's exceptions correct on top of its output.
+— or drops it — and the spec's overrides correct on top of its output.
 There is no type/subtype → cut mapping here: how the judge decides is
 Javier's business; this is a stub for his inference.
 """
@@ -14,12 +14,14 @@ from dataclasses import dataclass
 
 import ragtools.mime_types as mt
 
-from rag_etl.core import Resource
-from rag_etl.core.rules import Rule, apply
+from rag_etl.core import METADATA_FIELDS, Override, Resource, apply_overrides
 from rag_etl.transformers.base import Transformer
 
+# Chunk-level facts, derived from the chunks themselves: never inherited
+CHUNK_LEVEL_FIELDS = ("exercise_parts", "has_solution")
+
 # The stub's broad regex defaults, applied where no extractor set a label
-# and corrected by the exceptions. A node's own title speaks first; what
+# and corrected by the overrides. A node's own title speaks first; what
 # it leaves unset the lineage inherits; the fallbacks come last.
 
 # Anything quiz-, exam- or exercise-shaped is practice; everything else is theory
@@ -56,17 +58,17 @@ DEFAULT_SUBTYPE = "unknown"  # an honest flag for the titles no rule matched
 
 @dataclass(frozen=True)
 class JudgeTransformer(Transformer):
-    """Labels the trees: the stub's regex defaults and cuts, corrected by the exceptions.
+    """Labels the trees: the stub's regex defaults and cuts, corrected by the overrides.
 
     The stub works in three passes: what each node itself says (its cut
     and the labels its own title carries), what the lineage adds (every
     metadata field a node lacks it inherits from its parent, then the
-    exceptions correct), and the fallbacks that leave nothing empty.
+    overrides correct), and the fallbacks that leave nothing empty.
     Exercise parts stay with the extractors and the exercise cut; the real
     inference lands later.
     """
 
-    exceptions: tuple[Rule, ...] = ()
+    overrides: tuple[Override, ...] = ()
 
     def transform(self, roots: list[Resource]) -> list[Resource]:
         for root in roots:
@@ -75,7 +77,7 @@ class JudgeTransformer(Transformer):
                 self._own_labels(node)
             for node in root.walk():
                 self._inherit(node)
-                apply(node, self.exceptions)
+                apply_overrides(node, self.overrides)
             for node in root.walk():
                 self._fallback(node)
         return roots
@@ -116,13 +118,13 @@ class JudgeTransformer(Transformer):
         children are visited, and a node's own labels always beat the
         inherited ones. cut is not inherited — an instruction for
         splitting the node itself, a leaf with a container-cut would
-        never become a chunk — and neither are exercise_parts and
-        has_solution: chunk-level facts, derived from the chunks.
+        never become a chunk — and neither are the chunk-level facts,
+        derived from the chunks themselves.
         """
         if node.parent is None:
             return
-        for name in ("type", "subtype", "number", "subnumber", "week", "from_", "until"):
-            if getattr(node, name) is None:
+        for name in METADATA_FIELDS:
+            if name not in CHUNK_LEVEL_FIELDS and getattr(node, name) is None:
                 setattr(node, name, getattr(node.parent, name))
 
     def _fallback(self, node: Resource) -> None:

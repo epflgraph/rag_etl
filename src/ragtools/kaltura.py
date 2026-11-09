@@ -279,6 +279,17 @@ def create_kaltura_session(
     return client
 
 
+def session_from_env() -> KalturaClient:
+    """Open an admin Kaltura session with the credentials set in the environment."""
+    return create_kaltura_session(
+        api_url=os.environ["SWITCH_API_URL"],
+        kaltura_app_token_id=os.environ["KALTURA_APP_TOKEN_ID"],
+        kaltura_user_id=os.environ["KALTURA_USER_ID"],
+        kaltura_token=os.environ["KALTURA_TOKEN"],
+        kaltura_partner_id=int(os.environ["KALTURA_PARTNER_ID"]),
+    )
+
+
 def list_playlist_entries(client: KalturaClient, playlist_id: str) -> list:
     """
     Return all Kaltura entries in a playlist.
@@ -559,3 +570,21 @@ def get_video_download_url(client: KalturaClient, entry_id: str) -> str | None:
         return None
 
     return download_url
+
+
+class KalturaVideoResolver:
+    """Resolves the file url of the slides video of an entry, one session for all of them.
+
+    The session is opened on the first video asked for, so building a
+    resolver reaches nothing.
+    """
+
+    def __init__(self) -> None:
+        self._client: KalturaClient | None = None
+
+    def url(self, entry_id: str) -> str | None:
+        if self._client is None:
+            self._client = session_from_env()
+
+        slides_entry_id = find_slides_entry_id(self._client, entry_id)
+        return get_video_download_url(self._client, slides_entry_id)

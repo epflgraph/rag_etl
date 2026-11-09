@@ -29,7 +29,7 @@ from rag_etl.transformers import (
     NormalizeTransformer,
     Transformer,
 )
-from rag_etl.transformers.materialize.videos import GraphAISlideDetector
+from ragtools.graphai import GraphAISlideDetector
 
 logger = logging.getLogger(__name__)
 

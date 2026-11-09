@@ -31,7 +31,7 @@ from rag_etl.transformers.base import Transformer
 from rag_etl.transformers.materialize.image import ImageMaterializer
 from rag_etl.transformers.materialize.pdf import PdfMaterializer
 from rag_etl.transformers.materialize.video import VideoMaterializer
-from rag_etl.transformers.materialize.videos import KalturaVideoResolver
+from ragtools.kaltura import KalturaVideoResolver
 
 
 @dataclass(frozen=True)

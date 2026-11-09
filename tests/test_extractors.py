@@ -298,7 +298,7 @@ def test_mediaspace(monkeypatch, tmp_path):
         SimpleNamespace(id="0_empty", name="Placeholder", duration=0),
     ]
 
-    monkeypatch.setattr(f"{module}.create_kaltura_session", lambda **kwargs: client)
+    monkeypatch.setattr(f"{module}.session_from_env", lambda: client)
     monkeypatch.setattr(f"{module}.is_playlist_url", lambda url: True)
     monkeypatch.setattr(f"{module}.extract_playlist_id_from_url", lambda url: "playlist1")
     monkeypatch.setattr(f"{module}.list_playlist_entries", lambda client, playlist_id: entries)

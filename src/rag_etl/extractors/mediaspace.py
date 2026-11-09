@@ -1,5 +1,4 @@
 import logging
-import os
 import re
 import shutil
 from collections.abc import Sequence
@@ -12,7 +11,6 @@ from rag_etl.extractors.base import Extractor, SourceUnavailable
 from ragtools.kaltura import (
     build_entry_url,
     caption_mime_type,
-    create_kaltura_session,
     download_caption,
     extract_category_id_from_url,
     extract_playlist_id_from_url,
@@ -20,6 +18,7 @@ from ragtools.kaltura import (
     is_playlist_url,
     list_channel_entries,
     list_playlist_entries,
+    session_from_env,
 )
 import ragtools.mime_types as mt
 
@@ -232,13 +231,7 @@ class MediaspaceExtractor(Extractor):
 
         # Reaching the source, failing loud when it cannot be reached
         try:
-            client = create_kaltura_session(
-                api_url=os.environ["SWITCH_API_URL"],
-                kaltura_app_token_id=os.environ["KALTURA_APP_TOKEN_ID"],
-                kaltura_user_id=os.environ["KALTURA_USER_ID"],
-                kaltura_token=os.environ["KALTURA_TOKEN"],
-                kaltura_partner_id=int(os.environ["KALTURA_PARTNER_ID"]),
-            )
+            client = session_from_env()
         except Exception as error:
             raise SourceUnavailable(f"Kaltura session could not be created: {error}") from error
 

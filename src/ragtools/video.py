@@ -1,7 +1,7 @@
 """Videos: slide-change detection, frame extraction and subtitle handling.
 
 A recorded lecture is turned into slides by a slide detector (the
-interface below; the GraphAI implementation stays in the pipeline):
+interface below; `ragtools.graphai.GraphAISlideDetector` implements it):
 slide changes are found, one frame per slide segment is extracted with
 ffmpeg straight from the remote url, and the subtitles spoken over the
 segment are kept with the frame's text by whoever merges them.

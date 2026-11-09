@@ -1,8 +1,12 @@
+"""GraphAI plumbing: video retrieval and slide-change detection, behind the SlideDetector interface."""
+
 import logging
 import os
 import time
 
 import requests
+
+from ragtools.video import SlideDetector
 
 logger = logging.getLogger(__name__)
 
@@ -146,3 +150,14 @@ def detect_slides(video_token: str, token: str, language: str | None = None) -> 
         timestamps.append(int(slide["timestamp"]))
 
     return sorted(timestamps)
+
+
+class GraphAISlideDetector(SlideDetector):
+    """Slide-change detection over GraphAI, behind the swappable interface."""
+
+    def detect(self, video_url: str, language: str | None = None) -> list[int]:
+        token = get_access_token()
+        video_token = retrieve_video(video_url, token)
+        if video_token is None:
+            raise GraphAIError(f"GraphAI found no video at {video_url}")
+        return detect_slides(video_token, token, language)

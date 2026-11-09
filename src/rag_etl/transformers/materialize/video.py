@@ -35,11 +35,19 @@ from rag_etl.cache import Cache
 from rag_etl.core import Resource
 from rag_etl.core.resource import hash_bytes, hash_text
 from rag_etl.transformers.materialize.ocr import MAX_CONCURRENT_OCR, ocr_cached
-from rag_etl.transformers.materialize.videos import KalturaVideoResolver, entry_id_of
 from ragtools.graphai import GraphAIError
-from ragtools.kaltura import build_entry_url
+from ragtools.kaltura import KalturaVideoResolver, build_entry_url, extract_entry_id_from_url
 
 logger = logging.getLogger(__name__)
+
+
+def entry_id_of(node: Resource) -> str | None:
+    """Return the Kaltura entry id a video node stands for, read from its url.
+
+    Mediaspace videos carry it in their watch url, MOOC videos in their
+    playManifest url; a YouTube video carries none.
+    """
+    return extract_entry_id_from_url(node.url) if node.url else None
 
 # The transcript is quoted rather than put under a heading
 TRANSCRIPT_PREFIX = "> "

@@ -31,6 +31,10 @@ EMBEDDING_FILE = "embedding.json"
 BATCH_SIZE = 32
 REQUEST_CHAR_BUDGET = 96_000
 
+# A chunk must fit in one request on its own: the cut drops anything bigger,
+# so this is the one size limit every chunk answers to
+MAX_CHUNK_CHARS = REQUEST_CHAR_BUDGET
+
 
 @dataclass(frozen=True)
 class EmbedTransformer(Transformer):
@@ -67,9 +71,10 @@ class EmbedTransformer(Transformer):
         chars = 0
         for chunk in missing:
             length = len(chunk.text or "")
-            if length > REQUEST_CHAR_BUDGET:
+            # The cut drops oversized chunks, so this only fires on a cut bug
+            if length > MAX_CHUNK_CHARS:
                 raise ValueError(
-                    f"{chunk.title}: {length:,} chars over the {REQUEST_CHAR_BUDGET:,}-char embedding budget; fix its cut"
+                    f"{chunk.title}: {length:,} chars over the {MAX_CHUNK_CHARS:,}-char chunk limit; fix its cut"
                 )
             if batch and (len(batch) == BATCH_SIZE or chars + length > REQUEST_CHAR_BUDGET):
                 self._embed_batch(batch)

@@ -19,7 +19,7 @@ from pydantic import BaseModel, Field
 
 from ragtools.llm import get_model
 
-from ragtools.documents.headings import MAX_SECTION_LINES, merge_up_to_max_lines, split_by_most_common_heading
+from ragtools.documents.headings import MAX_SECTION_LINES, merge_sections, split_by_most_common_heading
 
 logger = logging.getLogger(__name__)
 
@@ -70,7 +70,7 @@ def split_exercises(text: str) -> list[ExerciseSnippet]:
     """
     snippets: dict[tuple[str, str], str] = {}
 
-    for section in merge_up_to_max_lines(split_by_most_common_heading(text), MAX_SECTION_LINES):
+    for section in merge_sections(split_by_most_common_heading(text), MAX_SECTION_LINES):
         lines = section.splitlines()
 
         # Annotate the section with line numbers (ensuring empty line at the end)

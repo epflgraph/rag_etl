@@ -3,15 +3,19 @@
 from __future__ import annotations
 
 import logging
-
 import re
+
+from collections.abc import Callable
 
 logger = logging.getLogger(__name__)
 
-# Sections merge until they reach this many lines; it also bounds a chunk's
-# size, since a section that cannot be split further would otherwise be
-# indexed as one oversized chunk
+# How many lines of a document one exercise-splitting call sees at most
 MAX_SECTION_LINES = 2000
+
+
+def line_count(text: str) -> int:
+    """The number of lines in a text."""
+    return len(text.splitlines())
 
 
 def split_by_most_common_heading(text: str) -> list[str]:
@@ -39,16 +43,19 @@ def split_by_most_common_heading(text: str) -> list[str]:
     return [section.strip() for section in sections if section.strip()]
 
 
-def merge_up_to_max_lines(sections: list[str], max_lines: int = MAX_SECTION_LINES) -> list[str]:
-    """Merge adjacent sections while they fit within max_lines together."""
+def merge_sections(
+    sections: list[str], max_size: int, size: Callable[[str], int] = line_count
+) -> list[str]:
+    """Merge adjacent sections while they fit within max_size together.
+
+    `size` measures a text: its line count by default, `len` for characters.
+    A section bigger than max_size on its own is kept as it is; the caller
+    decides what to do with it.
+    """
     merged: list[str] = []
-    merged_lines = 0
     for section in sections:
-        section_lines = len(section.splitlines())
-        if merged and merged_lines + section_lines <= max_lines:
-            merged[-1] = f"{merged[-1]}\n{section}"
-            merged_lines += section_lines
+        if merged and size(candidate := f"{merged[-1]}\n{section}") <= max_size:
+            merged[-1] = candidate
         else:
             merged.append(section)
-            merged_lines = section_lines
     return merged

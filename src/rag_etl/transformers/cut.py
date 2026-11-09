@@ -21,12 +21,12 @@ from rag_etl.cache import Cache
 from rag_etl.core import Resource
 from rag_etl.core.resource import hash_text
 from rag_etl.transformers.base import Transformer
+from rag_etl.transformers.embed import MAX_CHUNK_CHARS
 from ragtools.documents import (
-    MAX_SECTION_LINES,
     PAGE_MARKER,
     ExerciseSnippet,
     llm_stitch,
-    merge_up_to_max_lines,
+    merge_sections,
     split_by_most_common_heading,
     split_exercises,
     stitch,
@@ -102,8 +102,8 @@ def whole_document(transformer: "CutTransformer", node: Resource) -> None:
         _drop(node)
         return
 
-    if len(text.splitlines()) > MAX_SECTION_LINES:
-        logger.warning(f"Dropping {node.title}: {len(text.splitlines())} lines over the {MAX_SECTION_LINES}-line size guard")
+    if len(text) > MAX_CHUNK_CHARS:
+        logger.warning(f"Dropping {node.title}: {len(text):,} chars over the {MAX_CHUNK_CHARS:,}-char chunk limit")
         _drop(node)
         return
 
@@ -186,12 +186,12 @@ def text(transformer: "CutTransformer", node: Resource) -> None:
         _drop(node)
         return
 
-    sections = merge_up_to_max_lines(split_by_most_common_heading(full), MAX_SECTION_LINES)
+    sections = merge_sections(split_by_most_common_heading(full), MAX_CHUNK_CHARS, size=len)
 
     node.children = []
     for position, section in enumerate(sections, start=1):
-        if len(section.splitlines()) > MAX_SECTION_LINES:
-            logger.warning(f"Dropping part {position} of {node.title}: over the {MAX_SECTION_LINES}-line size guard")
+        if len(section) > MAX_CHUNK_CHARS:
+            logger.warning(f"Dropping part {position} of {node.title}: over the {MAX_CHUNK_CHARS:,}-char chunk limit")
             continue
 
         node.add_child(title=f"part {position}", text=section, cut=None)

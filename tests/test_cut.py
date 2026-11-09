@@ -8,6 +8,7 @@ import ragtools.mime_types as mt
 from rag_etl.cache import Cache
 from rag_etl.core import Resource
 from rag_etl.transformers.cut import CutTransformer
+from rag_etl.transformers.embed import MAX_CHUNK_CHARS
 from ragtools.documents import MAX_SECTION_LINES, Exercise, ExerciseList, ExerciseSnippet, split_exercises, stitch
 
 
@@ -49,15 +50,27 @@ def test_whole_document_container_stitches_its_pages(tmp_path, transformer):
     assert doc.is_leaf
 
 
-def test_whole_document_size_guard_drops(tmp_path, transformer):
+def test_whole_document_over_the_chunk_limit_drops(tmp_path, transformer):
+    """Few lines, but too many characters to embed: dropped, not a crash at embed time."""
     root = Resource(title="root")
     doc = root.add_child(title="big", cut="whole_document")
-    lines = "\n".join(f"line {i}" for i in range(MAX_SECTION_LINES + 1))
-    doc.add_child(title="page 1", path=write_page(tmp_path, "page_1.md", lines), mime_type=mt.MARKDOWN)
+    long_lines = "\n".join("x" * 1_000 for _ in range(MAX_CHUNK_CHARS // 1_000 + 1))
+    doc.add_child(title="page 1", path=write_page(tmp_path, "page_1.md", long_lines), mime_type=mt.MARKDOWN)
 
     transformer.transform([root])
 
     assert doc not in root.children
+
+
+def test_whole_document_of_many_short_lines_is_kept(tmp_path, transformer):
+    root = Resource(title="root")
+    doc = root.add_child(title="long", cut="whole_document")
+    short_lines = "\n".join(f"line {i}" for i in range(MAX_SECTION_LINES + 1))
+    doc.add_child(title="page 1", path=write_page(tmp_path, "page_1.md", short_lines), mime_type=mt.MARKDOWN)
+
+    transformer.transform([root])
+
+    assert doc.text == short_lines
 
 
 def test_whole_document_with_nothing_readable_drops(tmp_path, transformer):
@@ -203,15 +216,15 @@ def test_per_exercise_drops_when_no_exercises(tmp_path, transformer, monkeypatch
 
 
 def test_text_cut_chunks_by_headings(tmp_path, transformer):
-    section = "\n".join(f"line {i}" for i in range(1500))
+    section = "\n".join("x" * 100 for _ in range(600))
     md = write_page(tmp_path, "notes.md", f"# Doc\n\n## A\n{section}\n\n## B\n{section}")
     root = Resource(title="root")
     leaf = root.add_child(title="notes", path=md, mime_type=mt.MARKDOWN, cut="text")
 
     transformer.transform([root])
 
-    # Two 1500-line sections merge to 3000 > the guard, so they stay apart;
-    # the intro joins the first one
+    # Two ~60k-char sections together exceed the chunk limit, so they stay
+    # apart; the intro joins the first one
     assert len(leaf.children) == 2
     assert [child.text for child in leaf.children] == [f"# Doc\n## A\n{section}", f"## B\n{section}"]
 

@@ -2,7 +2,7 @@
 
 from types import SimpleNamespace
 
-from ragtools.images import MAX_ANSWER_CHARS, alt_text, ocr_image
+from ragtools.images import MAX_ANSWER_CHARS, alt_text, transcribe_page, transcribe_slide
 from ragtools.llm import AnswerTooLong
 
 
@@ -18,13 +18,13 @@ def stub_vision(monkeypatch, answer: str | Exception) -> None:
 
 def test_looped_read_dropped(tmp_path, monkeypatch):
     stub_vision(monkeypatch, AnswerTooLong(f"the answer was cut off at {MAX_ANSWER_CHARS:,} chars"))
-    assert ocr_image(tmp_path / "page.png") == ""
+    assert transcribe_page(tmp_path / "page.png") == ""
 
 
 def test_real_transcription_kept(tmp_path, monkeypatch):
     answer = "# Lithography\n\n- spin coat\n- expose\n- develop"
     stub_vision(monkeypatch, answer)
-    assert ocr_image(tmp_path / "page.png") == answer
+    assert transcribe_slide(tmp_path / "slide.png") == answer
 
 
 def test_looped_alt_text_dropped(tmp_path, monkeypatch):

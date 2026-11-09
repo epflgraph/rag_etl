@@ -18,8 +18,10 @@ from ragtools.llm import get_model
 PAGE_MARKER = "<!-- page {position} -->"
 
 # The LLM stitch (the old prompt, ported verbatim), a per-document fallback,
-# kept as a document next to this module
+# kept as documents next to this module; the user prompt is a template
+# taking the document in place of {document}
 STITCH_SYSTEM_PROMPT = (Path(__file__).parent / "prompts" / "stitch_markdown_pages.md").read_text(encoding="utf-8")
+STITCH_USER_PROMPT = (Path(__file__).parent / "prompts" / "stitch_user.md").read_text(encoding="utf-8").strip()
 
 
 def stitch(pages: list[str]) -> str:
@@ -86,17 +88,8 @@ def llm_stitch(text: str) -> str | None:
     Returns None when the model answers with nothing, so the deterministic
     result stands.
     """
-    md_text = f"```\n{text}\n```"
-
-    user_prompt = f"""
-    Stitch the following page-level Markdown snippets into one cohesive GitHub-Flavored Markdown document.
-
-    Each snippet is enclosed in triple backticks and appears **in order**.
-
-    Emit **only** the final Markdown (no fences).
-
-    {md_text}
-    """
+    # Replaced rather than formatted: the document's own braces (LaTeX) must stay as they are
+    user_prompt = STITCH_USER_PROMPT.replace("{document}", text)
 
     stitched = get_model("stitch").text(user_prompt, system=STITCH_SYSTEM_PROMPT, name="stitch-markdown-pages")
     return stitched.strip() or None

@@ -44,6 +44,7 @@ where = ["src"]
 # The prompts are documents, not code: they ship with the package
 [tool.setuptools.package-data]
 "ragtools.documents" = ["prompts/*.md"]
+"ragtools.images" = ["prompts/*.md"]
 "rag_etl.loaders" = ["index_settings.json"]
 
 [project.optional-dependencies]

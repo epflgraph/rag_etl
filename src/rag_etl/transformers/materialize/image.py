@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import ragtools.mime_types as mt
-from ragtools.images import SLIDE_SYSTEM_PROMPT, SLIDE_USER_PROMPT
+from ragtools.images import transcribe_slide
 
 from rag_etl.cache import Cache
 from rag_etl.core import Resource
@@ -36,7 +36,7 @@ class ImageMaterializer:
 
         work_dir = self.work_root / hash_bytes(image_path.read_bytes())
         md_path = ocr_cached(
-            self.cache.scope(CACHE_VERSION), image_path, SLIDE_SYSTEM_PROMPT, SLIDE_USER_PROMPT, work_dir / f"{image_path.stem}.md"
+            self.cache.scope(CACHE_VERSION), image_path, transcribe_slide, work_dir / f"{image_path.stem}.md"
         )
 
         if not md_path.read_text(encoding="utf-8").strip():

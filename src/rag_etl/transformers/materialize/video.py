@@ -20,7 +20,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import ragtools.mime_types as mt
-from ragtools.images import SLIDE_SYSTEM_PROMPT, SLIDE_USER_PROMPT
+from ragtools.images import transcribe_slide
 from ragtools.video import (
     Cue,
     SlideDetector,
@@ -158,9 +158,7 @@ class VideoMaterializer:
         with ThreadPoolExecutor(max_workers=MAX_CONCURRENT_OCR) as executor:
             md_paths = list(
                 executor.map(
-                    lambda frame: ocr_cached(
-                        cache, frame, SLIDE_SYSTEM_PROMPT, SLIDE_USER_PROMPT, frame.with_suffix(".md")
-                    ),
+                    lambda frame: ocr_cached(cache, frame, transcribe_slide, frame.with_suffix(".md")),
                     frames,
                 )
             )

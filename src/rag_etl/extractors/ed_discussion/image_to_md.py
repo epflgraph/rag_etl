@@ -10,13 +10,13 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from ragtools.images import ocr_image
+from ragtools.images import transcribe_slide
 
 
 def convert_image_to_md(image_path: Path, md_path: Path) -> None:
     """Convert one image into Markdown and write it to md_path."""
 
-    markdown = ocr_image(image_path)
+    markdown = transcribe_slide(image_path)
 
     md_path.parent.mkdir(parents=True, exist_ok=True)
     md_path.write_text(markdown, encoding="utf-8")

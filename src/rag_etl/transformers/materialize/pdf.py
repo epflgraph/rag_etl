@@ -17,7 +17,8 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import ragtools.mime_types as mt
-from ragtools.pdf import PDF_SYSTEM_PROMPT, PDF_USER_PROMPT, save_pdf_pages
+from ragtools.images import transcribe_page
+from ragtools.pdf import save_pdf_pages
 
 from rag_etl.cache import Cache
 from rag_etl.core import Resource
@@ -73,7 +74,7 @@ class PdfMaterializer:
         with ThreadPoolExecutor(max_workers=MAX_CONCURRENT_OCR) as executor:
             md_paths = list(
                 executor.map(
-                    lambda page: ocr_cached(cache, page, PDF_SYSTEM_PROMPT, PDF_USER_PROMPT, page.with_suffix(".md")),
+                    lambda page: ocr_cached(cache, page, transcribe_page, page.with_suffix(".md")),
                     page_paths,
                 )
             )

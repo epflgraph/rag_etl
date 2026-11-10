@@ -35,19 +35,15 @@ MICRO303 = Project(
             language="en",
         ),
         LocalFolderExtractor(dir=Path("local")),
-        # Ed Discussion waits until its catalogue reads the new pipeline's
-        # manifest (refactor plan). Its configuration, for when it returns:
+        # Ed Discussion, once the course's export is in place. Previous year's
+        # Q&A; which categories to keep (formerly theory and exam) and how to
+        # label them become overrides, e.g.
+        # Override('path="*/ed_discussion/*"', cut="whole_document") and
+        # Override('title="Logistics"', exclude=True)
         # EdDiscussionExtractor(
-        #     ed_discussion_base_path=str(course_path),
-        #     # Previous year's Q&A: dates are inherited from this year's documents via the catalogue
+        #     dir=Path("ed_discussion"),
         #     academic_year="2025_2026",
-        #     categories=[
-        #         "theory",
-        #         "exam",
-        #     ],
-        #     language="en",
-        #     semester=1,
-        #     include_student_endorsed=False,
+        #     language="english",
         # ),
     ),
 )

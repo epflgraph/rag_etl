@@ -13,7 +13,6 @@ import requests
 import ragtools.mime_types as mt
 from rag_etl.extractors.base import Extractor, SourceUnavailable
 from rag_etl.extractors.ed_discussion.ed_discussion_extractor import EdDiscussionExtractor
-from rag_etl.extractors.ed_discussion.utils import ThreadClassification
 from rag_etl.extractors.git import GitExtractor, branch_from_url, repo_from_url
 from rag_etl.extractors.local_folder import LocalFolderExtractor
 from rag_etl.extractors.mediaspace import MediaspaceExtractor
@@ -344,93 +343,49 @@ def test_mediaspace(monkeypatch, tmp_path):
     assert caption.path and caption.path.read_text().startswith("1\n")
 
 
-def _write_catalogue(metadata_dir: Path) -> None:
-    metadata_dir.mkdir(parents=True)
-    (metadata_dir / "moodle.json").write_text(
-        json.dumps(
-            {
-                "documents": [
-                    {
-                        "type": "exam",
-                        "subtype": "previous_year_exam",
-                        "number": "2025",
-                        "sub_number": None,
-                        "title": "Exam 2025",
-                        "from": "2026-02-16T08:00:00.000000",
-                        "until": "2026-06-01T20:00:00.000000",
-                        "week": None,
-                    }
-                ]
-            }
-        )
-    )
-
-
-def test_ed_discussion(monkeypatch, tmp_path):
-    base = tmp_path / "project"
-    _write_catalogue(base / "output" / "metadata")
-
-    ed_dir = base / "ed_discussion" / "2025_2026"
-    ed_dir.mkdir(parents=True)
-    (ed_dir / "thread1.json").write_text(
+def _write_thread(ed_dir: Path, name: str, title: str, category: str, subcategory: str, answered: bool) -> None:
+    answers = [{"user_id": 2, "content": "Everything", "is_endorsed": False}] if answered else []
+    (ed_dir / f"{name}.json").write_text(
         json.dumps(
             {
                 "thread": {
                     "id": 1,
                     "type": "question",
-                    "title": "Question about exam",
-                    "category": "exam",
-                    "subcategory": "",
-                    "content": "What is on the exam?",
-                    "answers": [{"user_id": 2, "content": "Everything", "is_endorsed": False}],
+                    "title": title,
+                    "category": category,
+                    "subcategory": subcategory,
+                    "content": "What is on it?",
+                    "document": "What is on it?",
+                    "answers": answers,
                 },
                 "users": [{"id": 1, "course_role": "student"}, {"id": 2, "course_role": "staff"}],
             }
         )
     )
 
-    vote = ThreadClassification(type="exam", catalogue_id=0, mentioned_number="2025", week=None, reason="r", confidence=9)
-    monkeypatch.setattr(
-        "rag_etl.extractors.ed_discussion.ed_discussion_extractor.classify_thread_with_cascade",
-        lambda **kwargs: (vote, [vote]),
-    )
 
-    extractor = EdDiscussionExtractor(
-        ed_discussion_base_path=str(base),
-        academic_year="2025_2026",
-        categories=["exam"],
-        language="english",
-        semester=1,
-        include_student_endorsed=False,
-    )
-    root = extractor.extract()
+def test_ed_discussion(tmp_path):
+    ed_dir = tmp_path / "ed_discussion" / "2025_2026"
+    ed_dir.mkdir(parents=True)
+    _write_thread(ed_dir, "t1", "Question about exam 2024", "Exams", "Exam 2024", answered=True)
+    _write_thread(ed_dir, "t2", "Room change?", "Logistics", "", answered=True)
+    _write_thread(ed_dir, "t3", "Nobody answered", "Exams", "Exam 2024", answered=False)
 
-    assert len(root.children) == 1
-    leaf = root.children[0]
-    assert leaf.title == "Question about exam"
-    assert leaf.type == "exam"
-    assert leaf.subtype == "previous_year_exam"
-    assert leaf.number == "2025"
-    assert leaf.cut == "whole_document"
-    assert leaf.from_ == "2026-02-16T08:00:00.000000"
-    assert leaf.until == "2026-06-01T20:00:00.000000"
-    assert leaf.path and leaf.path.exists()
+    root = EdDiscussionExtractor(dir=tmp_path / "ed_discussion", academic_year="2025_2026", language="english").extract()
+
+    # Ed's own filing shapes the tree; facts only on the leaves; unanswered threads are left out
+    tree = {category.title: {child.title: [leaf.title for leaf in child.children] for child in category.children}
+            for category in root.children}
+    assert tree["Exams"] == {"Exam 2024": ["Question about exam 2024"]}
+    assert list(tree["Logistics"]) == ["Room change?"]
+    leaf = next(node for node in root.walk() if node.title == "Question about exam 2024")
+    assert leaf.mime_type == mt.MARKDOWN and leaf.type is None and leaf.cut is None
+    assert leaf.path and "# Answer:" in leaf.path.read_text()
 
 
-def test_ed_discussion_empty_catalogue(tmp_path):
-    base = tmp_path / "project"
-    (base / "output" / "metadata").mkdir(parents=True)
-
-    extractor = EdDiscussionExtractor(
-        ed_discussion_base_path=str(base),
-        academic_year="2025_2026",
-        categories=["exam"],
-        language="english",
-        semester=1,
-        include_student_endorsed=False,
-    )
-    root = extractor.extract()
-    assert root.children == []
+def test_ed_discussion_without_export(tmp_path):
+    with pytest.raises(SourceUnavailable):
+        EdDiscussionExtractor(dir=tmp_path, academic_year="2025_2026", language="english").extract()
 
 
 def test_git_branch_parsing():

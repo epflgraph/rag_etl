@@ -20,6 +20,13 @@ def test_glob_matching():
     assert not override.matches(Resource(title="Series 2"))
 
 
+def test_url_matching():
+    override = Override('url="https://mediaspace.epfl.ch/*"')
+    assert override.matches(Resource(title="Lecture 1", url="https://mediaspace.epfl.ch/media/t/0_abc"))
+    assert not override.matches(Resource(title="Lecture 1", url="https://moodle.epfl.ch/x"))
+    assert not override.matches(Resource(title="no url"))
+
+
 def test_filename_derived_from_path():
     override = Override('filename="*.pdf" AND path="*week*"')
     assert override.matches(Resource(title="ex", path="/data/week1/ex.pdf"))

@@ -118,10 +118,6 @@ class MediaspaceExtractor(Extractor):
     """
 
     playlist_or_channel_url: str
-    type: str | None = None
-    subtype: str | None = None
-    exercise_parts: str | None = None
-    cut: str | None = None
     language: str | None = None
     created_after: str | date | datetime | float | None = None
     mime_types: Sequence[str] = (mt.SRT,)
@@ -275,10 +271,6 @@ class MediaspaceExtractor(Extractor):
                 title=entry_name,
                 url=build_entry_url(entry_id, self.playlist_or_channel_url),
                 mime_type=mt.MP4,
-                type=self.type,
-                subtype=self.subtype,
-                exercise_parts=self.exercise_parts,
-                cut=self.cut,
             )
 
             # Subtitles travel beside the video as a subtitles leaf

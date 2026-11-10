@@ -320,9 +320,6 @@ def test_mediaspace(monkeypatch, tmp_path):
     extractor = MediaspaceExtractor(
         playlist_or_channel_url="https://mediaspace.epfl.ch/playlist/1",
         dir=tmp_path / "mediaspace",
-        type="theory",
-        subtype="video_lecture",
-        cut="per_child",
     )
     root = extractor.extract()
 
@@ -331,7 +328,8 @@ def test_mediaspace(monkeypatch, tmp_path):
     video = root.children[0]
     assert video.title == "Lecture 1"
     assert video.mime_type == mt.MP4
-    assert video.type == "theory" and video.subtype == "video_lecture" and video.cut == "per_child"
+    # Facts only: labelling the recordings is the judge's and the overrides' business
+    assert video.type is None and video.subtype is None and video.cut is None
     # The watch url names the entry; nothing is written to stand for the video
     assert video.url == "https://mediaspace.epfl.ch/playlist/1/0_abc"
     assert video.path is None

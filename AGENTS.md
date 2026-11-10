@@ -106,7 +106,7 @@ time. Models are never part of a project.
 `Override(where, cut=None, exclude=False, **metadata)` (`core/overrides.py`)
 is the only manual channel:
 
-- `where`: flat `field="glob"` predicates joined by `AND` over `path`, `filename`, `mime_type`, `title`, `cut`, `is_leaf`, `text` and the metadata fields. fnmatch globs; a literal `[` is `[[]`. No nesting, no OR: needing them means the case wants code.
+- `where`: flat `field="glob"` predicates joined by `AND` over `path`, `filename`, `mime_type`, `title`, `url`, `cut`, `is_leaf`, `text` and the metadata fields. fnmatch globs; a literal `[` is `[[]`. No nesting, no OR: needing them means the case wants code.
 - Applied by the judge after inheritance, on top of its labels: the human wins. Most predicates wins; at equal specificity the first declared wins, with a warning. An unknown field name fails when the project loads.
 - `exclude=True` drops the matching resources and their subtrees (and containers left empty); it wins over everything and sets nothing else.
 - Overrides are pruned when a review shows one is no longer needed.
@@ -118,7 +118,7 @@ is the only manual channel:
 
 - *Moodle*: sections → modules → files; availability dates become `from_`/`until`. Assignments cannot be fetched (no API access) — accepted.
 - *MOOC* (edX export): course → chapters (weeks, from `first_week_chapter`/`week_count`) → sequentials → verticals → pages, linked documents, quizzes (statement and statement + solution files), videos with their subtitles. Documents linked on a video page are skipped as duplicates of the video's slides. A video naming no source stops the run.
-- *Mediaspace*: a channel or playlist; videos with their Kaltura captions.
+- *Mediaspace*: a channel or playlist; videos with their Kaltura captions. Videos have no `path`; overrides reach them by `url` (`url="https://mediaspace.epfl.ch/*"`).
 - *Local folder*, *Git* (repo or branch url; everything indexed by default).
 - *Ed Discussion*: threads filed under Ed's categories and subcategories, one markdown Q&A per answered thread (staff answers; endorsed student answers if asked). Which categories to keep and how to label them is done by overrides.
 
@@ -204,7 +204,6 @@ by a `--refresh`.
 ## Open work
 
 - **The judge's inference** (Javier). It should also absorb what Ed Discussion's former LLM jury did: matching a thread to the document it is about, and its dates and week.
-- **Labels still on an extractor**: `MediaspaceExtractor` takes `type`/`subtype`/`exercise_parts`/`cut`; they should become overrides.
 - **YouTube captions** are never indexed (SRT is not text and YouTube videos skip the video path).
 - **MOOC**: item titles are prefixed by their unit ("vertical - item"); HTML → markdown and edX quiz rendering belong in `ragtools`.
 - **Ed Discussion**: images in posts are transcribed during extraction; that belongs in materialize.

@@ -115,7 +115,7 @@ Sources available: `MoodleExtractor`, `MOOCExtractor`, `MediaspaceExtractor`
 `EdDiscussionExtractor`.
 
 **Overrides** fix what the judge gets wrong. The `where` is a list of globs
-joined by `AND` over a resource's attributes (`title`, `path`, `filename`,
+joined by `AND` over a resource's attributes (`title`, `url`, `path`, `filename`,
 `mime_type`, `type`, `subtype`, `number`, `week`, …); the rest sets any of
 `cut`, `type`, `subtype`, `number`, `subnumber`, `week`, `exercise_parts`,
 `has_solution`, `from_`, `until`, or `exclude=True` to leave the resources out.

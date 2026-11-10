@@ -6,7 +6,7 @@ import pytest
 
 from elasticsearch import NotFoundError
 
-from rag_etl.core import Resource
+from rag_etl.core import Resource, assign_ids
 from rag_etl.loaders.elasticsearch import ElasticsearchLoader
 
 TIMESTAMP = datetime(2026, 10, 19, 15, 30, 45, tzinfo=UTC)
@@ -60,6 +60,8 @@ def tree() -> tuple[list[Resource], tuple[Resource, Resource, Resource]]:
     intro = video.add_child(title="intro", type="theory", subtype="lecture", text="hello")
     for chunk in (a, b, intro):
         chunk.embedding = [1.0]
+    # As the pipeline does once the trees are final
+    assign_ids([pdf, video])
     return [pdf, video], (a, b, intro)
 
 
@@ -74,6 +76,8 @@ def test_documents_are_built_from_chunks(monkeypatch):
     assert compute["_source"]["content"] == "compute"
     assert compute["_source"]["embedding"] == [1.0]
     assert compute["_id"] == f"1-{a.content_hash}"
+    # The document's own id is the identifier; Elasticsearch's _id mirrors it
+    assert compute["_source"]["id"] == compute["_id"] == a.id
     assert compute["_index"] == "rag_demo_20261019_153045"
 
     assert compute["_source"]["url"] == "https://moodle/3"
@@ -159,6 +163,7 @@ def test_duplicate_content_is_kept_with_distinct_ids(monkeypatch):
     root = Resource(title="root")
     root.add_child(title="first", text="same", embedding=[1.0], type="theory", subtype="unknown")
     root.add_child(title="second", text="same", embedding=[1.0], type="theory", subtype="unknown")
+    assign_ids([root])
     sink: list = []
     bulk_into(monkeypatch, sink)
 
@@ -170,21 +175,39 @@ def test_duplicate_content_is_kept_with_distinct_ids(monkeypatch):
     assert sink[1]["_source"]["lineage"] == ["root", "second"]
 
 
-def test_unembedded_chunk_fails_loud(monkeypatch):
+def test_unembedded_chunk_fails_before_any_index_exists(monkeypatch):
     root = Resource(title="root")
-    root.add_child(title="chunk", text="body")
+    root.add_child(title="chunk", text="body", type="theory", subtype="unknown")
+    assign_ids([root])
     sink: list = []
     bulk_into(monkeypatch, sink)
+    client = FakeClient()
 
-    with pytest.raises(ValueError):
-        loader(FakeClient()).load([root])
+    with pytest.raises(ValueError, match="not embedded"):
+        loader(client).load([root])
+    assert client.indices.calls == []
 
 
-def test_unlabelled_chunk_fails_loud(monkeypatch):
+def test_unlabelled_chunk_fails_before_any_index_exists(monkeypatch):
     root = Resource(title="root")
     root.add_child(title="chunk", text="body", embedding=[1.0])
+    assign_ids([root])
     sink: list = []
     bulk_into(monkeypatch, sink)
+    client = FakeClient()
 
-    with pytest.raises(ValueError):
-        loader(FakeClient()).load([root])
+    with pytest.raises(ValueError, match="unlabelled"):
+        loader(client).load([root])
+    assert client.indices.calls == []
+
+
+def test_chunk_without_id_fails_before_any_index_exists(monkeypatch):
+    root = Resource(title="root")
+    root.add_child(title="chunk", text="body", embedding=[1.0], type="theory", subtype="unknown")
+    sink: list = []
+    bulk_into(monkeypatch, sink)
+    client = FakeClient()
+
+    with pytest.raises(ValueError, match="no id"):
+        loader(client).load([root])
+    assert client.indices.calls == []

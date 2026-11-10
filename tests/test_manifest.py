@@ -5,7 +5,7 @@ import json
 from datetime import UTC, datetime
 from pathlib import Path
 
-from rag_etl.core import Resource
+from rag_etl.core import Resource, assign_ids
 from rag_etl.loaders import ManifestLoader
 
 TIMESTAMP = datetime(2026, 10, 19, 15, 30, 45, tzinfo=UTC)
@@ -76,6 +76,18 @@ def test_tree_is_metadata_only(tmp_path):
     assert pdf["children"][0]["chunk"] is True
     assert pdf["children"][1]["exercise_parts"] == "solution"
     assert pdf["children"][1]["has_solution"] is True
+
+
+def test_tree_names_each_chunk_by_its_document_id(tmp_path):
+    roots = tree()
+    assign_ids(roots)
+
+    manifest = write(tmp_path / "output", roots)
+
+    [pdf, video] = manifest["tree"]
+    assert pdf["id"] is None
+    assert [child["id"] for child in pdf["children"]] == [chunk.id for chunk in roots[0].children]
+    assert video["children"][0]["id"].startswith("3-")
 
 
 def test_summary_drills_down_per_source_type_subtype_number_subnumber_parts(tmp_path):

@@ -13,6 +13,7 @@ import json
 import logging
 import os
 
+from collections.abc import Iterator
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -76,37 +77,44 @@ class ElasticsearchLoader(Loader):
         return index_name(self.project, self.timestamp)
 
     def load(self, roots: list[Resource]) -> None:
-        """Create the run's index, bulk-load the chunks, shift the alias."""
+        """Check every chunk, create the run's index, bulk-load the chunks, shift the alias."""
+        # A run that cannot publish everything publishes nothing, not even an empty index
+        self._check(roots)
+
         client = self.client if self.client is not None else _client()
         self._create_index(client)
         bulk(client, self._actions(roots))
         client.indices.refresh(index=self.index)
         self._shift_alias(client)
 
+    @staticmethod
+    def _check(roots: list[Resource]) -> None:
+        """Fail loud on any chunk that cannot become a document: no id, unembedded or unlabelled."""
+        for chunk in iter_chunks(roots):
+            if chunk.id is None:
+                raise ValueError(f"chunk {chunk.title!r} has no id: assign_ids runs before loading")
+            if chunk.embedding is None:
+                raise ValueError(f"chunk {chunk.title!r} is not embedded")
+            if chunk.type is None or chunk.subtype is None:
+                raise ValueError(f"chunk {chunk.title!r} is unlabelled: every indexed chunk needs a type and a subtype")
+
     def _create_index(self, client: Elasticsearch) -> None:
         body = index_settings(self.language)
         client.indices.create(index=self.index, settings=body["settings"], mappings=body["mappings"])
 
-    def _actions(self, roots: list[Resource]) -> list[dict[str, Any]]:
-        """One index action per chunk, with a strictly increasing per-document number."""
-        return [
-            {
-                "_op_type": "index",
-                "_index": self.index,
-                "_id": f"{number}-{chunk.content_hash}",
-                "_source": self._source(chunk),
-            }
-            for number, chunk in enumerate(iter_chunks(roots), start=1)
-        ]
+    def _actions(self, roots: list[Resource]) -> Iterator[dict[str, Any]]:
+        """One index action per chunk, streamed: documents are built as bulk sends them.
+
+        Elasticsearch's own `_id` mirrors the document's `id`, so a hit
+        carries one identifier, not two.
+        """
+        for chunk in iter_chunks(roots):
+            yield {"_op_type": "index", "_index": self.index, "_id": chunk.id, "_source": self._source(chunk)}
 
     def _source(self, node: Resource) -> dict[str, Any]:
-        """One document: content, vector, breadcrumb lineage, deep link and metadata."""
-        if node.embedding is None:
-            raise ValueError(f"chunk {node.title!r} is not embedded")
-        if node.type is None or node.subtype is None:
-            raise ValueError(f"chunk {node.title!r} is unlabelled: every indexed chunk needs a type and a subtype")
-
+        """One document: its id, content, vector, breadcrumb lineage, deep link and metadata."""
         document: dict[str, Any] = {
+            "id": node.id,
             "content": node.text,
             "embedding": node.embedding,
             "lineage": [ancestor.title or ancestor.url or "unknown" for ancestor in node.lineage()],

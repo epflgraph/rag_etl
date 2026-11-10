@@ -2,7 +2,7 @@ from pathlib import Path
 
 import hashlib
 
-from rag_etl.core.resource import Resource, hash_bytes, hash_text, iter_chunks
+from rag_etl.core.resource import Resource, assign_ids, hash_bytes, hash_text, iter_chunks
 
 
 def test_hash_helpers():
@@ -130,6 +130,19 @@ def test_iter_chunks_finds_text_nodes():
     container.add_child(title="page")
 
     assert list(iter_chunks([root])) == [chunk]
+
+
+def test_assign_ids_numbers_the_chunks_across_trees():
+    first = Resource(title="first")
+    a = first.add_child(title="a", text="same")
+    container = first.add_child(title="container")
+    second = Resource(title="second")
+    b = second.add_child(title="b", text="same")
+
+    assign_ids([first, second])
+
+    assert (a.id, b.id) == (f"1-{hash_text('same')}", f"2-{hash_text('same')}")
+    assert first.id is None and container.id is None
 
 
 def test_detach_removes_the_subtree_and_spares_a_root():

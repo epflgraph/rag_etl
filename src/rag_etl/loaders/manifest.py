@@ -45,6 +45,7 @@ def _pipeline_version() -> str:
 def _node(node: Resource) -> dict[str, Any]:
     """One tree node: metadata and a content-hash pointer, no text, no vector."""
     return {
+        "id": node.id,
         "title": node.title,
         "url": node.url,
         "path": str(node.path) if node.path is not None else None,

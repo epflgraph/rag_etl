@@ -50,6 +50,7 @@ class Resource:
     path: Path | None = None      # where the content lives on disk; None for pure containers
     url: str | None = None        # public url the resource is available at
     mime_type: str | None = None
+    id: str | None = None         # a chunk's identifier, assigned once the trees are final (assign_ids); None elsewhere
 
     # lineage
     parent: Resource | None = None
@@ -153,3 +154,15 @@ def iter_chunks(roots: Iterable[Resource]) -> Iterator[Resource]:
     """Yield every chunk in the trees, depth-first."""
     for root in roots:
         yield from (node for node in root.walk() if node.is_chunk)
+
+
+def assign_ids(roots: Iterable[Resource]) -> None:
+    """Give every chunk its identifier, once the trees are final.
+
+    The id is the chunk's position among all the run's chunks plus its
+    content hash: unique within the run even for chunks of equal content,
+    which are kept apart rather than deduplicated. It is not stable across
+    runs, nor meant to be. Containers keep no id.
+    """
+    for number, chunk in enumerate(iter_chunks(roots), start=1):
+        chunk.id = f"{number}-{chunk.content_hash}"

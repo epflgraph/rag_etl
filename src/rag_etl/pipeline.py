@@ -18,7 +18,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from rag_etl.cache import Cache
-from rag_etl.core import Resource
+from rag_etl.core import Resource, assign_ids
 from rag_etl.loaders import ElasticsearchLoader, Loader, ManifestLoader
 from rag_etl.projects import Project
 from rag_etl.transformers import (
@@ -105,6 +105,8 @@ def transform(roots: list[Resource], project: Project, refresh: str | None = Non
 
 def load(roots: list[Resource], project: Project, dry: bool = False) -> None:
     """Record the run in a manifest and, unless dry, publish it."""
+    # The trees are final: every chunk gets the id the manifest and the index both carry
+    assign_ids(roots)
     now = datetime.now(UTC)
 
     loaders: list[Loader] = [

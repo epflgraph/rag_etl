@@ -6,8 +6,6 @@ from typing import Any
 
 import requests
 
-from rag_etl.extractors.ed_discussion.image_to_md import convert_image_to_md
-
 logger = logging.getLogger(__name__)
 
 STAFF_ROLES = ["admin", "tutor", "staff"]
@@ -90,41 +88,6 @@ def download_remote_image(url: str, base_name: str, images_dir: Path) -> str | N
     except Exception as e:
         logger.warning(f"Failed to download image {url}: {e}")
         return None
-
-
-def inject_alt_text_into_content(
-    image_path: str | None,
-    content_html: str,
-    document_text: str,
-) -> tuple[str, str]:
-    """Inject alt text into content if image is present"""
-
-    if image_path is None or image_path.startswith("ERROR"):
-        return content_html, document_text
-
-    try:
-        md_path = Path(image_path).with_suffix(".md")
-        if not md_path.exists():
-            convert_image_to_md(Path(image_path), md_path)
-        alt_text = md_path.read_text(encoding="utf-8").strip()
-    except Exception as e:
-        logger.warning(f"Failed to generate alt text for {image_path}: {e}")
-        return content_html, document_text
-
-    if not alt_text:
-        return content_html, document_text
-
-    # Inject alt text generated with RCP LLM
-    if "</figure>" in content_html:
-        updated_html = content_html.replace(
-            "</figure>",
-            f"</figure>\n{alt_text}\n",
-        )
-    else:
-        updated_html = content_html + f"\n{alt_text}"
-
-    updated_doc = document_text + alt_text
-    return updated_html, updated_doc
 
 
 def extract_messages_from_thread(
@@ -263,12 +226,16 @@ def create_message(
 
     content = raw_content
     document = raw_document
-    document_with_title = f"{thread_title}\n\n" + document
 
     is_img, remote_url, local_path = find_image_path(content, images_dir)
 
+    # The post's image is shown as a markdown image; materialize reads it
     if is_img and local_path and not local_path.startswith("ERROR"):
-        content, document = inject_alt_text_into_content(local_path, content, document)
+        document = f"{document}\n\n![](<{local_path}>)"
+    elif is_img:
+        logger.warning(f"{thread_title}: image {remote_url or local_path} could not be found or downloaded")
+
+    document_with_title = f"{thread_title}\n\n" + document
 
     return {
         "msg_type": msg_type,

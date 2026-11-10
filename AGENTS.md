@@ -60,7 +60,7 @@ src/
     ├── core/                 resource.py (Resource, METADATA_FIELDS, iter_chunks, assign_ids), overrides.py
     ├── extractors/           base.py (Extractor, SourceUnavailable), markers.py (NO_BOT),
     │                         moodle.py, local_folder.py, git.py, mediaspace.py, mooc/, ed_discussion/
-    ├── transformers/         base.py, normalize.py, materialize/ (facade + pdf, image, video), judge.py, cut.py, embed.py
+    ├── transformers/         base.py, normalize.py, materialize/ (facade + pdf, image, markdown, video; ocr.py the shared cached read), judge.py, cut.py, embed.py
     ├── loaders/              base.py, manifest.py, elasticsearch.py, index_settings.json
     ├── projects/             Project, load_project; semester_2627_autumn/<project>.py
     ├── cache.py, pipeline.py, cli.py
@@ -122,7 +122,7 @@ is the only manual channel:
 - *MOOC* (edX export): course → chapters (weeks, from `first_week_chapter`/`week_count`) → sequentials → verticals → pages, linked documents, quizzes (statement and statement + solution files), videos with their subtitles. Documents linked on a video page are skipped as duplicates of the video's slides. A video naming no source stops the run.
 - *Mediaspace*: a channel or playlist; videos with their Kaltura captions. Videos have no `path`; overrides reach them by `url` (`url="https://mediaspace.epfl.ch/*"`).
 - *Local folder*, *Git* (repo or branch url; everything indexed by default).
-- *Ed Discussion*: threads filed under Ed's categories and subcategories, one markdown Q&A per answered thread (staff answers; endorsed student answers if asked). Which categories to keep and how to label them is done by overrides.
+- *Ed Discussion*: threads filed under Ed's categories and subcategories, one markdown Q&A per answered thread (staff answers; endorsed student answers if asked). A post's image is downloaded and shown as a markdown image, which materialize reads. Which categories to keep and how to label them is done by overrides.
 
 **Normalize.** zip and tar.gz unpack into children (UTF-8 names fixed),
 notebooks become markdown (alt texts by a vision model), files over their
@@ -132,6 +132,7 @@ family's limit are dropped (PDF 50 MB, images 10 MB, text 5 MB).
 
 - *PDF*: each page rendered deterministically (stable settings: the render is what gets hashed) and transcribed by the vision model; one child per page. No text-layer shortcut.
 - *Image*: transcribed in place.
+- *Markdown*: a source's markdown file that shows local images (`![alt](figures/plot.png)`, relative or absolute, `<…>` for paths with spaces) gets each one replaced by its transcript, where it was, in a scratch copy; images share the image cache scope. A missing image only warns and stays a reference (folders ship markdown without its figures); web images are left as they are. Only markdown the sources gave is read this way, never transcripts made in this step.
 - *Video*: one path for Mediaspace and MOOC videos. Kaltura entry id from the url → slides entry → GraphAI `detect_slides` (behind `SlideDetector`, swappable) → changes closer than `min_slide_seconds` dropped → one ffmpeg frame per segment, read from the url (never downloaded) → each slide transcribed, with the subtitles spoken over it appended as a quote; a slide links to its moment. GraphAI failing on one video drops that video, not the run. YouTube videos have no Kaltura entry and pass through.
 
 **Judge.** Fills `type`, `subtype` and `cut` for every resource, or drops it.
@@ -207,6 +208,5 @@ by a `--refresh`.
 
 - **The judge's inference** (Javier). It should also absorb what Ed Discussion's former LLM jury did: matching a thread to the document it is about, and its dates and week.
 - **YouTube captions** are never indexed (SRT is not text and YouTube videos skip the video path).
-- **Ed Discussion**: images in posts are transcribed during extraction; that belongs in materialize.
 - **Consumers**: GraphAI's `/rag/retrieve` must embed queries with Qwen3-Embedding-8B and query `content`.
 - **Operations**: CI (ruff, pytest) is missing; the weekly timers are not wired; MICRO-303 is the pilot, other projects follow one by one; delete `legacy/` after the cutover.

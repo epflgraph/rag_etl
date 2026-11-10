@@ -204,6 +204,36 @@ def test_unreadable_image_dropped(tmp_path, transformer, monkeypatch):
     assert root.children == []
 
 
+def test_markdown_images_read_where_they_are_shown(tmp_path, transformer, caplog):
+    (tmp_path / "figures").mkdir()
+    (tmp_path / "figures" / "plot.png").write_bytes(b"png fake")
+    md_path = tmp_path / "notes.md"
+    source = "# Notes\n\nBefore.\n\n![a plot](figures/plot.png)\n\nAfter.\n\n![gone](missing.png)\n\n![web](https://x.org/a.png)\n"
+    md_path.write_text(source)
+    root = Resource(title="root", children=[Resource(title="notes", path=md_path, mime_type=mt.MARKDOWN)])
+
+    transformer.transform([root])
+
+    notes = root.children[0]
+    text = notes.path.read_text()
+    # The local image is read in place; a missing one warns and stays a reference, a web one stays as is
+    assert "Before.\n\nslide text\n\nAfter." in text
+    assert "![gone](missing.png)" in text and "![web](https://x.org/a.png)" in text
+    assert "missing.png not found" in caplog.text
+    # The source file is left untouched
+    assert md_path.read_text() == source
+
+
+def test_markdown_without_local_images_is_left_alone(tmp_path, transformer):
+    md_path = tmp_path / "notes.md"
+    md_path.write_text("# Notes\n\nNo figures here.\n")
+    root = Resource(title="root", children=[Resource(title="notes", path=md_path, mime_type=mt.MARKDOWN)])
+
+    transformer.transform([root])
+
+    assert root.children[0].path == md_path
+
+
 def mediaspace_video() -> Resource:
     """A Mediaspace video node as the extractor builds it: its watch url names the entry."""
     return Resource(title="lecture 1", url="https://mediaspace.epfl.ch/media/t/0_abc", mime_type=mt.MP4)

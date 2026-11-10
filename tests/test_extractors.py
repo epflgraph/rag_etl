@@ -189,6 +189,45 @@ def test_moodle_pdf_suffix(monkeypatch, tmp_path):
     assert leaf.path and leaf.path.suffix == ".pdf"
 
 
+def test_moodle_own_type_names_fall_back_to_the_file_name(monkeypatch, tmp_path):
+    def file(name: str, mimetype: str, number: int) -> dict:
+        return {
+            "filename": name,
+            "filepath": "/",
+            "mimetype": mimetype,
+            "fileurl": f"https://moodle.epfl.ch/webservice/pluginfile.php/{number}",
+        }
+
+    sections = [
+        {
+            "name": "Week 1",
+            "summary": "",
+            "modules": [
+                {
+                    "id": 11,
+                    "name": "Material",
+                    "modname": "folder",
+                    "visible": True,
+                    "availability": None,
+                    "contents": [
+                        # Moodle's own name for gzip, a type the project keeps under its usual name
+                        file("series.tar.gz", "application/g-zip", 1),
+                        # Nothing the file name says makes this one wanted
+                        file("report.docx", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", 2),
+                        file("flow.tcl", "document/unknown", 3),
+                    ],
+                }
+            ],
+        }
+    ]
+    fake_moodle_get(monkeypatch, sections)
+
+    course = MoodleExtractor(course_id=1, dir=tmp_path / "moodle").extract()
+
+    kept = {leaf.path.name: leaf.mime_type for leaf in course.children[0].children}
+    assert kept == {"series.tar.gz": mt.TAR, "flow.tcl": mt.TCL_SOURCE}
+
+
 def test_local_folder(tmp_path):
     base = tmp_path / "local"
     (base / "week1").mkdir(parents=True)

@@ -165,11 +165,13 @@ class MoodleExtractor(Extractor):
                 for module_contents in module.get("contents", []):
                     mime_type = module_contents["mimetype"]
 
-                    # Moodle reports "document/unknown" for extensions it does not know (e.g. .s).
-                    # Fall back to the filename. The list check below still decides what is kept
-                    if mime_type == mt.MOODLE_UNKNOWN:
+                    # Moodle names some types its own way ("document/unknown" for
+                    # extensions it does not know, "application/g-zip" for .tar.gz):
+                    # when its name is not one the project keeps, the file name's
+                    # type is asked. The list check below still decides what is kept
+                    if mime_type not in self.mime_types:
                         guessed = mt.guess_mime_type(module_contents["filename"])
-                        if guessed:
+                        if guessed in self.mime_types:
                             mime_type = guessed
 
                     # Skip if mime type not in list

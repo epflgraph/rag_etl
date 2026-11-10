@@ -123,7 +123,7 @@ everything the pipeline can read, code, archives and images included. "Text"
 (Tcl, shell, JavaScript, JSON) is text too. Projects on the server import these
 constants: never remove or rename one, only add.
 
-- *Moodle*: sections → modules → files; availability dates become `from_`/`until`, written in Lausanne's time with its offset (`2026-09-07T08:00:00.000000+02:00`) so they name one instant. Requests time out after 60 s without data. Assignments cannot be fetched (no API access) — accepted.
+- *Moodle*: sections → modules → files; availability dates become `from_`/`until`, written in Lausanne's time with its offset (`2026-09-07T08:00:00.000000+02:00`) so they name one instant. Requests time out after 60 s without data. A type Moodle names its own way (`document/unknown`, `application/g-zip`) falls back to the file name's type. Assignments cannot be fetched (no API access) — accepted.
 - *MOOC* (edX export): course → chapters (weeks, from `first_week_chapter`/`week_count`) → sequentials → verticals → pages, linked documents, quizzes (statement and statement + solution files), videos with their subtitles. Documents linked on a video page are skipped as duplicates of the video's slides. A video naming no source stops the run.
 - *Mediaspace*: a channel or playlist; videos with their Kaltura captions. Videos have no `path`; overrides reach them by `url` (`url="https://mediaspace.epfl.ch/*"`).
 - *Local folder*, *Git* (repo or branch url; everything indexed by default).

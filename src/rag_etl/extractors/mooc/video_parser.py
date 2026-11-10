@@ -5,7 +5,7 @@ import json
 import logging
 
 from rag_etl.core import Resource
-from rag_etl.extractors.mooc.utils import load_root_elem_from_mooc_xml
+from rag_etl.extractors.mooc.utils import Export
 import ragtools.mime_types as mt
 
 logger = logging.getLogger(__name__)
@@ -16,14 +16,7 @@ class VideoParser:
     Video Parser for MOOCs.
     """
 
-    def get_video_platform_id(self, video_url: str, youtube_id: str) -> str:
-        if video_url != "":
-            video_platform = "mediaspace"
-        elif youtube_id != "":
-            video_platform = "youtube"
-        return video_platform
-
-    def find_transcript(self, root_video: _Element, course_path: Path, language: str | None) -> str | None:
+    def find_transcript(self, root_video: _Element, export: Export) -> Path | None:
         """
         Return the path of the video's subtitle file in the MOOC export.
 
@@ -45,70 +38,57 @@ class VideoParser:
         if not transcripts:
             return None
 
-        file_name = transcripts.get(language)
+        file_name = transcripts.get(export.language)
 
         if not file_name:
-            logger.debug(f"No {language} transcript among {sorted(transcripts)}, skipping subtitles for this video")
+            logger.debug(f"No {export.language} transcript among {sorted(transcripts)}, skipping subtitles for this video")
             return None
 
-        transcript_path = Path(course_path) / "static" / file_name
+        transcript_path = export.dir / "static" / file_name
         if not transcript_path.exists():
             logger.warning(f"Transcript {transcript_path} named by the descriptor does not exist")
             return None
 
-        return str(transcript_path)
+        return transcript_path
 
     def parse(
         self,
-        course_path: Path,
+        export: Export,
         elem_vertical: _Element,
         vertical_display_name: str,
-        language: str | None = None,
         week: int | None = None,
     ) -> Resource | None:
-        """Parse a MOOC video"""
+        """Parse a MOOC video: the video itself, its subtitles as a child.
+
+        A video plays from its own source (a Mediaspace url) or else from
+        YouTube. One that names neither is a broken export and stops the run.
+        """
 
         video_url_name = elem_vertical.get("url_name")
-        youtube_id = elem_vertical.get("youtube_id_1_0")
-        youtube_url = ""
-        if youtube_id:
-            youtube_url = f"https://www.youtube.com/watch?v={youtube_id}"
+        video_xml_path = export.xml_path("video", video_url_name)
 
-        video_filename = video_url_name + ".xml"
-        video_xml_path = Path(course_path) / "video" / video_filename
-
-        root_video = load_root_elem_from_mooc_xml(video_xml_path)
+        root_video = export.load("video", video_url_name)
         if root_video is None:
             return None
 
-        try:
-            video_title = root_video.get("display_name")
-        except Exception:
-            video_title = ""
-
-        switch_video_url = ""
+        source_url = ""
         for elem in root_video:
             if elem.tag == "source":
-                switch_video_url = elem.get("src")
+                source_url = elem.get("src")
 
-        srt_path = self.find_transcript(root_video, course_path, language)
+        youtube_id = elem_vertical.get("youtube_id_1_0")
+        youtube_url = f"https://www.youtube.com/watch?v={youtube_id}" if youtube_id else ""
 
-        video_platform = self.get_video_platform_id(video_url=switch_video_url, youtube_id=youtube_id)
+        video_url = source_url or youtube_url
+        if not video_url:
+            raise ValueError(f"The video {video_xml_path} names neither a source url nor a YouTube id")
 
-        video_url = ""
-        if video_platform == "mediaspace":
-            video_url = switch_video_url
-        elif video_platform == "youtube":
-            video_url = youtube_url
-        else:
-            return None
-
-        mooc_resource_title = vertical_display_name + " - " + video_title
+        video_title = root_video.get("display_name", "")
 
         # The week is inherited by every slide cut from this video, while the
         # numbering itself is not: a slide is identified by its timestamp
         video = Resource(
-            title=mooc_resource_title,
+            title=vertical_display_name + " - " + video_title,
             url=video_url,
             path=video_xml_path,
             mime_type=mt.MP4,
@@ -116,7 +96,8 @@ class VideoParser:
         )
 
         # A transcript found in the export travels beside the video as a caption leaf
+        srt_path = self.find_transcript(root_video, export)
         if srt_path is not None:
-            video.add_child(title="subtitles", path=Path(srt_path), mime_type=mt.SRT, cut=None)
+            video.add_child(title="subtitles", path=srt_path, mime_type=mt.SRT, cut=None)
 
         return video

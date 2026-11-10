@@ -1,5 +1,6 @@
 import requests
 import logging
+from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from lxml import etree
 import re
@@ -21,6 +22,29 @@ def load_root_elem_from_mooc_xml(xml_path: Path) -> etree._Element | None:
     except (OSError, etree.XMLSyntaxError):
         logger.exception("Error loading xml file: %s", xml_path)
         return None
+
+
+@dataclass(frozen=True)
+class Export:
+    """What every step of the walk through an edX export needs, read once.
+
+    An export keeps each block of the course in its own file, named
+    `<kind>/<url_name>.xml`; the course, chapters, sequentials, verticals
+    and the items they hold (html, problem, video) are all found that way.
+    """
+
+    dir: Path
+    assets_map: dict[str, str]         # assets.json: comparison key of a file name -> the file in static/
+    asset_base_url: str | None = None  # the prefix the course's files are published under
+    language: str | None = None        # which subtitle track a video keeps
+
+    def xml_path(self, kind: str, url_name: str) -> Path:
+        """Where the block of this kind and name is described in the export."""
+        return self.dir / kind / f"{url_name}.xml"
+
+    def load(self, kind: str, url_name: str) -> etree._Element | None:
+        """The block's root element, or None (logged) when it is missing or unreadable."""
+        return load_root_elem_from_mooc_xml(self.xml_path(kind, url_name))
 
 
 def clean_text(text: str) -> str:
@@ -93,7 +117,7 @@ def cmp_key(s: str) -> str:
     return s
 
 
-def get_filename_via_assets(course_path: str | Path, href: str, assets_map: dict[str, str]) -> Path:
+def get_filename_via_assets(export_dir: Path, href: str, assets_map: dict[str, str]) -> Path:
     """
     Find actual file path using previously loaded assets.json into assets_map
     """
@@ -104,10 +128,10 @@ def get_filename_via_assets(course_path: str | Path, href: str, assets_map: dict
     try:
         rel = url_path.relative_to("/")
     except ValueError:
-        return Path(course_path) / url_path
+        return export_dir / url_path
 
     if not rel.parts or rel.parts[0] != "static":
-        return Path(course_path) / rel
+        return export_dir / rel
 
     href_name = rel.name
 
@@ -118,11 +142,11 @@ def get_filename_via_assets(course_path: str | Path, href: str, assets_map: dict
     # assets.json names the file as the export wrote it, punctuation and all,
     # so it is tried untouched first. Sanitising is only a fallback, for a name
     # the filesystem could not have taken as it stands
-    resource_path = Path(course_path) / "static" / real_name
+    resource_path = export_dir / "static" / real_name
     if resource_path.exists():
         return resource_path
 
-    return Path(course_path) / "static" / sanitize_for_filename(real_name)
+    return export_dir / "static" / sanitize_for_filename(real_name)
 
 
 def extract_number(resource_title: str) -> str | None:
@@ -149,27 +173,6 @@ def extract_number(resource_title: str) -> str | None:
 
     return resource_number
 
-
-def extract_week(resource_number: str | None) -> int | None:
-    """
-    Infer the week a resource belongs to from its numbering.
-
-    MOOC numbering opens with the week, so "1.3.3" is material of week 1.
-
-    Returns None when the number carries no leading week.
-    """
-
-    if not resource_number:
-        return None
-
-    components = resource_number.split(".")
-
-    if len(components) < 2 or not components[0].isdigit():
-        return None
-
-    week = int(components[0])
-
-    return week
 
 # One course links the same asset from several pages, so each url is only
 # ever asked about once

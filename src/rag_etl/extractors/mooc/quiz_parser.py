@@ -2,15 +2,14 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from pathlib import Path
 
 from lxml.etree import _Element
 
 import ragtools.mime_types as mt
 from rag_etl.core import Resource
 from rag_etl.extractors.mooc.utils import (
+    Export,
     extract_number,
-    load_root_elem_from_mooc_xml,
     clean_text,
     normalize_markdown,
     escape_markdown,
@@ -55,7 +54,7 @@ class QuizParser:
 
     def parse(
         self,
-        course_path: Path,
+        export: Export,
         elem_vertical: _Element,
         vertical_display_name: str,
         week: int | None = None,
@@ -67,8 +66,7 @@ class QuizParser:
             logger.warning("QuizParser: missing url_name in elem_vertical")
             return []
 
-        quiz_xml_path = Path(course_path) / "problem" / f"{url_name}.xml"
-        root = load_root_elem_from_mooc_xml(quiz_xml_path)
+        root = export.load("problem", url_name)
         if root is None:
             return []
 
@@ -79,7 +77,7 @@ class QuizParser:
 
         resource_title = f"{vertical_display_name} - {quiz_data.display_name}".strip(" -")
 
-        out_dir = Path(course_path) / "quiz"
+        out_dir = export.dir / "quiz"
         out_dir.mkdir(parents=True, exist_ok=True)
 
         quiz_md_path = out_dir / f"{url_name}.quiz.md"
@@ -257,7 +255,13 @@ class QuizParser:
             return None
 
         # <solution><div class="detailed-solution"><p>...</p>...</div></solution>
-        container = sol.find("./div[@class='detailed-solution']") or sol.find("./div") or sol
+        # An lxml element's truth is whether it has children, not whether it
+        # was found, so the fallbacks test for None
+        container = sol.find("./div[@class='detailed-solution']")
+        if container is None:
+            container = sol.find("./div")
+        if container is None:
+            container = sol
 
         chunks: list[str] = []
 

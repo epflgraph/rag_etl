@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from rag_etl.core import Resource
 from rag_etl.extractors.base import Extractor
 
-from rag_etl.extractors.mooc.course_parser import CourseParser
+from rag_etl.extractors.mooc.course_parser import parse_course
 from rag_etl.extractors.mooc.utils import asset_base_url_from_course_url
 
 
@@ -37,8 +37,8 @@ class MOOCExtractor(Extractor):
         # under the same key, so that is what a project states
         asset_base_url = asset_base_url_from_course_url(self.course_url) if self.course_url else None
 
-        return CourseParser().parse(
-            course_path=self.dir,
+        return parse_course(
+            export_dir=self.dir,
             course_url=self.course_url,
             language=self.language,
             asset_base_url=asset_base_url,

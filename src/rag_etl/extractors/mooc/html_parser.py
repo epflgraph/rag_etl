@@ -2,7 +2,7 @@ import logging
 from pathlib import Path
 from lxml.etree import _Element
 from pathlib import PurePosixPath
-from urllib.parse import unquote, urljoin
+from urllib.parse import unquote
 import re
 import unicodedata
 
@@ -12,8 +12,8 @@ from bs4.element import Tag, NavigableString
 
 from rag_etl.core import Resource
 from rag_etl.extractors.mooc.utils import (
+    Export,
     clean_text,
-    load_root_elem_from_mooc_xml,
     get_filename_via_assets,
     url_exists,
 )
@@ -167,21 +167,6 @@ class HtmlParser:
         resource_title = html_title + " " + Path(normalized_path).name
         return resource_title
 
-    def find_document_links_local_regex(self, html_text: str, extension: str) -> list[str]:
-        """Find documents links in a local HTML file using regex"""
-
-        # Ensure the extension starts with a dot
-        if not extension.startswith("."):
-            extension = "." + extension
-
-        link_pattern = re.compile(
-            rf'href=[\'"]([^\'"]+{re.escape(extension)}(?:\?[^\s\'"]*)?)[\'"]',
-            re.IGNORECASE,
-        )
-        base_url = ""
-        links = [urljoin(base_url, match) for match in link_pattern.findall(html_text)]
-        return links
-
     def tagged_links(self, soup: BeautifulSoup, extensions: tuple[str, ...]) -> list[tuple[str, str | None]]:
         """
         Return every document linked from the page, with the tag written beside it.
@@ -268,12 +253,10 @@ class HtmlParser:
         # Taking a marker out of a line can leave the space it sat in
         return "\n".join(line.strip() for line in md_text.splitlines()).strip()
 
-    def resolve_link(
-        self, linked: str, course_path: Path, assets_map: dict[str, str], asset_base_url: str | None
-    ) -> tuple[Path, str | None]:
+    def resolve_link(self, linked: str, export: Export) -> tuple[Path, str | None]:
         """Return where a linked file is in the export, and the url it is published at."""
 
-        resource_url = self.asset_url(linked, asset_base_url)
+        resource_url = self.asset_url(linked, export.asset_base_url)
 
         if "block@" in linked:
             linked = "/static/" + linked.split("block@")[-1]
@@ -285,19 +268,17 @@ class HtmlParser:
             previous, linked = linked, unquote(linked)
 
         relative_path = Path(linked)
-        resource_path = Path(course_path) / relative_path.relative_to("/") if linked.startswith("/") else None
+        resource_path = export.dir / relative_path.relative_to("/") if linked.startswith("/") else None
         if resource_path is None or not resource_path.exists():
-            resource_path = get_filename_via_assets(course_path, linked, assets_map)
+            resource_path = get_filename_via_assets(export.dir, linked, export.assets_map)
 
         return resource_path, resource_url
 
     def parse(
         self,
-        course_path: Path,
+        export: Export,
         elem_vertical: _Element,
         vertical_display_name: str,
-        assets_map: dict[str, str],
-        asset_base_url: str | None = None,
         vertical_has_video: bool = False,
         week: int | None = None,
     ) -> list[Resource]:
@@ -312,16 +293,9 @@ class HtmlParser:
         mooc_resources: list[Resource] = []
 
         html_url_name = elem_vertical.get("url_name", "")
-        html_filename = html_url_name + ".html"
-        html_xml_filename = html_url_name + ".xml"
-        markdown_filename = html_url_name + ".md"
+        html_path = export.dir / "html" / f"{html_url_name}.html"
 
-        logging.debug(f"course_path={course_path}")
-        html_xml_path = Path(course_path) / "html" / html_xml_filename
-
-        html_path = Path(course_path) / "html" / html_filename
-
-        root_html = load_root_elem_from_mooc_xml(html_xml_path)
+        root_html = export.load("html", html_url_name)
         if root_html is None:
             return []
 
@@ -367,11 +341,8 @@ class HtmlParser:
         md_text = self.convert_html_text_to_markdown(soup)
         md_text = self.strip_tag_markers(md_text)
 
-        # We sanitize the filename of the MarkDown file we create
-        markdown_filename = sanitize_for_filename(markdown_filename)
-
-        # Write MarkDown to file in the same HTML folder
-        markdown_path = Path(course_path) / "html" / markdown_filename
+        # Write MarkDown to file in the same HTML folder, under a name the filesystem takes
+        markdown_path = export.dir / "html" / sanitize_for_filename(f"{html_url_name}.md")
 
         Path(markdown_path).write_text(md_text, encoding="utf-8")
         logger.debug(
@@ -405,7 +376,7 @@ class HtmlParser:
                 logger.info(f"Skipping {linked} because it is marked NO_BOT")
                 continue
 
-            resource_path, resource_url = self.resolve_link(linked, course_path, assets_map, asset_base_url)
+            resource_path, resource_url = self.resolve_link(linked, export)
             if not resource_path.exists():
                 # A resource pointing at a file that is not there only fails
                 # later, in whichever transformer opens it first

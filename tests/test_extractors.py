@@ -271,6 +271,8 @@ def test_mooc_tree(tmp_path):
     # The solutions file renders the whole quiz again, its answers marked
     assert [leaf.exercise_parts for leaf in quiz_leaves] == ["statement", "statement + solution"]
     assert all(leaf.number == "1" for leaf in quiz_leaves)
+    # The statement too has a solution: its sibling
+    assert all(leaf.has_solution for leaf in quiz_leaves)
 
     video = next(leaf for leaf in vertical.children if leaf.title == "Lecture video")
     assert video.mime_type == mt.MP4

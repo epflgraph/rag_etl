@@ -152,7 +152,7 @@ its node, top-down, replacing it by chunk leaves.
 
 - `whole_document`: one chunk, pages stitched.
 - `per_child`: each readable child becomes a chunk (pages, slides); a child with its own different cut keeps it.
-- `per_exercise`: pages stitched, split by `split_exercises` (one LLM pass, cached by the text's hash: number and statement/solution per exercise), one chunk per exercise linking to its page; `has_solution` set across the exercise.
+- `per_exercise`: pages stitched, split by `split_exercises` (one LLM pass, cached by the text's hash: number and statement/solution per exercise), one chunk per exercise linking to its page; `has_solution` set across the exercise. Heads-up: this pairing stays within one document. When statements and solutions are separate files (`series-3.pdf`, `series-3-solutions.pdf`), the statements' chunks keep `has_solution = False`; deliberately left so until a consumer needs it.
 - `text`: split at the most common heading level, sections merged up to the size limit.
 
 Stitching joins pages only where a file is merged (never slides),

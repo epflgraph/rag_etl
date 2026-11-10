@@ -55,13 +55,15 @@ class QuizParser:
         quiz_title = clean_text(root.get("display_name", ""))
         number = extract_number(f"{vertical_display_name} - {quiz.display_name}".strip(" -"))
 
-        # Statement and statement + solution, the assignment/solution pair Tutor Bot expects
+        # Statement and statement + solution, the assignment/solution pair Tutor Bot expects.
+        # Both have a solution: the export ships it with every quiz
         return [
             Resource(
                 title=quiz_title,
                 path=path,
                 mime_type=mt.guess_mime_type(str(path)),
                 exercise_parts=parts,
+                has_solution=True,
                 number=number,
                 week=week,
             )

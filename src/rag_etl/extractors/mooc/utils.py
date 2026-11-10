@@ -4,7 +4,6 @@ from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from lxml import etree
 import re
-from html import unescape
 from urllib.parse import unquote, urlparse
 import unicodedata
 
@@ -45,52 +44,6 @@ class Export:
     def load(self, kind: str, url_name: str) -> etree._Element | None:
         """The block's root element, or None (logged) when it is missing or unreadable."""
         return load_root_elem_from_mooc_xml(self.xml_path(kind, url_name))
-
-
-def clean_text(text: str) -> str:
-    """
-    Clean text
-    """
-
-    if not text:
-        return ""
-
-    # HTML unescape
-    t = unescape(text)
-
-    # To normal space
-    t = t.replace("\xa0", " ")
-
-    # collapse horizontal whitespace only (keep \n for structure)
-    t = re.sub(r"[ \t]+", " ", t)
-    return t.strip()
-
-
-def normalize_markdown(md: str) -> str:
-    """
-    Normalize markdown output including newlines, trailing spaces, and extra blank lines
-    """
-
-    if not md:
-        return ""
-
-    md = md.replace("\r\n", "\n").replace("\r", "\n")
-    md = "\n".join(line.rstrip() for line in md.splitlines())
-    md = re.sub(r"\n{3,}", "\n\n", md)
-    return md.strip()
-
-
-def escape_markdown(text: str) -> str:
-    """
-    Escape Makdown
-    """
-
-    if not text:
-        return ""
-    t = text.replace("\\", "\\\\")
-    t = t.replace("*", "\\*")
-    t = t.replace("_", "\\_")
-    return t
 
 
 # For comparison only

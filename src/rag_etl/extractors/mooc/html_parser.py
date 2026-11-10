@@ -7,18 +7,17 @@ import re
 import unicodedata
 
 from bs4 import BeautifulSoup
-from bs4.element import Tag, NavigableString
 
 
 from rag_etl.core import Resource
 from rag_etl.extractors.mooc.utils import (
     Export,
-    clean_text,
     get_filename_via_assets,
     url_exists,
 )
 
 from ragtools.encoding import sanitize_for_filename
+from ragtools.html import html_to_markdown
 from rag_etl.extractors.markers import NO_BOT, split_tag_number_text, split_tag_text
 
 import ragtools.mime_types as mt
@@ -37,128 +36,6 @@ class HtmlParser:
     """
     HTML Parser for MOOCs.
     """
-
-    def convert_html_text_to_markdown(self, soup: BeautifulSoup) -> str:
-        """Convert HTML text to Markdown with BeautifulSoup"""
-
-        self.remove_noise(soup)
-        self.remove_empty_paragraphs(soup)
-
-        out: list[str] = []
-        root = soup.body or soup
-        self.walk(root, out)
-
-        return "\n".join(out).strip()
-
-    def remove_noise(self, soup: BeautifulSoup) -> None:
-        """Remove HTML noise with BeautifulSoup"""
-
-        for tag in soup(["script", "style", "noscript"]):
-            tag.decompose()
-
-        for tag in soup.select("nav#menu, nav#im"):
-            tag.decompose()
-
-    def remove_empty_paragraphs(self, soup: BeautifulSoup) -> None:
-        """Remove Empty paragraphs with BeautifulSoup"""
-
-        for p in soup.find_all("p"):
-            text = p.get_text().replace("\xa0", " ").strip()
-            if not text:
-                p.decompose()
-
-    def inline_text(self, node: Tag) -> str:
-        """
-        From Node to text.
-        """
-
-        parts: list[str] = []
-
-        for child in node.children:
-            # If child is plain text (NavigableString in BeautifulSoup)
-            if isinstance(child, NavigableString):
-                # Clean text
-                t = clean_text(str(child))
-
-                # If it's not empty, append
-                if t:
-                    parts.append(t)
-
-            # If child is another HTML tag
-            elif isinstance(child, Tag):
-                # Clean it
-                t = clean_text(child.get_text(" ", strip=True))
-                if not t:
-                    continue
-
-                # If Bold HTML, convert to Markdown
-                if child.name in {"strong", "b"}:
-                    parts.append(f"**{t}**")
-                else:
-                    parts.append(t)
-
-        # Join all parts and clean any starting and ending white spaces
-        return " ".join(parts).strip()
-
-    def walk(self, node, out: list[str]) -> None:
-        """Walk through the HTML structure and try to convert it to Markdown"""
-
-        # Ignore plain text
-        if isinstance(node, NavigableString):
-            return
-
-        # Ignore non-HTML tags
-        if not isinstance(node, Tag):
-            return
-
-        # HTML Tag name
-        name = node.name
-
-        # HTML Tags to Markdown
-        if name in {"h1", "h2", "h3", "h4", "h5", "h6"}:
-            level = int(name[1])
-            text = clean_text(node.get_text(" ", strip=True))
-            if text:
-                out.append("#" * level + " " + text)
-                out.append("")
-            return
-
-        if name == "p":
-            text = self.inline_text(node)
-            if text:
-                out.append(text)
-                out.append("")
-            return
-
-        if name == "br":
-            out.append("")
-            return
-
-        if name == "ul":
-            for li in node.find_all("li", recursive=False):
-                self.walk(li, out)
-            out.append("")
-            return
-
-        if name == "ol":
-            i = 1
-            for li in node.find_all("li", recursive=False):
-                text = clean_text(li.get_text(" ", strip=True))
-                if text:
-                    out.append(f"{i}. {text}")
-                    i += 1
-            out.append("")
-            return
-
-        if name == "li":
-            text = clean_text(node.get_text(" ", strip=True))
-            if text:
-                out.append(f"- {text}")
-            return
-
-        # For any child HTML tag not handled above
-        for child in node.children:
-            self.walk(child, out)
 
     def tagged_links(self, soup: BeautifulSoup, extensions: tuple[str, ...]) -> list[tuple[str, str | None]]:
         """
@@ -327,7 +204,7 @@ class HtmlParser:
             return []
 
         # HTML to MarkDown
-        md_text = self.convert_html_text_to_markdown(soup)
+        md_text = html_to_markdown(soup)
         md_text = self.strip_tag_markers(md_text)
 
         # Write MarkDown to file in the same HTML folder, under a name the filesystem takes

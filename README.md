@@ -153,6 +153,7 @@ convert_ipynb_to_md("tp2.ipynb", "tp2.md")
 ```bash
 venv/bin/python -m pytest -q
 venv/bin/ruff check src tests
+venv/bin/mypy src
 ```
 
 Tests use synthetic fixtures and stubbed models: no network, no RCP. Read

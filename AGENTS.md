@@ -38,7 +38,7 @@ Bot). Anna's dashboard reads the manifests directly.
 - **Comments say the local why**, briefly. Architecture belongs here, not repeated in docstrings.
 - **Tests**: synthetic fixtures, stubbed models, no network. Keep them green; do not over-invest in them.
 
-Commands: `venv/bin/python -m pytest -q`, `venv/bin/ruff check src tests`.
+Commands: `venv/bin/python -m pytest -q`, `venv/bin/ruff check src tests`, `venv/bin/mypy src`.
 
 ## Layout
 

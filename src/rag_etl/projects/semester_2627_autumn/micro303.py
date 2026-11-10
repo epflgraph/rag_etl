@@ -4,60 +4,34 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import ragtools.mime_types as mt
-
+from rag_etl.core import Override
 from rag_etl.extractors import LocalFolderExtractor, MOOCExtractor, MoodleExtractor  # , EdDiscussionExtractor
 from rag_etl.projects import Project
-
-# The MOOC export's own labels: type/subtype/cut the export itself infers
-# (unlike Moodle files, these are inferred source-side on purpose). THEORY
-# and THEORY_SLIDES must be declared: the export's untagged documents are
-# filed under them, a PDF being looked at to tell a deck from a reading.
-MOOC_TAG_METADATA = {
-    "THEORY": {
-        "type": "theory",
-        "subtype": "theory",
-        "one_chunk_per_page": False,
-        "one_chunk_per_doc": False,
-    },
-    "THEORY_SLIDES": {
-        "type": "theory",
-        "subtype": "theory_slides",
-        "one_chunk_per_page": True,
-        "one_chunk_per_doc": False,
-    },
-    "MOOC_QUIZ": {
-        "type": "practice",
-        "subtype": "mooc_quiz",
-        "one_chunk_per_page": False,
-        "one_chunk_per_doc": True,
-    },
-    "MOOC_VIDEO": {
-        "type": "theory",
-        "subtype": "mooc_video",
-        "one_chunk_per_page": False,
-        "one_chunk_per_doc": True,
-    },
-}
 
 MICRO303 = Project(
     id="micro303",
     language="en",
     dir=Path("MICRO303"),
+    # What the MOOC export's tags used to say, until the judge infers it
+    overrides=(
+        # The quizzes the extractor writes out, statement and solutions alike
+        Override('path="*/mooc/*" AND filename="*.quiz*.md"', type="practice", subtype="mooc_quiz", cut="whole_document"),
+        # The lecture videos, one chunk per slide like any other video
+        Override('path="*/mooc/*" AND mime_type="video/mp4"', type="theory", subtype="mooc_video", cut="per_child"),
+        # The untitled blocks of the export: on every video page the one line
+        # "Download here the PDF document corresponding to the above video.",
+        # and once a hint about the platform's search bar
+        Override('title="*Raw HTML"', exclude=True),
+    ),
     sources=(
         MoodleExtractor(dir=Path("moodle"), course_id=19283),
         MOOCExtractor(
             dir=Path("mooc"),
-            tag_metadata=MOOC_TAG_METADATA,
-            mime_types=tuple(mt.DEFAULT_MIME_TYPES + [mt.MP4, mt.JSON]),
             # Week one opens at chapter 2 of the course, the ones
             # before and after it being a preamble and a closing section
             first_week_chapter=2,
             week_count=7,
-            include_untagged_documents=True,
             course_url="https://courseware.epfl.ch/learning/course/course-v1:EPFL+mems+2023/home",
-            theory_tag="THEORY",
-            theory_slides_tag="THEORY_SLIDES",
             language="en",
         ),
         LocalFolderExtractor(dir=Path("local")),

@@ -221,7 +221,7 @@ def _write_mooc_export(base: Path) -> None:
     (base / "sequential" / "seq1.xml").write_text('<sequential display_name="Seq"><vertical url_name="v1"/></sequential>')
     (base / "vertical").mkdir()
     (base / "vertical" / "v1.xml").write_text(
-        '<vertical display_name="Vert"><problem url_name="p1"/><video url_name="vid1"/></vertical>'
+        '<vertical display_name="Vert"><html url_name="h1"/><problem url_name="p1"/><video url_name="vid1"/></vertical>'
     )
     (base / "html").mkdir()
     (base / "html" / "h1.xml").write_text('<html display_name="Lecture"/>')
@@ -243,23 +243,11 @@ def _write_mooc_export(base: Path) -> None:
     (base / "policies" / "assets.json").write_text("{}")
 
 
-MOOC_TAG_METADATA = {
-    "MOOC_QUIZ": {"type": "practice", "subtype": "mooc_quiz", "one_chunk_per_doc": True},
-    "MOOC_VIDEO": {"type": "theory", "subtype": "mooc_video", "one_chunk_per_doc": True},
-}
-
-
 def test_mooc_tree(tmp_path):
     base = tmp_path / "export"
     _write_mooc_export(base)
 
-    extractor = MOOCExtractor(
-        dir=base,
-        tag_metadata=MOOC_TAG_METADATA,
-        language="en",
-        first_week_chapter=1,
-        week_count=1,
-    )
+    extractor = MOOCExtractor(dir=base, language="en", first_week_chapter=1, week_count=1)
     root = extractor.extract()
 
     # course > chapter (week) > sequential > vertical > leaves
@@ -270,13 +258,20 @@ def test_mooc_tree(tmp_path):
     sequential = chapter.children[0]
     vertical = sequential.children[0]
 
+    # Every item is extracted: the page, the quiz and the video
     titles = {leaf.title for leaf in vertical.children}
-    assert titles == {"Vert - Quiz 1", "Vert - Lecture video"}
-    quiz_leaves = [leaf for leaf in vertical.children if leaf.title == "Vert - Quiz 1"]
-    quiz_leaves.sort(key=lambda leaf: leaf.exercise_parts == "solution")
-    assert [leaf.exercise_parts for leaf in quiz_leaves] == ["statement", "solution"]
-    assert all(leaf.cut == "whole_document" for leaf in vertical.children)
-    assert all(leaf.number == "1" for leaf in vertical.children if leaf.title == "Vert - Quiz 1")
+    assert titles == {"Vert - Lecture", "Vert - Quiz 1", "Vert - Lecture video"}
+
+    # The leaves carry facts only; what they are, the judge decides
+    assert all(leaf.type is None and leaf.subtype is None and leaf.cut is None for leaf in vertical.children)
+    assert all(leaf.week == 1 for leaf in vertical.children)
+
+    quiz_leaves = sorted(
+        (leaf for leaf in vertical.children if leaf.title == "Vert - Quiz 1"), key=lambda leaf: len(leaf.exercise_parts)
+    )
+    # The solutions file renders the whole quiz again, its answers marked
+    assert [leaf.exercise_parts for leaf in quiz_leaves] == ["statement", "statement + solution"]
+    assert all(leaf.number == "1" for leaf in quiz_leaves)
 
     video = next(leaf for leaf in vertical.children if leaf.title == "Vert - Lecture video")
     assert video.mime_type == mt.MP4
@@ -285,9 +280,16 @@ def test_mooc_tree(tmp_path):
     assert video.children[0].mime_type == mt.SRT
 
 
-def test_mooc_untagged_needs_both_tags(tmp_path):
-    with pytest.raises(ValueError):
-        MOOCExtractor(dir=tmp_path / "export", include_untagged_documents=True).extract()
+def test_mooc_page_marked_no_bot_is_left_out(tmp_path):
+    base = tmp_path / "export"
+    _write_mooc_export(base)
+    (base / "html" / "h1.html").write_text("<html><body><p>[NO_BOT] staff notes</p></body></html>")
+
+    root = MOOCExtractor(dir=base, language="en", first_week_chapter=1, week_count=1).extract()
+
+    titles = {leaf.title for leaf in root.walk() if leaf.is_leaf}
+    assert "Vert - Lecture" not in titles
+    assert "Vert - Quiz 1" in titles
 
 
 def test_mediaspace(monkeypatch, tmp_path):

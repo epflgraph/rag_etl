@@ -34,7 +34,9 @@ def hash_text(text: str) -> str:
     return hash_bytes(text.encode("utf-8"))
 
 
-@dataclass
+# eq=False: a node is an identity in its tree, not a value. Two nodes with
+# the same fields are still two nodes, and removing one must not remove the other
+@dataclass(eq=False)
 class Resource:
     """One node of a resource tree flowing through the ETL pipeline.
 
@@ -132,6 +134,7 @@ class Resource:
         """Remove this node, and its subtree with it, from its parent; a root stays as it is."""
         if self.parent is not None:
             self.parent.children.remove(self)
+            self.parent = None
 
     def walk(self) -> Iterator[Resource]:
         """Yield this node, then its subtree, depth-first."""

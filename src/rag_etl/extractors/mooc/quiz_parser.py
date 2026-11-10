@@ -1,10 +1,8 @@
 from __future__ import annotations
 
 import logging
-from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
 
 from lxml.etree import _Element
 
@@ -16,7 +14,6 @@ from rag_etl.extractors.mooc.utils import (
     clean_text,
     normalize_markdown,
     escape_markdown,
-    cut_from_flags,
 )
 
 
@@ -61,19 +58,9 @@ class QuizParser:
         course_path: Path,
         elem_vertical: _Element,
         vertical_display_name: str,
-        tag_metadata: Mapping[str, Mapping[str, Any]],
         week: int | None = None,
     ) -> list[Resource]:
         mooc_resources: list[Resource] = []
-
-        tag_name = "MOOC_QUIZ"
-        tag_dict = tag_metadata.get(tag_name)
-
-        # A course that does not declare the tag is not asking for its quizzes,
-        # so they are skipped rather than produced without any metadata
-        if tag_dict is None:
-            logger.debug(f"Skipping quiz because the course declares no {tag_name} tag")
-            return []
 
         url_name = elem_vertical.get("url_name", "")
         if not url_name:
@@ -108,33 +95,25 @@ class QuizParser:
         # assignment vs solution used by Tutor Bot
         number_str = extract_number(resource_title)
 
-        # Quiz
+        # Quiz: the statement alone
         quiz_res: Resource = Resource(
             title=resource_title,
-            url=None,
             path=quiz_md_path,
             mime_type=mt.guess_mime_type(str(quiz_md_path)),
             exercise_parts="statement",
-            type=tag_dict.get("type"),
-            subtype=tag_dict.get("subtype"),
             number=number_str,
             week=week,
-            cut=cut_from_flags(tag_dict.get("one_chunk_per_page"), tag_dict.get("one_chunk_per_doc")),
         )
         mooc_resources.append(quiz_res)
 
-        # Quiz with solution
+        # Quiz with solution: the whole quiz again, its answers marked
         quiz_sol_res: Resource = Resource(
             title=resource_title,
-            url=None,
             path=quiz_sol_md_path,
             mime_type=mt.guess_mime_type(str(quiz_sol_md_path)),
-            exercise_parts="solution",
-            type=tag_dict.get("type"),
-            subtype=tag_dict.get("subtype"),
+            exercise_parts="statement + solution",
             number=number_str,
             week=week,
-            cut=cut_from_flags(tag_dict.get("one_chunk_per_page"), tag_dict.get("one_chunk_per_doc")),
         )
         mooc_resources.append(quiz_sol_res)
 

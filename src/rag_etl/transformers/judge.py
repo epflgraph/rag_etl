@@ -73,16 +73,30 @@ class JudgeTransformer(Transformer):
     overrides: tuple[Override, ...] = ()
 
     def transform(self, roots: list[Resource]) -> list[Resource]:
+        excluded: list[Resource] = []
         for root in roots:
             for node in root.walk():
                 self._default_cut(node)
                 self._own_labels(node)
             for node in root.walk():
                 self._inherit(node)
-                apply_overrides(node, self.overrides)
+                if apply_overrides(node, self.overrides):
+                    excluded.append(node)
             for node in root.walk():
                 self._fallback(node)
-        return roots
+
+        # Dropped once the walks are over, so no tree changes while it is walked.
+        # A container the exclusion leaves empty, with no file of its own, holds
+        # nothing anymore and goes with it
+        for node in excluded:
+            parent = node.parent
+            node.detach()
+            while parent is not None and not parent.children and parent.path is None:
+                emptied, parent = parent, parent.parent
+                emptied.detach()
+
+        # A root has no parent to leave: an excluded one leaves the run
+        return [root for root in roots if root not in excluded]
 
     def _default_cut(self, node: Resource) -> None:
         """The stub's default cut: what a tree needs to produce chunks.

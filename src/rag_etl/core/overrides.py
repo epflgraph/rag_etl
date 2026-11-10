@@ -24,25 +24,32 @@ _PREDICATE = re.compile(r'(\w+)\s*=\s*(?:"([^"]*)"|(\S+))')
 
 
 class Override:
-    """One correction: a where-predicate plus the cut and metadata it sets.
+    """One correction: a where-predicate plus what it does to the resources it matches.
 
     `Override('title="*[[]HOMEWORK*]*"', type="practice", cut="per_exercise")`
-    — any metadata field can be set; a name that is not one fails here, when
-    the project is loaded, rather than silently never applying.
+    sets the cut and metadata; any metadata field can be set, and a name
+    that is not one fails here, when the project is loaded, rather than
+    silently never applying. `Override('title="*Raw HTML"', exclude=True)`
+    leaves the matching resources, subtree and all, out of the run.
     """
 
-    def __init__(self, where: str, cut: str | None = None, **metadata: Any):
+    def __init__(self, where: str, cut: str | None = None, exclude: bool = False, **metadata: Any):
         unknown = set(metadata) - set(METADATA_FIELDS)
         if unknown:
             raise ValueError(f"Not metadata fields: {sorted(unknown)} (expected some of {METADATA_FIELDS})")
+        if exclude and (cut is not None or metadata):
+            raise ValueError(f"An override that excludes sets nothing else: {where}")
 
         self.where = where
         self.predicates = parse_where(where)
+        self.exclude = exclude
         self.assignments = {
             name: value for name, value in {"cut": cut, **metadata}.items() if value is not None
         }
 
     def __repr__(self) -> str:
+        if self.exclude:
+            return f"Override({self.where!r}, exclude=True)"
         assignments = ", ".join(f"{name}={value!r}" for name, value in self.assignments.items())
         return f"Override({self.where!r}, {assignments})"
 
@@ -95,25 +102,31 @@ def _attributes(resource: Resource) -> dict[str, str]:
     }
 
 
-def apply_overrides(resource: Resource, overrides: Sequence[Override]) -> None:
-    """Correct one resource with every override that matches it.
+def apply_overrides(resource: Resource, overrides: Sequence[Override]) -> bool:
+    """Correct one resource with every override that matches it; return whether one excludes it.
 
     Most-specific wins; equal specificity resolves by declaration order,
     first declared wins, loudly. No match leaves the resource untouched.
+    An excluding override wins over everything: the caller drops the
+    resource rather than correcting it.
     """
-    ordered = sorted(
-        ((index, override) for index, override in enumerate(overrides) if override.matches(resource)),
-        key=lambda pair: (pair[1].specificity, pair[0]),
-    )
+    matching = [(index, override) for index, override in enumerate(overrides) if override.matches(resource)]
+
+    excluding = next((override for _, override in matching if override.exclude), None)
+    if excluding is not None:
+        logger.info(f"Excluding {resource.title!r}: {excluding.where}")
+        return True
 
     depth: dict[str, int] = {}
-    for index, override in ordered:
+    for index, override in sorted(matching, key=lambda pair: (pair[1].specificity, pair[0])):
         for name, value in override.assignments.items():
             if name not in depth or override.specificity > depth[name]:
                 setattr(resource, name, value)
                 depth[name] = override.specificity
             elif getattr(resource, name) != value:
                 logger.warning(
-                    f"Ambiguous {name} for {resource!r}: {getattr(resource, name)!r} already set at the same "
-                    f"specificity, {value!r} from overrides[{index}] ({override.where}); keeping the first"
+                    f"Ambiguous {name} for {resource.title!r}: {getattr(resource, name)!r} already set at the "
+                    f"same specificity, {value!r} from overrides[{index}] ({override.where}); keeping the first"
                 )
+
+    return False

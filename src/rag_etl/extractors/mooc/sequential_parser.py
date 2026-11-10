@@ -1,11 +1,8 @@
 import logging
-from collections.abc import Mapping
 from pathlib import Path
 from lxml.etree import _Element
-from typing import Any
 
 from rag_etl.extractors.mooc.vertical_parser import VerticalParser
-from rag_etl.extractors.mooc.utils import UntaggedDocuments
 from rag_etl.core import Resource
 from rag_etl.extractors.mooc.utils import load_root_elem_from_mooc_xml
 
@@ -22,9 +19,7 @@ class SequentialParser:
         course_path: Path,
         elem_sequential: _Element,
         assets_map: dict[str, str],
-        tag_metadata: Mapping[str, Mapping[str, Any]],
         asset_base_url: str | None = None,
-        untagged_documents: UntaggedDocuments | None = None,
         week: int | None = None,
         language: str | None = None,
     ) -> Resource | None:
@@ -52,9 +47,7 @@ class SequentialParser:
                 elem_vertical=elem_vertical,
                 assets_map=assets_map,
                 asset_base_url=asset_base_url,
-                untagged_documents=untagged_documents,
                 week=week,
-                tag_metadata=tag_metadata,
                 language=language,
             )
             if vertical is not None:

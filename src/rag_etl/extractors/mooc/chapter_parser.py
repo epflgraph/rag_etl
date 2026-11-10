@@ -1,10 +1,7 @@
 import logging
-from collections.abc import Mapping
 from pathlib import Path
-from typing import Any
 
 from rag_etl.extractors.mooc.sequential_parser import SequentialParser
-from rag_etl.extractors.mooc.utils import UntaggedDocuments
 from rag_etl.core import Resource
 from rag_etl.extractors.mooc.utils import load_root_elem_from_mooc_xml
 
@@ -21,9 +18,7 @@ class ChapterParser:
         course_path: Path,
         chapter_filename: str,
         assets_map: dict[str, str],
-        tag_metadata: Mapping[str, Mapping[str, Any]],
         asset_base_url: str | None = None,
-        untagged_documents: UntaggedDocuments | None = None,
         week: int | None = None,
         language: str | None = None,
     ) -> Resource | None:
@@ -46,11 +41,9 @@ class ChapterParser:
             sequential = sequential_parser.parse(
                 elem_sequential=elem_sequential,
                 course_path=course_path,
-                tag_metadata=tag_metadata,
                 language=language,
                 assets_map=assets_map,
                 asset_base_url=asset_base_url,
-                untagged_documents=untagged_documents,
                 week=week,
             )
             if sequential is not None:

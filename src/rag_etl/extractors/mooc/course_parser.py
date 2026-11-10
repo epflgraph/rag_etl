@@ -1,10 +1,8 @@
 import logging
-from collections.abc import Mapping
 from pathlib import Path
-from typing import Any
 from rag_etl.extractors.mooc.chapter_parser import ChapterParser
 from rag_etl.core import Resource
-from rag_etl.extractors.mooc.utils import UntaggedDocuments, cmp_key, load_root_elem_from_mooc_xml
+from rag_etl.extractors.mooc.utils import cmp_key, load_root_elem_from_mooc_xml
 import json
 import re
 
@@ -122,9 +120,7 @@ class CourseParser:
         self,
         course_path: Path,
         course_url: str | None = None,
-        tag_metadata: Mapping[str, Mapping[str, Any]] | None = None,
         language: str | None = None,
-        untagged_documents: UntaggedDocuments | None = None,
         asset_base_url: str | None = None,
         first_week_chapter: int | None = None,
         week_count: int | None = None,
@@ -158,8 +154,6 @@ class CourseParser:
                 week=week,
                 assets_map=assets_map,
                 asset_base_url=asset_base_url,
-                untagged_documents=untagged_documents,
-                tag_metadata=tag_metadata or {},
                 language=language,
             )
             if chapter is not None:

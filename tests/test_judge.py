@@ -187,3 +187,28 @@ def test_overrides_win_over_the_defaults():
     JudgeTransformer(overrides=(override,)).transform([root])
 
     assert leaf.subtype == "recap"
+
+
+def test_excluded_resources_leave_the_trees():
+    root = Resource(title="root")
+    kept = root.add_child(title="Errata", mime_type=mt.MARKDOWN)
+    root.add_child(title="Week 1 - Raw HTML", mime_type=mt.MARKDOWN)
+    dropped_root = Resource(title="Raw HTML")
+
+    roots = JudgeTransformer(overrides=(Override('title="*Raw HTML"', exclude=True),)).transform([root, dropped_root])
+
+    assert roots == [root]
+    assert root.children == [kept]
+
+
+def test_a_container_emptied_by_an_exclusion_goes_too():
+    root = Resource(title="course")
+    kept = root.add_child(title="Week 1").add_child(title="Errata", mime_type=mt.MARKDOWN)
+    search = root.add_child(title="Search")
+    search.add_child(title="Search - Raw HTML", mime_type=mt.MARKDOWN)
+
+    roots = JudgeTransformer(overrides=(Override('title="*Raw HTML"', exclude=True),)).transform([root])
+
+    assert roots == [root]
+    assert [child.title for child in root.children] == ["Week 1"]
+    assert kept.parent is root.children[0]

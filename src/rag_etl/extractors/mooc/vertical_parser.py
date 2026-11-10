@@ -1,15 +1,12 @@
 import logging
-from collections.abc import Mapping
 from pathlib import Path
 from lxml.etree import _Element
-from typing import Any
 
 from rag_etl.extractors.mooc.video_parser import VideoParser
 from rag_etl.extractors.mooc.html_parser import HtmlParser
 from rag_etl.extractors.mooc.quiz_parser import QuizParser
 from rag_etl.extractors.mooc.utils import load_root_elem_from_mooc_xml
 
-from rag_etl.extractors.mooc.utils import UntaggedDocuments
 from rag_etl.core import Resource
 
 logger = logging.getLogger(__name__)
@@ -25,9 +22,7 @@ class VerticalParser:
         course_path: Path,
         elem_vertical: _Element,
         assets_map: dict[str, str],
-        tag_metadata: Mapping[str, Mapping[str, Any]],
         asset_base_url: str | None = None,
-        untagged_documents: UntaggedDocuments | None = None,
         week: int | None = None,
         language: str | None = None,
     ) -> Resource | None:
@@ -63,9 +58,7 @@ class VerticalParser:
                     vertical_display_name=vertical_display_name,
                     assets_map=assets_map,
                     asset_base_url=asset_base_url,
-                    untagged_documents=untagged_documents,
                     vertical_has_video=vertical_has_video,
-                    tag_metadata=tag_metadata,
                     week=week,
                 )
                 # Add the returned resources as leaves
@@ -79,7 +72,6 @@ class VerticalParser:
                     course_path=course_path,
                     elem_vertical=child,
                     vertical_display_name=vertical_display_name,
-                    tag_metadata=tag_metadata,
                     week=week,
                 )
                 # Add the returned resources as leaves
@@ -93,7 +85,6 @@ class VerticalParser:
                     course_path=course_path,
                     elem_vertical=child,
                     vertical_display_name=vertical_display_name,
-                    tag_metadata=tag_metadata,
                     language=language,
                     week=week,
                 )

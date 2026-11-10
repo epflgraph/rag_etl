@@ -1,18 +1,13 @@
 import requests
 import logging
-from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
 from lxml import etree
 import re
 from html import unescape
-from typing import Any
 from urllib.parse import unquote, urlparse
 import unicodedata
-from pydantic import BaseModel, Field
 
 from ragtools.encoding import sanitize_for_filename
-from ragtools.llm import get_model
-from ragtools.pdf import downscale_if_needed, render_pdf_pages
 
 logger = logging.getLogger(__name__)
 
@@ -72,22 +67,6 @@ def escape_markdown(text: str) -> str:
     t = t.replace("*", "\\*")
     t = t.replace("_", "\\_")
     return t
-
-
-def cut_from_flags(one_chunk_per_page: Any, one_chunk_per_doc: Any) -> str | None:
-    """
-    Return the cut a tag's one-chunk flags stand for.
-
-    A tag filed one chunk per page cuts per child; a tag filed one chunk per
-    document cuts the document whole. A tag carrying neither leaves the cut
-    to the judge.
-    """
-
-    if one_chunk_per_page:
-        return "per_child"
-    if one_chunk_per_doc:
-        return "whole_document"
-    return None
 
 
 # For comparison only
@@ -236,64 +215,6 @@ def url_exists(url: str) -> bool:
     _url_exists_cache[url] = exists
 
     return exists
-
-
-@dataclass(frozen=True)
-class UntaggedDocuments:
-    """
-    How to treat the documents a MOOC page links without tagging them.
-
-    A course that tags nothing still publishes readings and slide decks, and
-    they are worth indexing. Which of the two tags a PDF gets is decided by
-    looking at it, since only the file itself says whether it is a deck.
-
-    Built only when a course asks for them, so both tags are always set.
-    """
-
-    theory_tag: str
-    theory_slides_tag: str
-    extensions: tuple[str, ...] = (".pdf", ".txt", ".zip")
-
-
-SLIDES_SYSTEM_PROMPT = "You classify the first page of a PDF."
-
-SLIDES_USER_PROMPT = (
-    "Is this page from a slide deck used to present a lecture, or from an ordinary "
-    "document such as a report, an article, lecture notes, or an exercise sheet?"
-)
-
-
-class SlidesClassification(BaseModel):
-    is_slides: bool = Field(
-        ...,
-        description=(
-            "True when the page comes from a slide deck used to present a lecture, "
-            "false for an ordinary document such as a report, an article, lecture "
-            "notes, or an exercise sheet."
-        ),
-    )
-
-
-def pdf_is_slides(pdf_path: Path) -> bool:
-    """
-    Return whether a PDF is a slide deck.
-
-    Only the first page is looked at: a deck is recognisable from its title
-    slide, and one call per document keeps this affordable for a whole course.
-    """
-
-    pages = render_pdf_pages(str(pdf_path))
-    first_page = downscale_if_needed(pages[0])
-
-    classification = get_model("classify_slides").structured_vision(
-        SLIDES_USER_PROMPT,
-        [first_page],
-        SlidesClassification,
-        system=SLIDES_SYSTEM_PROMPT,
-        name="classify-pdf-slides",
-    )
-
-    return classification.is_slides
 
 
 # The key naming a published course, as in "course-v1:EPFL+mems+2023"

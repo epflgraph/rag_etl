@@ -1,12 +1,10 @@
 import logging
-from collections.abc import Mapping
 from pathlib import Path
 from lxml.etree import _Element
 from pathlib import PurePosixPath
 from urllib.parse import unquote, urljoin
 import re
 import unicodedata
-from typing import Any
 
 from bs4 import BeautifulSoup
 from bs4.element import Tag, NavigableString
@@ -17,24 +15,22 @@ from rag_etl.extractors.mooc.utils import (
     clean_text,
     load_root_elem_from_mooc_xml,
     get_filename_via_assets,
-    UntaggedDocuments,
-    pdf_is_slides,
     url_exists,
-    cut_from_flags,
 )
 
 from ragtools.encoding import sanitize_for_filename
-from rag_etl.extractors.markers import split_tag_number_text, split_tag_text
+from rag_etl.extractors.markers import NO_BOT, split_tag_number_text, split_tag_text
 
 import ragtools.mime_types as mt
 
 
 logger = logging.getLogger(__name__)
 
-# A tag as it is written into a page, as in "[MOOC_EXERCICE_6_SOLUTION]".
-# Spaces are allowed because a tag split across two HTML elements gains one
-# when the elements are joined back into text
-TAG_MARKER = re.compile(r"\[[A-Z_0-9][A-Z_0-9 ]*\]")
+# A tag as it is written into a page, as in "[MOOC_EXERCICE_6_SOLUTION]": a
+# capital and at least one more capital, digit or underscore, so citations
+# ("[1]") and single letters ("[A]") are not taken for one. Spaces are allowed
+# because a tag split across two HTML elements gains one when they are joined
+TAG_MARKER = re.compile(r"\[[A-Z][A-Z_0-9 ]+\]")
 
 
 class HtmlParser:
@@ -256,98 +252,21 @@ class HtmlParser:
 
         return inferred_url
 
-    def strip_tag_markers(self, md_text: str, tag_metadata: Mapping[str, Mapping[str, Any]]) -> str:
+    def strip_tag_markers(self, md_text: str) -> str:
         """
         Remove the tag markers a page carries from the text taken out of it.
 
-        A tag says how to file the thing it sits next to; it is not something a
-        student reads, and left in place it is indexed as course content and
-        read back by later stages as if it were a heading. Only markers naming
-        a tag the course declares are removed, so bracketed prose survives.
+        A marker says how to file the thing it sits next to; it is not something
+        a student reads, and left in place it is indexed as course content and
+        read back by later stages as if it were a heading. A marker is capitals,
+        digits and underscores, so citations ([1]) and bracketed prose survive.
         """
 
         for marker in set(TAG_MARKER.findall(md_text)):
-            tag, _, _ = split_tag_number_text(marker.replace(" ", ""))
-            if tag in tag_metadata:
-                md_text = md_text.replace(marker, "")
+            md_text = md_text.replace(marker, "")
 
         # Taking a marker out of a line can leave the space it sat in
-        lines = []
-        for line in md_text.splitlines():
-            lines.append(line.strip())
-
-        return "\n".join(lines).strip()
-
-    def parse_untagged_documents(
-        self,
-        soup: BeautifulSoup,
-        course_path: Path,
-        html_display_name: str,
-        assets_map: dict[str, str],
-        asset_base_url: str | None,
-        tag_metadata: Mapping[str, Mapping[str, Any]],
-        untagged_documents: UntaggedDocuments,
-        vertical_has_video: bool,
-        week: int | None,
-    ) -> list[Resource]:
-        """
-        Build a resource for every document a page links without tagging it.
-        Which tag a PDF gets is decided by looking at its first page, since a
-        slide deck and a reading want to be chunked differently. Anything that
-        is not a PDF cannot be a deck, so it is filed as theory.
-        """
-
-        # The slides of a page that holds a video are already indexed from the
-        # video itself, one frame per slide, each linking to its own moment
-        if vertical_has_video:
-            return []
-
-        mooc_resources: list[Resource] = []
-
-        for linked, link_tag in self.tagged_links(soup, untagged_documents.extensions):
-            # A tagged link is not this method's business
-            if link_tag:
-                continue
-
-            resource_path, resource_url = self.resolve_link(linked, course_path, assets_map, asset_base_url)
-            if not resource_path.exists():
-                logger.warning(f"Missing asset: href={linked!r} resolved={resource_path}")
-                continue
-
-            mime_type = mt.guess_mime_type(resource_path)
-
-            tag = untagged_documents.theory_tag
-            if mime_type == mt.PDF:
-                try:
-                    if pdf_is_slides(resource_path):
-                        tag = untagged_documents.theory_slides_tag
-                except Exception as error:
-                    # A document that cannot be looked at is still worth having,
-                    # so it is filed as theory and the file is named in the log
-                    logger.warning(f"Could not classify {resource_path.name}, filing it as {tag}: {error}")
-
-            tag_dict = tag_metadata.get(tag)
-            if tag_dict is None:
-                logger.info(f"Skipping {linked} because its tag ({tag}) is unexpected")
-                continue
-
-            logger.info(f"Untagged document {resource_path.name} filed as {tag}")
-
-            mooc_resources.append(
-                Resource(
-                    title=self.generate_title_for_found_resource(html_display_name, str(linked)),
-                    url=resource_url,
-                    path=resource_path,
-                    mime_type=mime_type,
-                    type=tag_dict.get("type"),
-                    subtype=tag_dict.get("subtype"),
-                    exercise_parts=tag_dict.get("exercise_parts"),
-                    week=week,
-                    cut=cut_from_flags(tag_dict.get("one_chunk_per_page"), tag_dict.get("one_chunk_per_doc")),
-                )
-            )
-
-        return mooc_resources
+        return "\n".join(line.strip() for line in md_text.splitlines()).strip()
 
     def resolve_link(
         self, linked: str, course_path: Path, assets_map: dict[str, str], asset_base_url: str | None
@@ -378,13 +297,17 @@ class HtmlParser:
         elem_vertical: _Element,
         vertical_display_name: str,
         assets_map: dict[str, str],
-        tag_metadata: Mapping[str, Mapping[str, Any]],
         asset_base_url: str | None = None,
-        untagged_documents: UntaggedDocuments | None = None,
         vertical_has_video: bool = False,
         week: int | None = None,
     ) -> list[Resource]:
-        """Parse a MOOC HTML file"""
+        """Parse a MOOC HTML page: the page itself and the documents it links.
+
+        Only facts are recorded: titles, files, urls, the week and the number
+        a tag marker carries. What the material is (type, subtype, cut) is the
+        judge's to decide, corrected by the project's overrides. A page or a
+        link marked [NO_BOT] is left out.
+        """
 
         mooc_resources: list[Resource] = []
 
@@ -435,30 +358,14 @@ class HtmlParser:
             logger.debug(f"inside html module_tag={module_tag}")
             logger.debug(f"inside html module_number={module_number}")
 
-        # A page carrying no tag the course declares has no metadata of its
-        # own, but the documents it links can still be classified one by one
-        if module_tag not in tag_metadata:
-            if untagged_documents is None:
-                return []
-
-            return self.parse_untagged_documents(
-                soup=soup,
-                course_path=course_path,
-                html_display_name=html_display_name,
-                assets_map=assets_map,
-                asset_base_url=asset_base_url,
-                tag_metadata=tag_metadata,
-                untagged_documents=untagged_documents,
-                vertical_has_video=vertical_has_video,
-                week=week,
-            )
-
-        # The membership check above guarantees the tag is declared
-        tag_dict = tag_metadata[module_tag]
+        # A page marked NO_BOT is not for the bots, nor are the documents it links
+        if NO_BOT.search(mooc_resource_title) or NO_BOT.search(soup.get_text()):
+            logger.info(f"Skipping the page {html_display_name!r} because it is marked NO_BOT")
+            return []
 
         # HTML to MarkDown
         md_text = self.convert_html_text_to_markdown(soup)
-        md_text = self.strip_tag_markers(md_text, tag_metadata)
+        md_text = self.strip_tag_markers(md_text)
 
         # We sanitize the filename of the MarkDown file we create
         markdown_filename = sanitize_for_filename(markdown_filename)
@@ -473,128 +380,51 @@ class HtmlParser:
             repr(markdown_path),
         )
 
-        mime_type = mt.guess_mime_type(str(markdown_path))
-        if module_number is not None:
-            module_number = str(module_number)
-
-        # A page is a wrapper around the files it links, so it can never be
-        # split into exercises. Claiming a subtype whose tag says it is split
-        # would promise a sub_number this resource cannot have, and whoever
-        # reads that metadata would go looking for one. The files it links are
-        # still extracted below
-        if tag_dict.get("split_exercises"):
-            logger.info(f"Not indexing the page {markdown_filename}, only the files it links")
-        else:
-            html_resource: Resource = Resource(
+        mooc_resources.append(
+            Resource(
                 title=mooc_resource_title,
-                url=None,
                 path=markdown_path,
-                mime_type=mime_type,
-                type=tag_dict.get("type"),
-                subtype=tag_dict.get("subtype"),
-                number=module_number,
+                mime_type=mt.guess_mime_type(str(markdown_path)),
+                number=str(module_number) if module_number is not None else None,
                 week=week,
-                cut=cut_from_flags(tag_dict.get("one_chunk_per_page"), tag_dict.get("one_chunk_per_doc")),
             )
-            mooc_resources.append(html_resource)
+        )
 
-        # For all supported linked files, each with the tag of its own paragraph
+        # Note: the documents a page holding a video links are left out on
+        # purpose. They are that video's slide deck, which the video already
+        # brings in slide by slide, each linking to its own moment, so the
+        # deck would be indexed twice. This is a choice about duplicates, not
+        # a fact of the export: revisit it if a course links other material
+        # beside its videos
+        if vertical_has_video:
+            return mooc_resources
+
+        # Every linked document, each with the tag marker of its own paragraph
         for linked, link_tag in self.tagged_links(soup, (".pdf", ".txt", ".zip", ".md")):
-            # A link's own tag wins over the page's, so one page can hold
-            # the exercises and their solutions and name each correctly
-            if link_tag:
-                link_module_tag, link_module_number, _ = split_tag_number_text(f"[{link_tag}]")
-            else:
-                link_module_tag, link_module_number = module_tag, module_number
+            if link_tag and NO_BOT.search(f"[{link_tag}]"):
+                logger.info(f"Skipping {linked} because it is marked NO_BOT")
+                continue
 
-            logger.debug(f"linked={linked}")
+            resource_path, resource_url = self.resolve_link(linked, course_path, assets_map, asset_base_url)
+            if not resource_path.exists():
+                # A resource pointing at a file that is not there only fails
+                # later, in whichever transformer opens it first
+                logger.warning(f"Missing asset: href={linked!r} resolved={resource_path}")
+                continue
 
-            # A page either writes the published url or a path under
-            # /static, and the file itself is read from the export either way
-            linked_url = self.asset_url(linked, asset_base_url)
-            if "block@" in linked:
-                linked = "/static/" + linked.split("block@")[-1]
+            # A link's own marker carries its number, so one page can list
+            # several numbered documents; otherwise the page's number holds
+            _, link_number, _ = split_tag_number_text(f"[{link_tag}]") if link_tag else (None, module_number, None)
 
-            # Some pages encode their links twice, so unquoting is repeated
-            # until it stops changing anything
-            previous = None
-            while linked != previous:
-                previous, linked = linked, unquote(linked)
-
-            linked_path = Path(linked)
-            directory = linked_path.parent
-            filename = linked_path.name
-            filename = sanitize_for_filename(filename)
-
-            relative_path = directory / filename
-
-            # We remove the leading '/' in '/static/'
-            relative_path = relative_path.relative_to("/")
-            logger.debug(f"course_path={course_path}")
-            logger.debug(f"relative_path={relative_path}")
-            logger.debug(f"filename={filename}")
-
-            resource_path = Path(course_path) / relative_path
-
-            resource_path_exists = resource_path.exists()
-            logger.debug(
-                "resource_path exists? %s (%s)",
-                resource_path_exists,
-                repr(resource_path),
-            )
-            if not resource_path_exists:
-                resource_path = get_filename_via_assets(course_path, linked, assets_map)
-                resource_path_exists = resource_path.exists()
-                if not resource_path_exists:
-                    logger.warning("Missing asset: href=%r resolved=%s", linked, resource_path)
-                    # A resource pointing at a file that is not there only
-                    # fails later, in whichever transformer opens it first
-                    continue
-
-                logger.debug(
-                    "resource_path resolved exists? %s (%s)",
-                    resource_path_exists,
-                    repr(resource_path),
+            mooc_resources.append(
+                Resource(
+                    title=self.generate_title_for_found_resource(html_display_name, resource_path.name),
+                    url=resource_url,
+                    path=resource_path,
+                    mime_type=mt.guess_mime_type(resource_path),
+                    number=str(link_number) if link_number is not None else None,
+                    week=week,
                 )
-
-            mime_type = mt.guess_mime_type(resource_path)
-
-            resource_title = self.generate_title_for_found_resource(
-                html_title=html_display_name,
-                found_resource_path=str(linked),
             )
-
-            # We don't extract tags from the PDF files, we use the one
-            # written next to the link, or the page's as a fallback
-            if not link_module_tag:
-                continue
-
-            logger.debug(f"link_module_tag={link_module_tag}")
-            link_tag_dict = tag_metadata.get(link_module_tag)
-
-            # A tag the course does not declare carries no metadata, so the
-            # file is skipped rather than indexed unclassified
-            if link_tag_dict is None:
-                logger.info(f"Skipping {linked} because its tag ({link_module_tag}) is unexpected")
-                continue
-
-            if link_module_number is not None:
-                link_module_number = str(link_module_number)
-
-            # Create resource and append it
-            mooc_resource: Resource = Resource(
-                title=resource_title,
-                url=linked_url,
-                path=resource_path,
-                mime_type=mime_type,
-                type=link_tag_dict.get("type"),
-                subtype=link_tag_dict.get("subtype"),
-                number=link_module_number,
-                week=week,
-                exercise_parts=link_tag_dict.get("exercise_parts"),
-                cut=cut_from_flags(link_tag_dict.get("one_chunk_per_page"), link_tag_dict.get("one_chunk_per_doc")),
-            )
-
-            mooc_resources.append(mooc_resource)
 
         return mooc_resources

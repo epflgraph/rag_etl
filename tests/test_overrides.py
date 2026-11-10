@@ -86,5 +86,18 @@ def test_equal_specificity_first_declared_wins(caplog):
 
 def test_no_match_leaves_resource_untouched():
     r = Resource(title="random talk", type="theory")
-    apply_overrides(r, [Override('title="*[[]HOMEWORK*]*"', type="practice")])
+    assert apply_overrides(r, [Override('title="*[[]HOMEWORK*]*"', type="practice")]) is False
     assert r.type == "theory"
+
+
+def test_excluding_override_wins_and_sets_nothing():
+    r = Resource(title="Week 1 - Raw HTML", type="theory")
+    overrides = [Override('title="*Raw HTML"', exclude=True), Override('title="Week 1*"', type="practice")]
+
+    assert apply_overrides(r, overrides) is True
+    assert r.type == "theory"
+
+
+def test_excluding_override_takes_no_labels():
+    with pytest.raises(ValueError, match="sets nothing else"):
+        Override('title="*Raw HTML"', exclude=True, type="practice")

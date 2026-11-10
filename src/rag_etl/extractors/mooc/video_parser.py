@@ -1,13 +1,11 @@
 from lxml.etree import _Element
-from collections.abc import Mapping
 from pathlib import Path
-from typing import Any
 
 import json
 import logging
 
 from rag_etl.core import Resource
-from rag_etl.extractors.mooc.utils import load_root_elem_from_mooc_xml, cut_from_flags
+from rag_etl.extractors.mooc.utils import load_root_elem_from_mooc_xml
 import ragtools.mime_types as mt
 
 logger = logging.getLogger(__name__)
@@ -65,7 +63,6 @@ class VideoParser:
         course_path: Path,
         elem_vertical: _Element,
         vertical_display_name: str,
-        tag_metadata: Mapping[str, Mapping[str, Any]],
         language: str | None = None,
         week: int | None = None,
     ) -> Resource | None:
@@ -106,15 +103,6 @@ class VideoParser:
         else:
             return None
 
-        tag_name = "MOOC_VIDEO"
-        tag_dict = tag_metadata.get(tag_name)
-
-        # Unlike quizzes, videos are never optional: a course running the video
-        # chain without this tag would silently produce nothing, so it is told
-        # what is missing instead
-        if tag_dict is None:
-            raise ValueError(f"The course declares no {tag_name} tag, so its MOOC videos cannot be classified")
-
         mooc_resource_title = vertical_display_name + " - " + video_title
 
         # The week is inherited by every slide cut from this video, while the
@@ -125,9 +113,6 @@ class VideoParser:
             path=video_xml_path,
             mime_type=mt.MP4,
             week=week,
-            type=tag_dict.get("type"),
-            subtype=tag_dict.get("subtype"),
-            cut=cut_from_flags(tag_dict.get("one_chunk_per_page"), tag_dict.get("one_chunk_per_doc")),
         )
 
         # A transcript found in the export travels beside the video as a caption leaf

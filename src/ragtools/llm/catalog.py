@@ -57,7 +57,6 @@ MODELS: dict[tuple[str, str], RCPClient] = {
 # One entry per concern, chosen from the catalog
 _TASKS: dict[str, tuple[str, str]] = {
     "ocr": ("Qwen/Qwen3.6-35B-A3B", "instruct"),
-    "classify_slides": ("Qwen/Qwen3.6-35B-A3B", "instruct"),
     "judge": ("Qwen/Qwen3.6-35B-A3B", "thinking"),
     "split_exercises": ("Qwen/Qwen3.6-35B-A3B", "thinking"),
     "stitch": ("Qwen/Qwen3.6-35B-A3B", "instruct"),

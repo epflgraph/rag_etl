@@ -99,7 +99,7 @@ class MoodleExtractor(Extractor):
     """
 
     course_id: int
-    mime_types: Sequence[str] = tuple(mt.DEFAULT_MIME_TYPES)
+    mime_types: Sequence[str] = mt.DEFAULT_MIME_TYPES
     sections: int | None = None    # when set, only the first N sections are extracted
 
     def extract(self) -> Resource:

@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 
 from collections.abc import Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 import ragtools.mime_types as mt
 from ragtools.archives import untar_file, unzip_file
@@ -32,7 +32,7 @@ def size_limit(mime_type: str | None) -> int | None:
         return PDF_SIZE_LIMIT
     if mime_type in (mt.JPEG, mt.PNG):
         return IMAGE_SIZE_LIMIT
-    if mime_type is not None and (mime_type.startswith("text/") or mime_type in (mt.IPYNB, mt.SRT)):
+    if mt.is_text(mime_type) or mime_type in (mt.IPYNB, mt.SRT):
         return TEXT_SIZE_LIMIT
     return None
 
@@ -63,7 +63,7 @@ class NormalizeTransformer(Transformer):
     name = "normalize"
 
     cache: Cache
-    mime_types: Sequence[str] = field(default_factory=lambda: list(mt.DEFAULT_MIME_TYPES))
+    mime_types: Sequence[str] = mt.DEFAULT_MIME_TYPES
 
     def transform(self, roots: list[Resource]) -> list[Resource]:
         for root in roots:
@@ -94,7 +94,7 @@ class NormalizeTransformer(Transformer):
 
                 # An archive can hold text saved before UTF-8 was the norm, and
                 # a reader that assumes UTF-8 gets nothing at all out of it
-                if mime_type.startswith("text/"):
+                if mt.is_text(mime_type):
                     ensure_utf8(extracted_file)
 
                 node.add_child(title=extracted_file.name, path=extracted_file, mime_type=mime_type)

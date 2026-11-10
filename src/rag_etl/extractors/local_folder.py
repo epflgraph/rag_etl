@@ -24,7 +24,7 @@ class LocalFolderExtractor(Extractor):
 
     METADATA_FILES = ["from", "until", "url"]
 
-    mime_types: Sequence[str] = tuple(DEFAULT_MIME_TYPES)
+    mime_types: Sequence[str] = DEFAULT_MIME_TYPES
 
     def extract_closest_metadata(self, path, metadata_file):
         # Try to get metadata from current path

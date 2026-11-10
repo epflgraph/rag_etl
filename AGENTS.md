@@ -116,7 +116,12 @@ is the only manual channel:
 ## Steps in detail
 
 **Extractors.** Return everything includable; professors exclude with a
-`NO_BOT` marker (Moodle, file and folder names, MOOC pages).
+`NO_BOT` marker (Moodle, file and folder names, MOOC pages). Those that filter
+by type keep `mime_types.DEFAULT_MIME_TYPES` unless a project passes its own:
+everything the pipeline can read, code, archives and images included. "Text"
+(`mt.is_text`) is wider than `text/*`: code Python files under `application/`
+(Tcl, shell, JavaScript, JSON) is text too. Projects on the server import these
+constants: never remove or rename one, only add.
 
 - *Moodle*: sections → modules → files; availability dates become `from_`/`until`, written in Lausanne's time with its offset (`2026-09-07T08:00:00.000000+02:00`) so they name one instant. Requests time out after 60 s without data. Assignments cannot be fetched (no API access) — accepted.
 - *MOOC* (edX export): course → chapters (weeks, from `first_week_chapter`/`week_count`) → sequentials → verticals → pages, linked documents, quizzes (statement and statement + solution files), videos with their subtitles. Documents linked on a video page are skipped as duplicates of the video's slides. A video naming no source stops the run.

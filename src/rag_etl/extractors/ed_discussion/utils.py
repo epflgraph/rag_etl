@@ -8,9 +8,9 @@ import requests
 
 logger = logging.getLogger(__name__)
 
-STAFF_ROLES = ["admin", "tutor", "staff"]
+STAFF_ROLES = ("admin", "tutor", "staff")
 
-IMAGE_EXTENSIONS = ["", ".jpg", ".jpeg", ".png"]
+IMAGE_EXTENSIONS = ("", ".jpg", ".jpeg", ".png")
 
 
 def get_user_roles(users: list[dict]) -> dict[int, str | None]:

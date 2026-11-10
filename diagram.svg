@@ -1,0 +1,347 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2150 1050" font-family="Helvetica, Arial, sans-serif">
+  <title>rag-etl — the pipeline in one picture</title>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#334155"/>
+    </marker>
+    <style>
+      .title { font-size: 20px; font-weight: bold; fill: #0F172A; }
+      .subtitle { font-size: 12px; fill: #475569; }
+      .h { font-size: 12px; font-weight: bold; fill: #334155; }
+      .b { font-size: 11px; font-weight: bold; fill: #0F172A; }
+      .t { font-size: 10.5px; fill: #0F172A; }
+      .s { font-size: 9.5px; fill: #334155; }
+      .label { font-size: 10px; fill: #334155; paint-order: stroke; stroke: #FFFFFF; stroke-width: 4px; }
+      .line { fill: none; stroke: #334155; stroke-width: 1.4; }
+      .dash { fill: none; stroke: #334155; stroke-width: 1.4; stroke-dasharray: 5 4; }
+      .tree { fill: none; stroke: #94A3B8; stroke-width: 1.2; }
+      .panel { fill: #FFFFFF; stroke: #94A3B8; stroke-width: 1.2; }
+      .source { fill: #EEF2FF; stroke: #6366F1; stroke-width: 1.2; }
+      .step { fill: #ECFDF5; stroke: #059669; stroke-width: 1.2; }
+      .substep { fill: #FFFFFF; stroke: #059669; stroke-width: 1; }
+      .project { fill: #FFFBEB; stroke: #D97706; stroke-width: 1.2; }
+      .output { fill: #EFF6FF; stroke: #2563EB; stroke-width: 1.2; }
+      .mcp { fill: #F5F3FF; stroke: #7C3AED; stroke-width: 1.2; }
+      .service { fill: #F8FAFC; stroke: #64748B; stroke-width: 1.2; }
+      .chunk { fill: #F1F5F9; stroke: #475569; stroke-width: 1.2; }
+      .node { fill: #EFF6FF; stroke: #2563EB; stroke-width: 1.2; }
+    </style>
+  </defs>
+
+  <rect width="2150" height="1050" fill="#FFFFFF"/>
+
+  <text x="30" y="36" class="title">rag-etl — the pipeline in one picture</text>
+  <text x="30" y="56" class="subtitle">one fixed sequence for every project: sources in, an Elasticsearch index and a manifest out</text>
+
+  <!-- Project -->
+  <rect x="290" y="70" width="520" height="70" rx="8" class="project"/>
+  <text x="302" y="89" class="h">Project — one file per project: projects/semester_*/&lt;id&gt;.py</text>
+  <text x="302" y="107" class="t">sources: configured extractors · language · dir under $BASE_PATH</text>
+  <text x="302" y="123" class="t">overrides: where-globs → type, subtype, number, week, cut… or exclude</text>
+  <text x="302" y="136" class="s">professors exclude material themselves with NO_BOT markers</text>
+  <path d="M360,140 L360,166" class="dash" marker-end="url(#arrow)"/>
+  <text x="366" y="157" class="label">sources</text>
+  <path d="M800,140 C900,148 980,150 1000,166" class="dash" marker-end="url(#arrow)"/>
+  <text x="880" y="152" class="label">overrides win over the judge</text>
+
+  <!-- Sources -->
+  <text x="30" y="88" class="h">Sources</text>
+  <rect x="30" y="98" width="210" height="42" rx="8" class="source"/>
+  <text x="135" y="115" class="b" text-anchor="middle">Moodle</text>
+  <text x="135" y="130" class="s" text-anchor="middle">sections, files, release dates</text>
+  <rect x="30" y="148" width="210" height="42" rx="8" class="source"/>
+  <text x="135" y="165" class="b" text-anchor="middle">MOOC export (edX)</text>
+  <text x="135" y="180" class="s" text-anchor="middle">pages, documents, quizzes, videos, weeks</text>
+  <rect x="30" y="198" width="210" height="42" rx="8" class="source"/>
+  <text x="135" y="215" class="b" text-anchor="middle">Mediaspace (Kaltura)</text>
+  <text x="135" y="230" class="s" text-anchor="middle">channels and playlists, captions</text>
+  <rect x="30" y="248" width="210" height="42" rx="8" class="source"/>
+  <text x="135" y="265" class="b" text-anchor="middle">Local folder</text>
+  <text x="135" y="280" class="s" text-anchor="middle">files handed over by hand</text>
+  <rect x="30" y="298" width="210" height="42" rx="8" class="source"/>
+  <text x="135" y="315" class="b" text-anchor="middle">GitLab / GitHub</text>
+  <text x="135" y="330" class="s" text-anchor="middle">a repository or branch url</text>
+  <rect x="30" y="348" width="210" height="42" rx="8" class="source"/>
+  <text x="135" y="365" class="b" text-anchor="middle">Ed Discussion</text>
+  <text x="135" y="380" class="s" text-anchor="middle">answered threads, by category</text>
+  <path d="M240,119 L288,200" class="line" marker-end="url(#arrow)"/>
+  <path d="M240,169 L288,205" class="line" marker-end="url(#arrow)"/>
+  <path d="M240,219 L288,210" class="line" marker-end="url(#arrow)"/>
+  <path d="M240,269 L288,215" class="line" marker-end="url(#arrow)"/>
+  <path d="M240,319 L288,220" class="line" marker-end="url(#arrow)"/>
+  <path d="M240,369 L288,225" class="line" marker-end="url(#arrow)"/>
+
+  <!-- Steps -->
+  <rect x="290" y="168" width="140" height="96" rx="8" class="step"/>
+  <text x="360" y="192" class="b" text-anchor="middle">1 — extract</text>
+  <text x="360" y="212" class="t" text-anchor="middle">one tree per source</text>
+  <text x="360" y="228" class="t" text-anchor="middle">facts only: titles,</text>
+  <text x="360" y="244" class="t" text-anchor="middle">urls, dates, weeks</text>
+
+  <rect x="452" y="168" width="140" height="96" rx="8" class="step"/>
+  <text x="522" y="192" class="b" text-anchor="middle">2 — normalize</text>
+  <text x="522" y="212" class="t" text-anchor="middle">zip, tar.gz → files</text>
+  <text x="522" y="228" class="t" text-anchor="middle">notebooks → md</text>
+  <text x="522" y="244" class="t" text-anchor="middle">oversized files dropped</text>
+
+  <rect x="614" y="168" width="140" height="96" rx="8" class="step"/>
+  <text x="684" y="192" class="b" text-anchor="middle">3 — materialize</text>
+  <text x="684" y="212" class="t" text-anchor="middle">PDF → one page each</text>
+  <text x="684" y="228" class="t" text-anchor="middle">video → one slide each</text>
+  <text x="684" y="244" class="t" text-anchor="middle">all read by a vision model</text>
+
+  <!-- Judge, with its planned inference -->
+  <rect x="776" y="168" width="450" height="96" rx="8" class="step"/>
+  <text x="1001" y="186" class="b" text-anchor="middle">4 — judge: infer metadata and the cut</text>
+  <rect x="786" y="194" width="118" height="62" rx="6" class="substep"/>
+  <text x="845" y="210" class="b" text-anchor="middle">Infer type</text>
+  <text x="845" y="225" class="s" text-anchor="middle">per document: theory,</text>
+  <text x="845" y="237" class="s" text-anchor="middle">practice, exam,</text>
+  <text x="845" y="249" class="s" text-anchor="middle">organization</text>
+  <rect x="922" y="194" width="168" height="62" rx="6" class="substep"/>
+  <text x="1006" y="210" class="b" text-anchor="middle">Infer metadata: LLM as jury</text>
+  <text x="1006" y="225" class="s" text-anchor="middle">per course: subtype, number,</text>
+  <text x="1006" y="237" class="s" text-anchor="middle">has_solution of every practice/</text>
+  <text x="1006" y="249" class="s" text-anchor="middle">exam document; three LLMs vote</text>
+  <rect x="1108" y="194" width="108" height="62" rx="6" class="substep"/>
+  <text x="1162" y="210" class="b" text-anchor="middle">Normalize labels</text>
+  <text x="1162" y="225" class="s" text-anchor="middle">per course:</text>
+  <text x="1162" y="237" class="s" text-anchor="middle">normalize the</text>
+  <text x="1162" y="249" class="s" text-anchor="middle">subtype labels</text>
+  <path d="M904,225 L920,225" class="line" marker-end="url(#arrow)"/>
+  <path d="M1090,225 L1106,225" class="line" marker-end="url(#arrow)"/>
+  <text x="1001" y="278" class="s" text-anchor="middle">today a stub: title cues, inheritance down the tree, default cuts</text>
+
+  <rect x="1248" y="168" width="140" height="96" rx="8" class="step"/>
+  <text x="1318" y="192" class="b" text-anchor="middle">5 — cut</text>
+  <text x="1318" y="212" class="t" text-anchor="middle">whole_document</text>
+  <text x="1318" y="228" class="t" text-anchor="middle">per_child · per_exercise</text>
+  <text x="1318" y="244" class="t" text-anchor="middle">text (by headings)</text>
+
+  <rect x="1410" y="168" width="140" height="96" rx="8" class="step"/>
+  <text x="1480" y="192" class="b" text-anchor="middle">6 — embed</text>
+  <text x="1480" y="212" class="t" text-anchor="middle">Qwen3-Embedding-8B</text>
+  <text x="1480" y="228" class="t" text-anchor="middle">4096 dims, batched</text>
+
+  <rect x="1572" y="168" width="140" height="96" rx="8" class="step"/>
+  <text x="1642" y="192" class="b" text-anchor="middle">7 — load</text>
+  <text x="1642" y="212" class="t" text-anchor="middle">ids assigned</text>
+  <text x="1642" y="228" class="t" text-anchor="middle">manifest always</text>
+  <text x="1642" y="244" class="t" text-anchor="middle">index unless --dry</text>
+
+  <path d="M430,216 L450,216" class="line" marker-end="url(#arrow)"/>
+  <path d="M592,216 L612,216" class="line" marker-end="url(#arrow)"/>
+  <path d="M754,216 L774,216" class="line" marker-end="url(#arrow)"/>
+  <path d="M1226,216 L1246,216" class="line" marker-end="url(#arrow)"/>
+  <path d="M1388,216 L1408,216" class="line" marker-end="url(#arrow)"/>
+  <path d="M1550,216 L1570,216" class="line" marker-end="url(#arrow)"/>
+
+  <!-- Cache -->
+  <path d="M452,322 L452,366 A549,12 0 0 0 1550,366 L1550,322" fill="#F1F5F9" stroke="#475569" stroke-width="1.2"/>
+  <ellipse cx="1001" cy="322" rx="549" ry="12" fill="#F1F5F9" stroke="#475569" stroke-width="1.2"/>
+  <text x="1001" y="350" class="b" text-anchor="middle">content-hash cache — $CACHE_DIR/&lt;project&gt;/&lt;step&gt;/</text>
+  <text x="1001" y="366" class="t" text-anchor="middle">no model or prompt in the key: --refresh &lt;step&gt; or a recipe version bump · PDFs and videos as Merkle trees: one changed page re-reads one page</text>
+  <path d="M522,266 L522,306" class="dash" marker-end="url(#arrow)" marker-start="url(#arrow)"/>
+  <path d="M684,266 L684,306" class="dash" marker-end="url(#arrow)" marker-start="url(#arrow)"/>
+  <path d="M1001,284 L1001,306" class="dash" marker-end="url(#arrow)" marker-start="url(#arrow)"/>
+  <path d="M1318,266 L1318,306" class="dash" marker-end="url(#arrow)" marker-start="url(#arrow)"/>
+  <path d="M1480,266 L1480,306" class="dash" marker-end="url(#arrow)" marker-start="url(#arrow)"/>
+
+  <!-- Outputs -->
+  <path d="M1760,150 L1932,150 L1950,168 L1950,232 L1760,232 Z" class="output"/>
+  <text x="1772" y="170" class="b">manifest</text>
+  <text x="1772" y="186" class="s">output/&lt;ts&gt;_manifest[_dry].json</text>
+  <text x="1772" y="202" class="s">header · summary · trees</text>
+  <text x="1772" y="218" class="s">ids and hashes, no text, no vectors</text>
+
+  <path d="M1760,270 L1760,338 A95,10 0 0 0 1950,338 L1950,270" fill="#EFF6FF" stroke="#2563EB" stroke-width="1.2"/>
+  <ellipse cx="1855" cy="270" rx="95" ry="10" fill="#EFF6FF" stroke="#2563EB" stroke-width="1.2"/>
+  <text x="1855" y="296" class="b" text-anchor="middle">Elasticsearch</text>
+  <text x="1855" y="312" class="s" text-anchor="middle">fresh index per run</text>
+  <text x="1855" y="326" class="s" text-anchor="middle">rag_&lt;id&gt;_&lt;YYYYMMDD&gt;_&lt;HHMMSS&gt;</text>
+  <text x="1855" y="340" class="s" text-anchor="middle">alias rag_&lt;id&gt; moved atomically</text>
+  <text x="1760" y="378" class="label">windows filtered at query time</text>
+
+  <path d="M1712,200 L1758,192" class="line" marker-end="url(#arrow)"/>
+  <path d="M1712,236 C1735,250 1740,290 1758,298" class="line" marker-end="url(#arrow)"/>
+
+  <!-- Consumers -->
+  <rect x="1980" y="70" width="140" height="40" rx="8" class="service"/>
+  <text x="2050" y="87" class="b" text-anchor="middle">Aitor + Javier</text>
+  <text x="2050" y="101" class="s" text-anchor="middle">inspection, debugging</text>
+  <rect x="1980" y="120" width="140" height="40" rx="8" class="service"/>
+  <text x="2050" y="137" class="b" text-anchor="middle">Anna's dashboard</text>
+  <text x="2050" y="151" class="s" text-anchor="middle">reads the manifests</text>
+  <rect x="1980" y="172" width="140" height="44" rx="8" class="service"/>
+  <text x="2050" y="190" class="b" text-anchor="middle">AI tutors</text>
+  <text x="2050" y="205" class="s" text-anchor="middle">course chatbots, Tutor Bot</text>
+  <rect x="1980" y="252" width="140" height="60" rx="8" class="output"/>
+  <text x="2050" y="271" class="b" text-anchor="middle">MCP server</text>
+  <text x="2050" y="286" class="s" text-anchor="middle">tools per project: retrieve</text>
+  <text x="2050" y="298" class="s" text-anchor="middle">and list documents;</text>
+  <text x="2050" y="310" class="s" text-anchor="middle">overview from the manifest</text>
+
+  <path d="M1950,175 L1978,94" class="line" marker-end="url(#arrow)"/>
+  <path d="M1950,185 L1978,142" class="line" marker-end="url(#arrow)"/>
+  <path d="M1950,215 L1978,266" class="line" marker-end="url(#arrow)"/>
+  <path d="M1950,300 L1978,290" class="line" marker-end="url(#arrow)"/>
+  <path d="M2050,252 L2050,218" class="line" marker-end="url(#arrow)"/>
+
+  <!-- MCP server loop: not this repository, the server's own -->
+  <text x="1008" y="462" class="h" fill="#6D28D9">MCP server loop — built in the MCP server's repository, not here</text>
+
+  <rect x="1760" y="472" width="190" height="80" rx="8" class="mcp"/>
+  <text x="1855" y="494" class="b" text-anchor="middle">7 — question generation</text>
+  <text x="1855" y="512" class="t" text-anchor="middle">practice and exam questions</text>
+  <text x="1855" y="528" class="t" text-anchor="middle">from the indexed documents,</text>
+  <text x="1855" y="544" class="t" text-anchor="middle">each with its source document</text>
+
+  <rect x="1572" y="472" width="150" height="80" rx="8" class="mcp"/>
+  <text x="1647" y="494" class="b" text-anchor="middle">8 — tool config generation</text>
+  <text x="1647" y="512" class="t" text-anchor="middle">from the manifest's</text>
+  <text x="1647" y="528" class="t" text-anchor="middle">metadata</text>
+
+  <rect x="1384" y="472" width="150" height="80" rx="8" class="mcp"/>
+  <text x="1459" y="494" class="b" text-anchor="middle">9 — tool config eval</text>
+  <text x="1459" y="512" class="t" text-anchor="middle">the questions' retrieval</text>
+  <text x="1459" y="528" class="t" text-anchor="middle">against the index,</text>
+  <text x="1459" y="544" class="t" text-anchor="middle">through the MCP server</text>
+
+  <rect x="1196" y="472" width="150" height="80" rx="8" class="mcp"/>
+  <text x="1271" y="494" class="b" text-anchor="middle">10 — refinement</text>
+  <text x="1271" y="512" class="t" text-anchor="middle">proposes a tool change</text>
+  <text x="1271" y="528" class="t" text-anchor="middle">from the retrieval</text>
+  <text x="1271" y="544" class="t" text-anchor="middle">performance</text>
+
+  <rect x="1008" y="472" width="150" height="80" rx="8" class="mcp"/>
+  <text x="1083" y="494" class="b" text-anchor="middle">11 — promotion</text>
+  <text x="1083" y="512" class="t" text-anchor="middle">of the refined tool,</text>
+  <text x="1083" y="528" class="t" text-anchor="middle">when it beats the</text>
+  <text x="1083" y="544" class="t" text-anchor="middle">live version</text>
+
+  <path d="M1930,348 L1930,470" class="line" marker-end="url(#arrow)"/>
+  <path d="M1760,512 L1724,512" class="line" marker-end="url(#arrow)"/>
+  <path d="M1572,512 L1536,512" class="line" marker-end="url(#arrow)"/>
+  <path d="M1384,512 L1348,512" class="line" marker-end="url(#arrow)"/>
+  <path d="M1196,512 L1160,512" class="line" marker-end="url(#arrow)"/>
+  <path d="M1271,552 C1300,572 1430,572 1459,554" class="dash" marker-end="url(#arrow)"/>
+  <text x="1365" y="580" class="label" text-anchor="middle">refinement loop, while questions are missed</text>
+  <path d="M1647,472 L1647,456 L2050,456 L2050,314" class="line" marker-end="url(#arrow)"/>
+  <text x="1800" y="452" class="label">publish candidate tool</text>
+  <path d="M1083,552 L1083,596 L2132,596 L2132,282 L2122,282" class="line" marker-end="url(#arrow)"/>
+  <text x="1600" y="600" class="label">publish / update the live tool</text>
+
+  <g transform="translate(0,55)">
+  <!-- Human loop -->
+  <rect x="30" y="570" width="380" height="400" rx="10" class="panel"/>
+  <text x="46" y="596" class="h">The human loop — between runs</text>
+  <rect x="50" y="620" width="340" height="34" rx="8" class="output"/>
+  <text x="220" y="641" class="t" text-anchor="middle">1 · dry run: every step, nothing published</text>
+  <rect x="50" y="700" width="340" height="34" rx="8" class="service"/>
+  <text x="220" y="721" class="t" text-anchor="middle">2 · read the manifest: labels, counts, coverage</text>
+  <rect x="50" y="780" width="340" height="34" rx="8" class="project"/>
+  <text x="220" y="801" class="t" text-anchor="middle">3 · overrides where the labels are off (a line each)</text>
+  <rect x="50" y="860" width="340" height="34" rx="8" class="step"/>
+  <text x="220" y="881" class="t" text-anchor="middle">4 · real run, then the weekly timer</text>
+  <path d="M220,654 L220,698" class="line" marker-end="url(#arrow)"/>
+  <path d="M220,734 L220,778" class="line" marker-end="url(#arrow)"/>
+  <path d="M220,814 L220,858" class="line" marker-end="url(#arrow)"/>
+  <path d="M390,877 C430,840 430,760 392,717" class="dash" marker-end="url(#arrow)"/>
+  <text x="246" y="935" class="s">something off in a manifest → override + rerun;</text>
+  <text x="246" y="950" class="s">the cache makes reruns cheap</text>
+
+  <!-- Resource tree -->
+  <rect x="430" y="570" width="1690" height="400" rx="10" class="panel"/>
+  <text x="446" y="596" class="h">The resource tree — one recursive Resource for every level, one tree per source</text>
+
+  <!-- Moodle -->
+  <rect x="495" y="615" width="130" height="30" rx="6" class="source"/>
+  <text x="560" y="634" class="t" text-anchor="middle">Moodle section</text>
+  <rect x="495" y="680" width="130" height="30" rx="6" class="node"/>
+  <text x="560" y="699" class="t" text-anchor="middle">syllabus.md</text>
+  <rect x="495" y="815" width="130" height="40" rx="20" class="chunk"/>
+  <text x="560" y="832" class="s" text-anchor="middle">whole_document</text>
+  <text x="560" y="845" class="s" text-anchor="middle">one chunk</text>
+  <path d="M560,645 L560,680" class="tree"/>
+  <path d="M560,710 L560,815" class="tree"/>
+
+  <!-- Exercises -->
+  <rect x="795" y="615" width="130" height="30" rx="6" class="node"/>
+  <text x="860" y="634" class="t" text-anchor="middle">series-01.zip</text>
+  <rect x="735" y="680" width="120" height="30" rx="6" class="node"/>
+  <text x="795" y="699" class="t" text-anchor="middle">statements.pdf</text>
+  <rect x="865" y="680" width="120" height="30" rx="6" class="node"/>
+  <text x="925" y="699" class="t" text-anchor="middle">solutions.pdf</text>
+  <rect x="735" y="745" width="120" height="30" rx="6" class="node"/>
+  <text x="795" y="764" class="t" text-anchor="middle">page 1..N</text>
+  <rect x="865" y="745" width="120" height="30" rx="6" class="node"/>
+  <text x="925" y="764" class="t" text-anchor="middle">page 1..N</text>
+  <rect x="735" y="815" width="120" height="40" rx="20" class="chunk"/>
+  <text x="795" y="832" class="s" text-anchor="middle">per_exercise</text>
+  <text x="795" y="845" class="s" text-anchor="middle">parts: statement</text>
+  <rect x="865" y="815" width="120" height="40" rx="20" class="chunk"/>
+  <text x="925" y="832" class="s" text-anchor="middle">per_exercise</text>
+  <text x="925" y="845" class="s" text-anchor="middle">parts: solution</text>
+  <path d="M860,645 L795,680" class="tree"/>
+  <path d="M860,645 L925,680" class="tree"/>
+  <path d="M795,710 L795,745" class="tree"/>
+  <path d="M925,710 L925,745" class="tree"/>
+  <path d="M795,775 L795,815" class="tree"/>
+  <path d="M925,775 L925,815" class="tree"/>
+  <text x="860" y="875" class="s" text-anchor="middle">one chunk per exercise, has_solution</text>
+
+  <!-- Notes -->
+  <rect x="1055" y="615" width="130" height="30" rx="6" class="node"/>
+  <text x="1120" y="634" class="t" text-anchor="middle">theory-notes.pdf</text>
+  <rect x="1055" y="680" width="130" height="30" rx="6" class="node"/>
+  <text x="1120" y="699" class="t" text-anchor="middle">page 1..N</text>
+  <text x="1120" y="728" class="s" text-anchor="middle">rendered, transcribed</text>
+  <rect x="1055" y="815" width="130" height="40" rx="20" class="chunk"/>
+  <text x="1120" y="832" class="s" text-anchor="middle">per_child: a page</text>
+  <text x="1120" y="845" class="s" text-anchor="middle">or text: a section</text>
+  <path d="M1120,645 L1120,680" class="tree"/>
+  <path d="M1120,735 L1120,815" class="tree"/>
+
+  <!-- Video -->
+  <rect x="1335" y="615" width="130" height="30" rx="6" class="node"/>
+  <text x="1400" y="634" class="t" text-anchor="middle">Kaltura video</text>
+  <rect x="1335" y="680" width="130" height="30" rx="6" class="node"/>
+  <text x="1400" y="699" class="t" text-anchor="middle">slide 1..N</text>
+  <text x="1400" y="728" class="s" text-anchor="middle">frame transcribed</text>
+  <text x="1400" y="741" class="s" text-anchor="middle">+ what was said over it</text>
+  <rect x="1335" y="815" width="130" height="40" rx="20" class="chunk"/>
+  <text x="1400" y="832" class="s" text-anchor="middle">per_child: a slide</text>
+  <text x="1400" y="845" class="s" text-anchor="middle">links to its moment</text>
+  <path d="M1400,645 L1400,680" class="tree"/>
+  <path d="M1400,748 L1400,815" class="tree"/>
+
+  <!-- Git -->
+  <rect x="1615" y="615" width="130" height="30" rx="6" class="source"/>
+  <text x="1680" y="634" class="t" text-anchor="middle">git branch</text>
+  <rect x="1615" y="680" width="130" height="30" rx="6" class="node"/>
+  <text x="1680" y="699" class="t" text-anchor="middle">files</text>
+  <rect x="1615" y="815" width="130" height="40" rx="20" class="chunk"/>
+  <text x="1680" y="832" class="s" text-anchor="middle">whole_document</text>
+  <text x="1680" y="845" class="s" text-anchor="middle">size limit</text>
+  <path d="M1680,645 L1680,680" class="tree"/>
+  <path d="M1680,710 L1680,815" class="tree"/>
+
+  <!-- Ed -->
+  <rect x="1895" y="615" width="130" height="30" rx="6" class="source"/>
+  <text x="1960" y="634" class="t" text-anchor="middle">Ed category</text>
+  <rect x="1895" y="680" width="130" height="30" rx="6" class="node"/>
+  <text x="1960" y="699" class="t" text-anchor="middle">subcategory</text>
+  <rect x="1895" y="745" width="130" height="30" rx="6" class="node"/>
+  <text x="1960" y="764" class="t" text-anchor="middle">thread Q&amp;A.md</text>
+  <rect x="1895" y="815" width="130" height="40" rx="20" class="chunk"/>
+  <text x="1960" y="832" class="s" text-anchor="middle">whole_document</text>
+  <text x="1960" y="845" class="s" text-anchor="middle">one per thread</text>
+  <path d="M1960,645 L1960,680" class="tree"/>
+  <path d="M1960,710 L1960,745" class="tree"/>
+  <path d="M1960,775 L1960,815" class="tree"/>
+
+  <text x="446" y="910" class="t">no fixed depth: a zip in a zip, or a file straight to a chunk · nesting is the only relation between resources · deep links travel down as url (#page=N, timestamps)</text>
+  <text x="446" y="930" class="t">indexed per chunk: content, embedding, lineage, url, type, subtype, number, subnumber, week, exercise_parts, has_solution, from, until — nothing project-level</text>
+  <text x="446" y="950" class="t">labels are inherited down the tree unless a node states its own; overrides correct any node; exclude=True drops a subtree</text>
+  </g>
+</svg>

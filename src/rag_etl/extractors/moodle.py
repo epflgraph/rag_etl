@@ -8,6 +8,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
 import requests
 
@@ -18,6 +19,18 @@ from rag_etl.extractors.markers import NO_BOT, split_tag_text
 from ragtools.encoding import sanitize_for_filename
 
 logger = logging.getLogger(__name__)
+
+# Seconds a request may go without receiving data, so a stalled Moodle fails
+# the run loud instead of hanging it; it does not cap a whole download
+REQUEST_TIMEOUT = 60
+
+# EPFL's time: release dates read as the professor set them, offset included
+LOCAL_TIME = ZoneInfo("Europe/Zurich")
+
+
+def local_iso(epoch: int) -> str:
+    """An epoch as an ISO date in Lausanne's time, with its offset, so it names one instant."""
+    return datetime.fromtimestamp(epoch, LOCAL_TIME).isoformat(timespec="microseconds")
 
 
 def display(name: str) -> str:
@@ -64,13 +77,13 @@ def extract_from_and_until(module) -> tuple[str | None, str | None]:
     gt_restrictions = [restriction for restriction in restrictions if restriction.get("d") in (">=", ">")]
     if gt_restrictions:
         gt_epochs = [restriction.get("t") for restriction in gt_restrictions]
-        from_ = datetime.fromtimestamp(max(gt_epochs)).strftime("%Y-%m-%dT%H:%M:%S.%f")
+        from_ = local_iso(max(gt_epochs))
 
     # Until field
     lt_restrictions = [restriction for restriction in restrictions if restriction.get("d") in ("<=", "<")]
     if lt_restrictions:
         lt_epochs = [restriction.get("t") for restriction in lt_restrictions]
-        until = datetime.fromtimestamp(min(lt_epochs)).strftime("%Y-%m-%dT%H:%M:%S.%f")
+        until = local_iso(min(lt_epochs))
 
     return from_, until
 
@@ -106,7 +119,7 @@ class MoodleExtractor(Extractor):
 
         # Retrieve course contents from Moodle API, failing loud when unreachable
         try:
-            sections = requests.get(moodle_endpoint, params=params).json()
+            sections = requests.get(moodle_endpoint, params=params, timeout=REQUEST_TIMEOUT).json()
         except requests.RequestException as error:
             raise SourceUnavailable(f"Moodle API unreachable: {error}") from error
 
@@ -144,8 +157,8 @@ class MoodleExtractor(Extractor):
                 module_title = display(module["name"])
                 from_, until = extract_from_and_until(module)
 
-                # Build module unique name
-                module_unique_name = f"{module['modplural'][:-1]}.{module['name'].replace(':', '')}.{module['id']}"
+                # One folder per module, named by its kind (resource, folder), name and id
+                module_unique_name = f"{module['modname']}.{module['name'].replace(':', '')}.{module['id']}"
                 module_unique_name = sanitize_for_filename(module_unique_name)
                 module_path = self.dir / module_unique_name / "content"
 
@@ -173,7 +186,9 @@ class MoodleExtractor(Extractor):
 
                     # Download file from url, failing loud when it fails
                     try:
-                        response = requests.get(f"{module_contents['fileurl']}&token={os.environ['MOODLE_TOKEN']}")
+                        response = requests.get(
+                            f"{module_contents['fileurl']}&token={os.environ['MOODLE_TOKEN']}", timeout=REQUEST_TIMEOUT
+                        )
                         response.raise_for_status()
                     except requests.RequestException as error:
                         raise SourceUnavailable(

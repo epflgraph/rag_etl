@@ -3,7 +3,6 @@
 import json
 import subprocess
 from copy import deepcopy
-from datetime import datetime
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -106,7 +105,8 @@ def test_moodle_unnamed_section_casts_to_an_empty_title(monkeypatch, tmp_path):
 
 
 def test_moodle_dates(monkeypatch, tmp_path):
-    from_epoch, until_epoch = 1770000000, 1771000000
+    # One date in winter, one in summer: Lausanne's offset changes between them
+    from_epoch, until_epoch = 1770000000, 1788000000
     sections = [
         {
             "name": "Week 1",
@@ -142,8 +142,9 @@ def test_moodle_dates(monkeypatch, tmp_path):
 
     course = MoodleExtractor(course_id=1, dir=tmp_path / "moodle").extract()
     leaf = course.children[0].children[0]
-    assert leaf.from_ == datetime.fromtimestamp(from_epoch).strftime("%Y-%m-%dT%H:%M:%S.%f")
-    assert leaf.until == datetime.fromtimestamp(until_epoch).strftime("%Y-%m-%dT%H:%M:%S.%f")
+    # Lausanne's time, its offset stated: 02:40 UTC in winter, 10:40 UTC in summer
+    assert leaf.from_ == "2026-02-02T03:40:00.000000+01:00"
+    assert leaf.until == "2026-08-29T12:40:00.000000+02:00"
 
 
 def test_moodle_unreachable(monkeypatch, tmp_path):

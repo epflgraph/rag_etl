@@ -118,7 +118,7 @@ is the only manual channel:
 **Extractors.** Return everything includable; professors exclude with a
 `NO_BOT` marker (Moodle, file and folder names, MOOC pages).
 
-- *Moodle*: sections → modules → files; availability dates become `from_`/`until`. Assignments cannot be fetched (no API access) — accepted.
+- *Moodle*: sections → modules → files; availability dates become `from_`/`until`, written in Lausanne's time with its offset (`2026-09-07T08:00:00.000000+02:00`) so they name one instant. Requests time out after 60 s without data. Assignments cannot be fetched (no API access) — accepted.
 - *MOOC* (edX export): course → chapters (weeks, from `first_week_chapter`/`week_count`) → sequentials → verticals → pages, linked documents, quizzes (statement and statement + solution files), videos with their subtitles. Documents linked on a video page are skipped as duplicates of the video's slides. A video naming no source stops the run.
 - *Mediaspace*: a channel or playlist; videos with their Kaltura captions. Videos have no `path`; overrides reach them by `url` (`url="https://mediaspace.epfl.ch/*"`).
 - *Local folder*, *Git* (repo or branch url; everything indexed by default).

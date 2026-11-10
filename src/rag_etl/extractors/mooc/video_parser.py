@@ -88,7 +88,8 @@ class VideoParser:
         # The week is inherited by every slide cut from this video, while the
         # numbering itself is not: a slide is identified by its timestamp
         video = Resource(
-            title=vertical_display_name + " - " + video_title,
+            # Its own name: the unit's is its parent's title already
+            title=video_title,
             url=video_url,
             path=video_xml_path,
             mime_type=mt.MP4,

@@ -257,22 +257,22 @@ def test_mooc_tree(tmp_path):
     sequential = chapter.children[0]
     vertical = sequential.children[0]
 
-    # Every item is extracted: the page, the quiz and the video
+    # Every item is extracted, each under its own name: the page, the quiz and the video
     titles = {leaf.title for leaf in vertical.children}
-    assert titles == {"Vert - Lecture", "Vert - Quiz 1", "Vert - Lecture video"}
+    assert titles == {"Lecture", "Quiz 1", "Lecture video"}
 
     # The leaves carry facts only; what they are, the judge decides
     assert all(leaf.type is None and leaf.subtype is None and leaf.cut is None for leaf in vertical.children)
     assert all(leaf.week == 1 for leaf in vertical.children)
 
     quiz_leaves = sorted(
-        (leaf for leaf in vertical.children if leaf.title == "Vert - Quiz 1"), key=lambda leaf: len(leaf.exercise_parts)
+        (leaf for leaf in vertical.children if leaf.title == "Quiz 1"), key=lambda leaf: len(leaf.exercise_parts)
     )
     # The solutions file renders the whole quiz again, its answers marked
     assert [leaf.exercise_parts for leaf in quiz_leaves] == ["statement", "statement + solution"]
     assert all(leaf.number == "1" for leaf in quiz_leaves)
 
-    video = next(leaf for leaf in vertical.children if leaf.title == "Vert - Lecture video")
+    video = next(leaf for leaf in vertical.children if leaf.title == "Lecture video")
     assert video.mime_type == mt.MP4
     assert video.url == "https://mediaspace.epfl.ch/media/0_abc"
     assert len(video.children) == 1
@@ -287,8 +287,8 @@ def test_mooc_page_marked_no_bot_is_left_out(tmp_path):
     root = MOOCExtractor(dir=base, language="en", first_week_chapter=1, week_count=1).extract()
 
     titles = {leaf.title for leaf in root.walk() if leaf.is_leaf}
-    assert "Vert - Lecture" not in titles
-    assert "Vert - Quiz 1" in titles
+    assert "Lecture" not in titles
+    assert "Quiz 1" in titles
 
 
 def test_mediaspace(monkeypatch, tmp_path):

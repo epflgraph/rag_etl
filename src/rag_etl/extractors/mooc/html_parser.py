@@ -160,13 +160,6 @@ class HtmlParser:
         for child in node.children:
             self.walk(child, out)
 
-    def generate_title_for_found_resource(self, html_title: str, found_resource_path: str) -> str:
-        """Generate resource title making use of its parent title."""
-
-        normalized_path = unicodedata.normalize("NFC", found_resource_path)
-        resource_title = html_title + " " + Path(normalized_path).name
-        return resource_title
-
     def tagged_links(self, soup: BeautifulSoup, extensions: tuple[str, ...]) -> list[tuple[str, str | None]]:
         """
         Return every document linked from the page, with the tag written beside it.
@@ -300,16 +293,12 @@ class HtmlParser:
             return []
 
         html_display_name = root_html.get("display_name", "")
-        mooc_resource_title = vertical_display_name + " - " + html_display_name
-        logger.debug(f"mooc_resource_title={mooc_resource_title}")
 
-        # Extract tag
-        module_number = None
-
-        module_tag, module_number, mooc_resource_title = split_tag_number_text(mooc_resource_title)
-        logger.debug(f"title module_tag={module_tag}")
-        logger.debug(f"title module_number={module_number}")
-        logger.debug(f"title mooc_resource_title={mooc_resource_title}")
+        # The page is titled by its own name; its unit's name is its parent's
+        # title already. A marker, though, may sit in either name, so the two
+        # are read together for it
+        _, _, page_title = split_tag_number_text(html_display_name)
+        module_tag, module_number, names = split_tag_number_text(vertical_display_name + " - " + html_display_name)
 
         # Extract text from HTML
         try:
@@ -333,7 +322,7 @@ class HtmlParser:
             logger.debug(f"inside html module_number={module_number}")
 
         # A page marked NO_BOT is not for the bots, nor are the documents it links
-        if NO_BOT.search(mooc_resource_title) or NO_BOT.search(soup.get_text()):
+        if NO_BOT.search(names) or NO_BOT.search(soup.get_text()):
             logger.info(f"Skipping the page {html_display_name!r} because it is marked NO_BOT")
             return []
 
@@ -353,7 +342,7 @@ class HtmlParser:
 
         mooc_resources.append(
             Resource(
-                title=mooc_resource_title,
+                title=page_title,
                 path=markdown_path,
                 mime_type=mt.guess_mime_type(str(markdown_path)),
                 number=str(module_number) if module_number is not None else None,
@@ -389,7 +378,7 @@ class HtmlParser:
 
             mooc_resources.append(
                 Resource(
-                    title=self.generate_title_for_found_resource(html_display_name, resource_path.name),
+                    title=unicodedata.normalize("NFC", resource_path.name),
                     url=resource_url,
                     path=resource_path,
                     mime_type=mt.guess_mime_type(resource_path),

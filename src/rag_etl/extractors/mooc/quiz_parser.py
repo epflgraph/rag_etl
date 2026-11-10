@@ -75,6 +75,9 @@ class QuizParser:
             # Unsupported quiz type
             return []
 
+        # The quiz is titled by its own name (the unit's is its parent's title
+        # already), while its number may sit in either
+        quiz_title = clean_text(root.get("display_name", ""))
         resource_title = f"{vertical_display_name} - {quiz_data.display_name}".strip(" -")
 
         out_dir = export.dir / "quiz"
@@ -95,7 +98,7 @@ class QuizParser:
 
         # Quiz: the statement alone
         quiz_res: Resource = Resource(
-            title=resource_title,
+            title=quiz_title,
             path=quiz_md_path,
             mime_type=mt.guess_mime_type(str(quiz_md_path)),
             exercise_parts="statement",
@@ -106,7 +109,7 @@ class QuizParser:
 
         # Quiz with solution: the whole quiz again, its answers marked
         quiz_sol_res: Resource = Resource(
-            title=resource_title,
+            title=quiz_title,
             path=quiz_sol_md_path,
             mime_type=mt.guess_mime_type(str(quiz_sol_md_path)),
             exercise_parts="statement + solution",

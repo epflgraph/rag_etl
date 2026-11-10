@@ -205,7 +205,7 @@ by a `--refresh`.
 
 - **The judge's inference** (Javier). It should also absorb what Ed Discussion's former LLM jury did: matching a thread to the document it is about, and its dates and week.
 - **YouTube captions** are never indexed (SRT is not text and YouTube videos skip the video path).
-- **MOOC**: item titles are prefixed by their unit ("vertical - item"); HTML → markdown and edX quiz rendering belong in `ragtools`.
+- **MOOC**: HTML → markdown and edX quiz rendering belong in `ragtools`.
 - **Ed Discussion**: images in posts are transcribed during extraction; that belongs in materialize.
 - **Consumers**: GraphAI's `/rag/retrieve` must embed queries with Qwen3-Embedding-8B and query `content`.
 - **Operations**: CI (ruff, pytest) is missing; the weekly timers are not wired; MICRO-303 is the pilot, other projects follow one by one; delete `legacy/` after the cutover.

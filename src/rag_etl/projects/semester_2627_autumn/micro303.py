@@ -12,7 +12,8 @@ MICRO303 = Project(
     id="micro303",
     language="en",
     dir=Path("MICRO303"),
-    # What the MOOC export's tags used to say, until the judge infers it
+    # The MOOC's labels until the judge infers them: what its tags used to say,
+    # except that videos are now cut per slide rather than whole
     overrides=(
         # The quizzes the extractor writes out, statement and solutions alike
         Override('path="*/mooc/*" AND filename="*.quiz*.md"', type="practice", subtype="mooc_quiz", cut="whole_document"),

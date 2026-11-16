@@ -112,12 +112,13 @@ class ElasticsearchLoader(Loader):
             yield {"_op_type": "index", "_index": self.index, "_id": chunk.id, "_source": self._source(chunk)}
 
     def _source(self, node: Resource) -> dict[str, Any]:
-        """One document: its id, content, vector, breadcrumb lineage, deep link and metadata."""
+        """One document: its id, content, vector, title, ancestors' breadcrumb, deep link and metadata."""
         document: dict[str, Any] = {
             "id": node.id,
             "content": node.text,
             "embedding": node.embedding,
-            "lineage": [ancestor.title or ancestor.url or "unknown" for ancestor in node.lineage()],
+            "title": node.title,
+            "lineage": [ancestor.title or ancestor.url or "unknown" for ancestor in node.lineage()[:-1]],
             "url": node.url,
             **node.metadata,
         }

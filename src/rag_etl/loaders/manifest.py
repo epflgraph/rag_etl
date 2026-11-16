@@ -29,7 +29,7 @@ from rag_etl.loaders.elasticsearch import alias_name, index_name
 logger = logging.getLogger(__name__)
 
 # Levels of the summary drill-down, outermost first
-SUMMARY_LEVELS = ("source", "type", "subtype", "number", "subnumber", "parts")
+SUMMARY_LEVELS = ("source", "type", "subtype", "number", "subnumber", "exercise_parts")
 
 # Coverage fields a summary group reports: a with_X count of the chunks
 # carrying one, plus X itself when every chunk in the group shares one value
@@ -43,19 +43,23 @@ def _pipeline_version() -> str:
         return "unknown"
 
 
-def _node(node: Resource) -> dict[str, Any]:
-    """One tree node: metadata and a content-hash pointer, no text, no vector."""
+def _node(node: Resource, project_dir: Path) -> dict[str, Any]:
+    """One tree node: metadata and a content-hash pointer, no text, no vector.
+
+    The path is relative to the project folder, so it reads the same on
+    every machine and shows no local layout.
+    """
     return {
         "id": node.id,
         "title": node.title,
         "url": node.url,
-        "path": str(node.path) if node.path is not None else None,
+        "path": str(node.path.relative_to(project_dir, walk_up=True)) if node.path is not None else None,
         "mime_type": node.mime_type,
         "cut": node.cut,
         **node.metadata,
         "chunk": node.is_chunk,
         "content_hash": node.content_hash,
-        "children": [_node(child) for child in node.children],
+        "children": [_node(child, project_dir) for child in node.children],
     }
 
 
@@ -98,9 +102,9 @@ def _summary(rows: list[dict[str, Any]], keys: tuple[str, ...]) -> dict[str, Any
 
 @dataclass(frozen=True)
 class ManifestLoader(Loader):
-    """Writes one manifest per run into the directory it is given."""
+    """Writes one manifest per run into the project folder's output/."""
 
-    path: Path
+    project_dir: Path
     project: str
     timestamp: datetime
     dry: bool
@@ -124,7 +128,7 @@ class ManifestLoader(Loader):
                         "subtype": chunk.subtype,
                         "number": chunk.number,
                         "subnumber": chunk.subnumber,
-                        "parts": chunk.exercise_parts,
+                        "exercise_parts": chunk.exercise_parts,
                         "url": chunk.url,
                         "week": chunk.week,
                         "from": chunk.from_,
@@ -134,13 +138,14 @@ class ManifestLoader(Loader):
                 ],
                 SUMMARY_LEVELS,
             ),
-            "tree": [_node(root) for root in roots],
+            "tree": [_node(root, self.project_dir) for root in roots],
         }
 
-        self.path.mkdir(parents=True, exist_ok=True)
+        output = self.project_dir / "output"
+        output.mkdir(parents=True, exist_ok=True)
         name = f"{self.timestamp:%Y%m%dT%H%M%S}_manifest"
         if self.dry:
             name += "_dry"
-        path = self.path / f"{name}.json"
+        path = output / f"{name}.json"
         path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
         logger.info(f"Manifest written: {path}")

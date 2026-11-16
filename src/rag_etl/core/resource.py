@@ -162,10 +162,10 @@ def iter_chunks(roots: Iterable[Resource]) -> Iterator[Resource]:
 def assign_ids(roots: Iterable[Resource]) -> None:
     """Give every chunk its identifier, once the trees are final.
 
-    The id is the chunk's position among all the run's chunks plus its
-    content hash: unique within the run even for chunks of equal content,
-    which are kept apart rather than deduplicated. It is not stable across
-    runs, nor meant to be. Containers keep no id.
+    The id is the chunk's position among all the run's chunks: unique
+    within the run even for chunks of equal content, which are kept apart
+    rather than deduplicated. It is not stable across runs, nor meant to
+    be. Containers keep no id.
     """
     for number, chunk in enumerate(iter_chunks(roots), start=1):
-        chunk.id = f"{number}-{chunk.content_hash}"
+        chunk.id = str(number)

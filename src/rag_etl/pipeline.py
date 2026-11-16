@@ -110,7 +110,7 @@ def load(roots: list[Resource], project: Project, dry: bool = False) -> None:
     now = datetime.now(UTC)
 
     loaders: list[Loader] = [
-        ManifestLoader(project_dir(project) / "output", project=project.id, timestamp=now, dry=dry)
+        ManifestLoader(project_dir(project), project=project.id, timestamp=now, dry=dry)
     ]
     if not dry:
         loaders.append(ElasticsearchLoader(project=project.id, timestamp=now, language=project.language))

@@ -75,13 +75,15 @@ def test_documents_are_built_from_chunks(monkeypatch):
     [compute, solution, hello] = sink
     assert compute["_source"]["content"] == "compute"
     assert compute["_source"]["embedding"] == [1.0]
-    assert compute["_id"] == f"1-{a.content_hash}"
+    assert compute["_id"] == "1"
     # The document's own id is the identifier; Elasticsearch's _id mirrors it
     assert compute["_source"]["id"] == compute["_id"] == a.id
     assert compute["_index"] == "rag_demo_20261019_153045"
 
     assert compute["_source"]["url"] == "https://moodle/3"
-    assert compute["_source"]["lineage"] == ["Exercise set 3", "Exercise 2a"]
+    # The chunk's own title is its field; the lineage names its ancestors only
+    assert compute["_source"]["title"] == "Exercise 2a"
+    assert compute["_source"]["lineage"] == ["Exercise set 3"]
     assert compute["_source"]["type"] == "practice"
     assert compute["_source"]["number"] == "2"
     assert compute["_source"]["subnumber"] == "a"
@@ -94,7 +96,8 @@ def test_documents_are_built_from_chunks(monkeypatch):
     assert solution["_source"]["exercise_parts"] == "solution"
 
     assert "url" not in hello["_source"]
-    assert hello["_source"]["lineage"] == ["Lecture 5", "intro"]
+    assert hello["_source"]["title"] == "intro"
+    assert hello["_source"]["lineage"] == ["Lecture 5"]
 
 
 def test_first_run_creates_refreshes_and_adds_the_alias(monkeypatch):
@@ -171,8 +174,7 @@ def test_duplicate_content_is_kept_with_distinct_ids(monkeypatch):
 
     assert len(sink) == 2
     assert sink[0]["_id"] != sink[1]["_id"]
-    assert sink[0]["_source"]["lineage"] == ["root", "first"]
-    assert sink[1]["_source"]["lineage"] == ["root", "second"]
+    assert [doc["_source"]["title"] for doc in sink] == ["first", "second"]
 
 
 def test_unembedded_chunk_fails_before_any_index_exists(monkeypatch):

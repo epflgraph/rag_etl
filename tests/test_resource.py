@@ -141,7 +141,7 @@ def test_assign_ids_numbers_the_chunks_across_trees():
 
     assign_ids([first, second])
 
-    assert (a.id, b.id) == (f"1-{hash_text('same')}", f"2-{hash_text('same')}")
+    assert (a.id, b.id) == ("1", "2")
     assert first.id is None and container.id is None
 
 

@@ -39,17 +39,16 @@ def tree() -> list[Resource]:
     return [pdf, video]
 
 
-def write(directory: Path, roots: list[Resource], dry: bool = False) -> dict:
-    ManifestLoader(directory, project="demo", timestamp=TIMESTAMP, dry=dry).load(roots)
-    [path] = directory.glob("*.json")
+def write(project_dir: Path, roots: list[Resource], dry: bool = False) -> dict:
+    ManifestLoader(project_dir, project="demo", timestamp=TIMESTAMP, dry=dry).load(roots)
+    [path] = (project_dir / "output").glob("*.json")
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def test_manifest_lands_where_told_with_the_timestamp_name(tmp_path):
-    directory = tmp_path / "output"
-    manifest = write(directory, tree())
+def test_manifest_lands_in_output_with_the_timestamp_name(tmp_path):
+    manifest = write(tmp_path, tree())
 
-    assert (directory / "20261019T153045_manifest.json").exists()
+    assert (tmp_path / "output" / "20261019T153045_manifest.json").exists()
     header = manifest["header"]
     assert header["project"] == "demo"
     assert header["dry"] is False
@@ -60,7 +59,7 @@ def test_manifest_lands_where_told_with_the_timestamp_name(tmp_path):
 
 
 def test_tree_is_metadata_only(tmp_path):
-    manifest = write(tmp_path / "output", tree())
+    manifest = write(tmp_path,tree())
 
     def walk(node):
         assert "text" not in node
@@ -82,16 +81,16 @@ def test_tree_names_each_chunk_by_its_document_id(tmp_path):
     roots = tree()
     assign_ids(roots)
 
-    manifest = write(tmp_path / "output", roots)
+    manifest = write(tmp_path,roots)
 
     [pdf, video] = manifest["tree"]
     assert pdf["id"] is None
     assert [child["id"] for child in pdf["children"]] == [chunk.id for chunk in roots[0].children]
-    assert video["children"][0]["id"].startswith("3-")
+    assert video["children"][0]["id"] == "3"
 
 
 def test_summary_drills_down_per_source_type_subtype_number_subnumber_parts(tmp_path):
-    manifest = write(tmp_path / "output", tree())
+    manifest = write(tmp_path,tree())
     summary = manifest["summary"]
 
     assert summary["chunks"] == 3
@@ -119,11 +118,11 @@ def test_summary_drills_down_per_source_type_subtype_number_subnumber_parts(tmp_
     assert pdf_group["number"] == "2"
     [sub_a, sub_b] = pdf_group["counts"]
     assert sub_a["subnumber"] == "a"
-    assert sub_a["parts"] == "statement"
+    assert sub_a["exercise_parts"] == "statement"
     assert sub_a["chunks"] == 1
     assert "counts" not in sub_a
     assert sub_b["subnumber"] == "b"
-    assert sub_b["parts"] == "solution"
+    assert sub_b["exercise_parts"] == "solution"
     assert "counts" not in sub_b
 
     assert video_group["source"] == "Lecture 5"
@@ -136,7 +135,7 @@ def test_summary_drills_down_per_source_type_subtype_number_subnumber_parts(tmp_
     assert video_group["subtype"] == "lecture"
     assert video_group["number"] is None
     assert video_group["subnumber"] is None
-    assert video_group["parts"] is None
+    assert video_group["exercise_parts"] is None
     assert "counts" not in video_group
 
 
@@ -146,7 +145,7 @@ def test_summary_states_values_only_when_unanimous(tmp_path):
     root.add_child(title="two", from_="2026-10-07", text="b")
     root.add_child(title="three", text="c")
 
-    manifest = write(tmp_path / "output", [root])
+    manifest = write(tmp_path,[root])
     group = manifest["summary"]
 
     assert group["chunks"] == 3
@@ -167,7 +166,7 @@ def test_unlabelled_chunks_land_in_null_buckets(tmp_path):
     root = Resource(title="stray")
     root.add_child(title="chunk", text="body")
 
-    manifest = write(tmp_path / "output", [root])
+    manifest = write(tmp_path,[root])
 
     summary = manifest["summary"]
     assert summary["source"] == "stray"
@@ -175,9 +174,23 @@ def test_unlabelled_chunks_land_in_null_buckets(tmp_path):
     assert "counts" not in summary
 
 
-def test_dry_manifest_is_named_and_stamped(tmp_path):
-    directory = tmp_path / "output"
-    manifest = write(directory, tree(), dry=True)
+def test_tree_paths_are_relative_to_the_project_folder(tmp_path):
+    root = Resource(title="folder", path=tmp_path / "local")
+    root.add_child(title="page", path=tmp_path / "work" / "abc" / "page_1.md", text="body")
+    root.add_child(title="elsewhere", path=tmp_path.parent / "shared.md", text="other")
+    root.add_child(title="no file", path=None, text="third")
 
-    assert (directory / "20261019T153045_manifest_dry.json").exists()
+    [folder] = write(tmp_path, [root])["tree"]
+
+    assert folder["path"] == "local"
+    [page, elsewhere, no_file] = folder["children"]
+    assert page["path"] == "work/abc/page_1.md"
+    assert elsewhere["path"] == "../shared.md"
+    assert no_file["path"] is None
+
+
+def test_dry_manifest_is_named_and_stamped(tmp_path):
+    manifest = write(tmp_path, tree(), dry=True)
+
+    assert (tmp_path / "output" / "20261019T153045_manifest_dry.json").exists()
     assert manifest["header"]["dry"] is True

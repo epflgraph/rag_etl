@@ -19,6 +19,7 @@
       "content":     { "type": "text", "analyzer": "base_en" },
       "embedding":   { "type": "dense_vector", "dims": 4096, "similarity": "dot_product",
                        "index": true, "index_options": { "type": "int8_hnsw" } },
+      "title":       { "type": "keyword" },
       "lineage":     { "type": "keyword" },
       "url":         { "type": "keyword" },
       "type":        { "type": "keyword" },

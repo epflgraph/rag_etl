@@ -95,7 +95,7 @@ is "no children", `is_chunk` is "has text").
 - **`add_child(**fields)`** builds a child as a copy of its parent, naming only what differs: a page keeps its PDF's url and labels. `add_child(child)` attaches a subtree as it is. `detach()` removes a node and its subtree.
 - **Deep links travel as `url`**, copied down and refined (a page's `#page=N`, a slide's timestamp). Loaders read `node.url`; nothing re-resolves lineage.
 - **Nesting is the only relation** between resources. Links between trees (a video and its deck) are not modelled.
-- **Chunk ids** are assigned once the trees are final (`assign_ids`, at load): `<position in the run>-<content hash>`, unique within a run, not stable across runs. Equal content under different metadata stays two chunks: courses own their duplicates.
+- **Chunk ids** are assigned once the trees are final (`assign_ids`, at load): its position in the run (`"19"`), unique within a run, not stable across runs. Equal content under different metadata stays two chunks: courses own their duplicates.
 
 ## Projects and overrides
 
@@ -172,12 +172,12 @@ hash, written to `Resource.embedding`.
 
 **Load.**
 
-- *Manifest* (always): `output/<timestamp>_manifest[_dry].json`, for people (inspection, Anna's dashboard, the MCP server's overview); nothing in the pipeline reads it. Header (project, dry, timestamp, index, alias, version), a summary drilling down source → type → subtype → number → subnumber → parts with per-group coverage of url/week/from/until (a level a group does not split is stated on the group, null included, instead of nesting a single subgroup), and the trees without text or vectors (content hashes and chunk ids instead).
+- *Manifest* (always): `output/<timestamp>_manifest[_dry].json`, for people (inspection, Anna's dashboard, the MCP server's overview); nothing in the pipeline reads it. Header (project, dry, timestamp, index, alias, version), a summary drilling down source → type → subtype → number → subnumber → exercise_parts with per-group coverage of url/week/from/until (a level a group does not split is stated on the group, null included, instead of nesting a single subgroup), and the trees without text or vectors (content hashes and chunk ids instead; paths relative to the project folder).
 - *Elasticsearch* (not on dry runs): create `rag_<id>_<YYYYMMDD>_<HHMMSS>` from `index_settings.json` (content analyzer set per language), bulk-load, refresh, then one atomic alias update moves `rag_<id>`. The alias's index is never deleted; older indices stay for rollback. TLS verified with `ES_CAFILE`.
 
-The document schema (14 fields), the contract with the consumers: `id`,
-`content`, `embedding` (dense_vector 4096, dot_product, int8_hnsw), `lineage`
-(titles root → chunk), `url` (own or nearest ancestor's, absent if none),
+The document schema (15 fields), the contract with the consumers: `id`,
+`content`, `embedding` (dense_vector 4096, dot_product, int8_hnsw), `title`
+(the chunk's own), `lineage` (its ancestors' titles, root → parent), `url` (own or nearest ancestor's, absent if none),
 `type`, `subtype`, `number`, `subnumber`, `week`, `exercise_parts`,
 `has_solution`, `from`, `until`. Single language, no translation. Nothing
 project-level per chunk: the project travels in the index name. Release

@@ -8,6 +8,7 @@ FIELDS = {
     "id",
     "content",
     "embedding",
+    "title",
     "lineage",
     "url",
     "type",

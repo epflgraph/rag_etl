@@ -2,8 +2,9 @@
 
 The manifest records what a run produced without carrying content: the
 header states run identity, the summary drills down per source, type,
-subtype, number, subnumber and exercise parts — per group counting how
-many chunks carry a url, week or release dates, and stating those values
+subtype, number, subnumber and exercise parts — levels a group does not
+split are folded into it, nulls stated, and per group it counts how
+many chunks carry a url, week or release dates, stating those values
 when the whole group shares one — and the tree mirrors the resource
 trees with metadata and content-hash pointers only — text and vectors
 are recovered from the cache by hash. Nothing reads a manifest; it is
@@ -59,15 +60,22 @@ def _node(node: Resource) -> dict[str, Any]:
 
 
 def _summary(rows: list[dict[str, Any]], keys: tuple[str, ...]) -> dict[str, Any]:
-    """One summary node: coverage counts, unanimous values, drill-down.
+    """One summary node: shared levels, coverage counts, unanimous values, drill-down.
 
-    Each coverage field reports how many chunks in the group carry a
-    non-null value, and the value itself only when they all share one.
-    The drill-down groups rows by the next key — None sorts last, so
-    manifests diff cleanly — and recurses; the last level, where no keys
-    remain, carries no counts key.
+    Levels every row shares, null included, are stated on the node itself:
+    a single subgroup would only repeat the node's counts. Each coverage
+    field reports how many chunks in the group carry a non-null value, and
+    the value itself only when they all share one. The drill-down groups
+    rows by the first level that splits them — None sorts last, so
+    manifests diff cleanly — and recurses; a node no level splits carries
+    no counts key.
     """
-    node: dict[str, Any] = {"chunks": len(rows)}
+    node: dict[str, Any] = {}
+    while keys and len(values := {row[keys[0]] for row in rows}) == 1:
+        node[keys[0]] = values.pop()
+        keys = keys[1:]
+
+    node["chunks"] = len(rows)
     for name in COVERAGE_FIELDS:
         node[f"with_{name}"] = sum(1 for row in rows if row[name] is not None)
         values = {row[name] for row in rows}
@@ -80,8 +88,9 @@ def _summary(rows: list[dict[str, Any]], keys: tuple[str, ...]) -> dict[str, Any
     for row in rows:
         grouped.setdefault(row[keys[0]], []).append(row)
 
+    # each group states its own value for the splitting level as a shared level
     node["counts"] = [
-        {keys[0]: value, **_summary(grouped[value], keys[1:])}
+        _summary(grouped[value], keys)
         for value in sorted(grouped, key=lambda v: (v is not None, v))
     ]
     return node

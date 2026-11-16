@@ -172,7 +172,7 @@ hash, written to `Resource.embedding`.
 
 **Load.**
 
-- *Manifest* (always): `output/<timestamp>_manifest[_dry].json`, for people (inspection, Anna's dashboard, the MCP server's overview); nothing in the pipeline reads it. Header (project, dry, timestamp, index, alias, version), a summary drilling down source → type → subtype → number → subnumber → parts with per-group coverage of url/week/from/until, and the trees without text or vectors (content hashes and chunk ids instead).
+- *Manifest* (always): `output/<timestamp>_manifest[_dry].json`, for people (inspection, Anna's dashboard, the MCP server's overview); nothing in the pipeline reads it. Header (project, dry, timestamp, index, alias, version), a summary drilling down source → type → subtype → number → subnumber → parts with per-group coverage of url/week/from/until (a level a group does not split is stated on the group, null included, instead of nesting a single subgroup), and the trees without text or vectors (content hashes and chunk ids instead).
 - *Elasticsearch* (not on dry runs): create `rag_<id>_<YYYYMMDD>_<HHMMSS>` from `index_settings.json` (content analyzer set per language), bulk-load, refresh, then one atomic alias update moves `rag_<id>`. The alias's index is never deleted; older indices stay for rollback. TLS verified with `ES_CAFILE`.
 
 The document schema (14 fields), the contract with the consumers: `id`,

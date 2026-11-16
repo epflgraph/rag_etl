@@ -113,40 +113,31 @@ def test_summary_drills_down_per_source_type_subtype_number_subnumber_parts(tmp_
     assert pdf_group["from"] == "2026-10-06"
     assert pdf_group["until"] == "2026-10-13"
 
-    [practice] = pdf_group["counts"]
-    assert practice["type"] == "practice"
-    [homework] = practice["counts"]
-    assert homework["subtype"] == "homework"
-    [number_two] = homework["counts"]
-    assert number_two["number"] == "2"
-    assert number_two["chunks"] == 2
-    [sub_a, sub_b] = number_two["counts"]
+    # levels the group does not split are stated on it; the drill-down starts where it splits
+    assert pdf_group["type"] == "practice"
+    assert pdf_group["subtype"] == "homework"
+    assert pdf_group["number"] == "2"
+    [sub_a, sub_b] = pdf_group["counts"]
     assert sub_a["subnumber"] == "a"
+    assert sub_a["parts"] == "statement"
+    assert sub_a["chunks"] == 1
+    assert "counts" not in sub_a
     assert sub_b["subnumber"] == "b"
-    [statement] = sub_a["counts"]
-    assert statement["parts"] == "statement"
-    # the last level carries no counts key
-    assert "counts" not in statement
-    [solution] = sub_b["counts"]
-    assert solution["parts"] == "solution"
-    assert "counts" not in solution
+    assert sub_b["parts"] == "solution"
+    assert "counts" not in sub_b
 
     assert video_group["source"] == "Lecture 5"
     assert video_group["chunks"] == 1
     assert video_group["with_url"] == 0
     assert video_group["week"] == 5
     assert video_group["with_from"] == 0
-    # unlabelled buckets stay visible, all the way down
-    [theory] = video_group["counts"]
-    assert theory["type"] == "theory"
-    [lecture] = theory["counts"]
-    [number_none] = lecture["counts"]
-    assert number_none["number"] is None
-    [subnumber_none] = number_none["counts"]
-    [parts_none] = subnumber_none["counts"]
-    assert parts_none["parts"] is None
-    assert parts_none["chunks"] == 1
-    assert "counts" not in parts_none
+    # unset levels are stated as null, not left out
+    assert video_group["type"] == "theory"
+    assert video_group["subtype"] == "lecture"
+    assert video_group["number"] is None
+    assert video_group["subnumber"] is None
+    assert video_group["parts"] is None
+    assert "counts" not in video_group
 
 
 def test_summary_states_values_only_when_unanimous(tmp_path):
@@ -156,7 +147,7 @@ def test_summary_states_values_only_when_unanimous(tmp_path):
     root.add_child(title="three", text="c")
 
     manifest = write(tmp_path / "output", [root])
-    [group] = manifest["summary"]["counts"]
+    group = manifest["summary"]
 
     assert group["chunks"] == 3
     # unanimous values are stated
@@ -178,10 +169,10 @@ def test_unlabelled_chunks_land_in_null_buckets(tmp_path):
 
     manifest = write(tmp_path / "output", [root])
 
-    [group] = manifest["summary"]["counts"]
-    assert group["source"] == "stray"
-    [type_group] = group["counts"]
-    assert type_group["type"] is None
+    summary = manifest["summary"]
+    assert summary["source"] == "stray"
+    assert summary["type"] is None
+    assert "counts" not in summary
 
 
 def test_dry_manifest_is_named_and_stamped(tmp_path):

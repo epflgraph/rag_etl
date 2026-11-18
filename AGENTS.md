@@ -212,6 +212,7 @@ by a `--refresh`.
 ## Open work
 
 - **The judge's inference** (Javier). It should also absorb what Ed Discussion's former LLM jury did: matching a thread to the document it is about, and its dates and week.
+- **Links in MOOC pages** (Javier to decide, on hold until then). `html_to_markdown` drops every href, so page text reads "find here , a document…" with nothing for the bot to link to in Open WebUI. The MOOC parser also takes external links (`https://…`) as linked documents and warns `Missing asset` for each. Open: which links stay in the text (absolute ones at least), and whether `/static/…` links become their published courseware urls.
 - **YouTube captions** are never indexed (SRT is not text and YouTube videos skip the video path).
 - **Consumers**: GraphAI's `/rag/retrieve` must embed queries with Qwen3-Embedding-8B and query `content`.
 - **Operations**: CI (ruff, pytest) is missing; the weekly timers are not wired; MICRO-303 is the pilot, other projects follow one by one; delete `legacy/` after the cutover.

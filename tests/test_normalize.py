@@ -1,6 +1,7 @@
 """Unit tests for normalize: archives, notebooks and size limits. No network."""
 
 import json
+import re
 import tarfile
 import zipfile
 
@@ -9,14 +10,13 @@ from pathlib import Path
 import pytest
 
 import ragtools.mime_types as mt
-from rag_etl.cache import Cache
 from rag_etl.core import Resource
 from rag_etl.transformers.normalize import NormalizeTransformer
 
 
 @pytest.fixture
 def transformer(tmp_path, monkeypatch):
-    return NormalizeTransformer(cache=Cache(tmp_path / "cache" / "normalize"), work_root=tmp_path / "work" / "normalize")
+    return NormalizeTransformer(work_root=tmp_path / "work" / "normalize")
 
 
 def make_zip(path: Path, files: dict[str, bytes]) -> Path:
@@ -115,8 +115,44 @@ def test_notebook_converted(tmp_path, transformer):
     assert notebook.path.is_relative_to(transformer.work_root)
 
 
-def test_notebook_images_still_resolve_from_the_work_area(tmp_path, transformer, monkeypatch):
-    monkeypatch.setattr("ragtools.notebooks.alt_text", lambda path: "a plot")
+def test_notebook_output_images_written_beside_the_markdown(tmp_path, transformer):
+    notebook_path = tmp_path / "tp.ipynb"
+    notebook_path.write_text(
+        json.dumps(
+            {
+                "cells": [
+                    {
+                        "cell_type": "code",
+                        "execution_count": 1,
+                        "metadata": {},
+                        "source": ["plot()"],
+                        "outputs": [
+                            {
+                                "output_type": "display_data",
+                                "metadata": {},
+                                "data": {"image/png": "iVBORw0KGgo=", "text/plain": ["<Figure>"]},
+                            }
+                        ],
+                    }
+                ],
+                "metadata": {},
+                "nbformat": 4,
+                "nbformat_minor": 5,
+            }
+        ),
+        encoding="utf-8",
+    )
+    root = Resource(title="root", children=[Resource(title="tp", path=notebook_path, mime_type=mt.IPYNB)])
+
+    transformer.transform([root])
+
+    # The plot's reference resolves from the Markdown, so materialize reads it
+    md_path = root.children[0].path
+    [target] = re.findall(r"!\[[^\]]*\]\(([^)]+)\)", md_path.read_text(encoding="utf-8"))
+    assert (md_path.parent / target).is_file()
+
+
+def test_notebook_images_still_resolve_from_the_work_area(tmp_path, transformer):
     source = tmp_path / "local"
     (source / "figures").mkdir(parents=True)
     (source / "figures" / "plot.png").write_bytes(b"png fake")

@@ -4,7 +4,7 @@ import pytest
 
 from ragtools.documents.exercises import EXERCISE_SYSTEM_PROMPT
 from ragtools.documents.stitch import STITCH_SYSTEM_PROMPT, STITCH_USER_PROMPT
-from ragtools.images import ALT_TEXT_PROMPT, PAGE_SYSTEM_PROMPT, SLIDE_SYSTEM_PROMPT, TRANSCRIBE_USER_PROMPT
+from ragtools.images import PAGE_SYSTEM_PROMPT, SLIDE_SYSTEM_PROMPT, TRANSCRIBE_USER_PROMPT
 
 
 @pytest.mark.parametrize(
@@ -13,7 +13,6 @@ from ragtools.images import ALT_TEXT_PROMPT, PAGE_SYSTEM_PROMPT, SLIDE_SYSTEM_PR
         EXERCISE_SYSTEM_PROMPT,
         STITCH_SYSTEM_PROMPT,
         STITCH_USER_PROMPT,
-        ALT_TEXT_PROMPT,
         PAGE_SYSTEM_PROMPT,
         SLIDE_SYSTEM_PROMPT,
         TRANSCRIBE_USER_PROMPT,

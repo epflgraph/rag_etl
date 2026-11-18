@@ -110,7 +110,7 @@ def test_transform_bypasses_only_the_refreshed_cache(tmp_path, monkeypatch):
 
     # each step's cache lives in the project's folder
     project_cache = tmp_path / "base" / "fake" / "cache"
-    assert (project_cache / "normalize", False) in caches
+    assert (project_cache / "cut", False) in caches
     assert (project_cache / "materialize", True) in caches
 
 

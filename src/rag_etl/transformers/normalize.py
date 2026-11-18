@@ -15,7 +15,6 @@ from ragtools.encoding import ensure_utf8
 from ragtools.html import convert_html_to_md
 from ragtools.notebooks import convert_ipynb_to_md
 
-from rag_etl.cache import Cache
 from rag_etl.core import Resource
 from rag_etl.transformers.base import Transformer
 
@@ -26,11 +25,6 @@ logger = logging.getLogger(__name__)
 PDF_SIZE_LIMIT = 50 * 1024**2
 IMAGE_SIZE_LIMIT = 10 * 1024**2
 TEXT_SIZE_LIMIT = 5 * 1024**2
-
-# The cache scope converted notebooks live in. Bumped whenever converting
-# changes what the same notebook yields (layout, alt-text prompt, model):
-# the new scope starts empty
-CACHE_VERSION = "notebook-md-1"
 
 
 def size_limit(mime_type: str | None) -> int | None:
@@ -67,12 +61,12 @@ class NormalizeTransformer(Transformer):
     - files bigger than their mime family's size limit are dropped.
 
     What it writes goes to the work area, in a folder named by the content
-    it came from, never next to the sources.
+    it came from, never next to the sources. Every conversion is cheap and
+    calls no model, so nothing is cached: images are read in materialize.
     """
 
     name = "normalize"
 
-    cache: Cache
     work_root: Path
     mime_types: Sequence[str] = mt.DEFAULT_MIME_TYPES
 
@@ -117,24 +111,17 @@ class NormalizeTransformer(Transformer):
                 node.detach()
 
     def _convert_notebooks(self, root: Resource) -> None:
-        cache = self.cache.scope(CACHE_VERSION)
         for node in list(root.walk()):
             if node.mime_type != mt.IPYNB or node.path is None:
                 continue
 
-            content_hash = node.content_hash
-            md_path = self.work_root / content_hash / f"{node.path.stem}.md"
-
-            if not cache.get(content_hash, md_path):
-                logger.info(f"Converting notebook {node.title}")
-                convert_ipynb_to_md(node.path, md_path)
-                cache.set(content_hash, md_path)
-
+            # Its output images land beside the Markdown, for materialize to read
+            md_path = self.work_root / node.content_hash / f"{node.path.stem}.md"
+            convert_ipynb_to_md(node.path, md_path)
             node.path = md_path
             node.mime_type = mt.MARKDOWN
 
     def _convert_html(self, root: Resource) -> None:
-        # Deterministic and cheap: converted at every run, never cached
         for node in list(root.walk()):
             if node.mime_type != mt.HTML or node.path is None:
                 continue

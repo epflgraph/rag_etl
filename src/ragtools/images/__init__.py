@@ -34,7 +34,6 @@ def _transcribe_system_prompt(specifics: str) -> str:
 PAGE_SYSTEM_PROMPT = _transcribe_system_prompt("transcribe_page")
 SLIDE_SYSTEM_PROMPT = _transcribe_system_prompt("transcribe_slide")
 TRANSCRIBE_USER_PROMPT = _prompt("transcribe_user")
-ALT_TEXT_PROMPT = _prompt("alt_text")
 
 # One page, slide or figure never reads to more than this. Asked about a
 # repetitive page — a dot leader, a dense figure — the model sometimes
@@ -102,20 +101,3 @@ def _transcribe(image_path: str | Path, system_prompt: str) -> str:
         return ""
 
     return strip_code_fence(markdown)
-
-
-def alt_text(image_path: str | Path) -> str:
-    """Generate the ALT text of one image, for documents that reference it."""
-
-    try:
-        alt = get_model("ocr").vision(
-            ALT_TEXT_PROMPT,
-            [str(image_path)],
-            name="generate-alt-text",
-            max_chars=MAX_ANSWER_CHARS,
-        )
-    except AnswerTooLong as e:
-        logger.warning(f"Dropping the ALT text of {image_path}: {e} — beyond any description")
-        return ""
-
-    return alt

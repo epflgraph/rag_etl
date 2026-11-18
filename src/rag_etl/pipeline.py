@@ -34,7 +34,7 @@ from ragtools.graphai import GraphAISlideDetector
 logger = logging.getLogger(__name__)
 
 # The transformers that keep a cache, by name: what `--refresh` accepts
-CACHED_STEPS = (NormalizeTransformer.name, MaterializeTransformer.name, CutTransformer.name, EmbedTransformer.name)
+CACHED_STEPS = (MaterializeTransformer.name, CutTransformer.name, EmbedTransformer.name)
 
 
 def project_dir(project: Project) -> Path:
@@ -88,7 +88,7 @@ def transform(roots: list[Resource], project: Project, refresh: str | None = Non
         return project_dir(project) / "work" / name
 
     transformers: list[Transformer] = [
-        NormalizeTransformer(cache=cache(NormalizeTransformer.name), work_root=work(NormalizeTransformer.name)),
+        NormalizeTransformer(work_root=work(NormalizeTransformer.name)),
         MaterializeTransformer(
             cache=cache(MaterializeTransformer.name),
             work_root=work(MaterializeTransformer.name),

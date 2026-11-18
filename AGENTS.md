@@ -74,7 +74,7 @@ materialize → judge → cut → embed → load. One fixed sequence; projects n
 list steps. The contracts:
 
 - `Extractor.extract() -> Resource` — one root per source. Extractors are frozen dataclasses with a `dir` (relative to the project folder, resolved by the pipeline with `dataclasses.replace`).
-- `Transformer.transform(roots) -> roots` — frozen dataclasses with a `name` (ClassVar) that names their cache and their `--refresh` value. Trees are reshaped in place.
+- `Transformer.transform(roots) -> roots` — frozen dataclasses with a `name` (ClassVar) that names their work folder and, for those that cache, their cache and their `--refresh` value. Trees are reshaped in place.
 - `Loader.load(roots) -> None` — frozen dataclasses configured by their fields.
 
 The work area (`<project>/work/`) is scratch, wiped at every run start:
@@ -135,8 +135,9 @@ constants: never remove or rename one, only add.
 - *Ed Discussion*: threads filed under Ed's categories and subcategories, one markdown Q&A per answered thread (staff answers; endorsed student answers if asked). A post's image is downloaded and shown as a markdown image, which materialize reads. Which categories to keep and how to label them is done by overrides.
 
 **Normalize.** zip and tar.gz unpack into children (UTF-8 names fixed),
-notebooks become markdown (alt texts by a vision model), HTML becomes
-markdown (MOOC pages, a repository's pages), files over their
+notebooks become markdown (their output images written beside it, read in
+materialize like any markdown's images), HTML becomes markdown (MOOC pages,
+a repository's pages), files over their
 family's limit are dropped (PDF 50 MB, images 10 MB, text 5 MB).
 
 **Materialize** (facade over pdf, image and video materializers).
@@ -195,7 +196,7 @@ hybrid (vectors + text); query vectors must be unit-normalized.
 **Cache** (`cache.py`): on disk in the project's folder, `<project>/cache/<step>/` (projects never share one), keyed
 by content hash only, values are files or directories, no eviction.
 
-- No model, prompt or setting in the key. A change is applied deliberately: every cached recipe has a version (`CACHE_VERSION`: `notebook-md-1` in normalize, `pdf-ocr-1`, `image-ocr-1`, `video-slides-1` in materialize, `exercises-1` in cut, `embedding-1` in embed), and bumping it starts a fresh scope, the old one kept for rollback. `--refresh <step>` overwrites a step's current scope in place, for a rerun of the same recipe.
+- No model, prompt or setting in the key. A change is applied deliberately: every cached recipe has a version (`CACHE_VERSION`: `pdf-ocr-1`, `image-ocr-1`, `video-slides-1` in materialize, `exercises-1` in cut, `embedding-1` in embed), and bumping it starts a fresh scope, the old one kept for rollback. `--refresh <step>` overwrites a step's current scope in place, for a rerun of the same recipe.
 - PDFs and videos cache as Merkle trees: transcripts are leaves under their own hash, and the parent keeps a small node record (`children.json`) of its ordered leaves. A node hit adopts the whole subtree without rendering; a miss falls back to the leaves, so one changed page re-reads one page.
 
 **Models**: every call goes through `RCPClient`. `catalog.py` holds the

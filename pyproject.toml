@@ -21,6 +21,7 @@ dependencies = [
     "openai",
     "lxml",
     "beautifulsoup4",
+    "markdownify",
     "nbformat",
     "nbconvert",
     "pymupdf",

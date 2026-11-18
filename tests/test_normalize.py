@@ -187,7 +187,28 @@ def test_html_converted(tmp_path, transformer):
     page = root.children[0]
     assert page.mime_type == mt.MARKDOWN
     assert page.path.is_relative_to(transformer.work_root)
-    assert page.path.read_text(encoding="utf-8") == "## Title\n\nSome **text** ."
+    assert page.path.read_text(encoding="utf-8") == "## Title\n\nSome **text**."
+
+
+def test_html_keeps_every_text_and_the_links(tmp_path, transformer):
+    html_path = tmp_path / "page.html"
+    html_path.write_text(
+        "<html><head><script>track()</script></head><body>"
+        "<div>Loose text in a div</div>"
+        "<table><tr><th>Step</th><th>Time</th></tr><tr><td>Etch</td><td>5 min</td></tr></table>"
+        '<p>Find <a href="https://x.org/notes.pdf">the notes</a> here.</p>'
+        "</body></html>",
+        encoding="utf-8",
+    )
+    root = Resource(title="root", children=[Resource(title="page", path=html_path, mime_type=mt.HTML)])
+
+    transformer.transform([root])
+
+    text = root.children[0].path.read_text(encoding="utf-8")
+    assert "Loose text in a div" in text
+    assert "| Etch | 5 min |" in text
+    assert "[the notes](https://x.org/notes.pdf)" in text
+    assert "track()" not in text
 
 
 def test_oversized_files_dropped(tmp_path, transformer):

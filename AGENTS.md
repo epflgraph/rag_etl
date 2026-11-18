@@ -222,6 +222,7 @@ by a bump of the `CACHE_VERSION` of each step that uses it.
 
 - **The judge's inference** (Javier). It should also absorb what Ed Discussion's former LLM jury did: matching a thread to the document it is about, and its dates and week.
 - **Links in MOOC pages** (Javier to decide, on hold until then). `html_to_markdown` keeps every link as the page wrote it (stripping them is markdownify's `strip=["a"]`). Relative `/static/…` links lead nowhere outside the courseware: open whether they become their published urls. The MOOC parser also takes external links (`https://…`) as linked documents and warns `Missing asset` for each.
+- **Mixed-language projects.** `Project.language` sets GraphAI's slide-detection language for every video and the Elasticsearch content analyzer for the whole index, while EPFL courses often mix languages (a French course with an English MOOC, an English deck with a French forum). Each source already states its own language (ISO code); open whether a resource could carry its language for detection, and whether the index should use a language-neutral analyzer. Left as is until the language can be informed reliably per resource.
 - **YouTube captions** are never indexed (SRT is not text and YouTube videos skip the video path).
 - **Consumers**: GraphAI's `/rag/retrieve` must embed queries with Qwen3-Embedding-8B and query `content`.
 - **Operations**: CI (ruff, pytest) is missing; the weekly timers are not wired; MICRO-303 is the pilot, other projects follow one by one; delete `legacy/` after the cutover.

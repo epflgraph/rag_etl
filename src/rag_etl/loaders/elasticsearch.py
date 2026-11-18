@@ -23,19 +23,9 @@ from elasticsearch import Elasticsearch, NotFoundError
 from elasticsearch.helpers import bulk
 
 from rag_etl.core import Resource, iter_chunks
-from rag_etl.loaders.base import Loader
+from rag_etl.loaders.base import Loader, alias_name, index_name
 
 logger = logging.getLogger(__name__)
-
-
-def alias_name(project: str) -> str:
-    """The stable name consumers query: rag_{project}."""
-    return f"rag_{project}"
-
-
-def index_name(project: str, timestamp: datetime) -> str:
-    """The fresh index one run publishes into: rag_{project}_{YYYYMMDD}_{HHMMSS}."""
-    return f"{alias_name(project)}_{timestamp:%Y%m%d_%H%M%S}"
 
 
 def index_settings(language: str | None) -> dict[str, Any]:

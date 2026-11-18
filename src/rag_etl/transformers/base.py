@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from pathlib import Path
 from typing import ClassVar
 
+from rag_etl.cache import Cache
 from rag_etl.core import Resource
 
 
@@ -15,11 +17,25 @@ class Transformer(ABC):
 
     A transformer adds, updates and removes nodes (recursively) and hands
     the same trees back; the pipeline runs these in order, so the output
-    of one is the input of the next.
+    of one is the input of the next. It writes files in its own folder of
+    the project's work area and its own cache, never in the sources.
     """
 
-    # The step's name: its cache scope, its `--refresh` value, its log label
+    # The step's name: its work folder, its cache, its `--refresh` value, its log label
     name: ClassVar[str]
+
+    project_dir: Path = field(kw_only=True)
+    refresh: bool = field(default=False, kw_only=True)  # bypass the cache's lookups, overwriting them
+
+    @property
+    def work_root(self) -> Path:
+        """The step's scratch folder, wiped at every run start."""
+        return self.project_dir / "work" / self.name
+
+    @property
+    def cache(self) -> Cache:
+        """The step's cache, kept across runs."""
+        return Cache(self.project_dir / "cache" / self.name, refresh=self.refresh)
 
     @abstractmethod
     def transform(self, roots: list[Resource]) -> list[Resource]:

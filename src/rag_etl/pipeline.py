@@ -17,7 +17,6 @@ import shutil
 from datetime import UTC, datetime
 from pathlib import Path
 
-from rag_etl.cache import Cache
 from rag_etl.core import Resource, assign_ids
 from rag_etl.loaders import ElasticsearchLoader, Loader, ManifestLoader
 from rag_etl.projects import Project
@@ -37,32 +36,28 @@ logger = logging.getLogger(__name__)
 CACHED_STEPS = (MaterializeTransformer.name, CutTransformer.name, EmbedTransformer.name)
 
 
-def project_dir(project: Project) -> Path:
-    """The project's folder: its sources, its work area, its cache and its manifests.
-
-    Declared relative to $BASE_PATH (the id when not declared), resolved
-    here, at run time; an absolute folder is taken as it is.
-    """
-    return Path(os.environ["BASE_PATH"]) / (project.dir or project.id)
-
-
 def run_pipeline(project: Project, dry: bool = False, refresh: str | None = None) -> None:
     """Run the fixed sequence over one project's sources.
 
+    The project's folder holds its sources, its work area, its cache and
+    its manifests. It is declared relative to $BASE_PATH (the id when not
+    declared) and resolved here, once; an absolute folder is taken as it is.
     Every run writes a manifest; a dry run's carries a ``_dry`` suffix
     and nothing is published. Failures propagate loud.
     """
+    project_dir = Path(os.environ["BASE_PATH"]) / (project.dir or project.id)
+
     # The work area is pure scratch: everything in it is re-derivable from
     # the sources and the cache, so every run starts from a clean work
     # area — and a crashed run's leftovers never survive into the new one
-    shutil.rmtree(project_dir(project) / "work", ignore_errors=True)
+    shutil.rmtree(project_dir / "work", ignore_errors=True)
 
-    roots = extract(project)
-    roots = transform(roots, project, refresh)
-    load(roots, project, dry)
+    roots = extract(project, project_dir)
+    roots = transform(roots, project, project_dir, refresh)
+    load(roots, project, project_dir, dry)
 
 
-def extract(project: Project) -> list[Resource]:
+def extract(project: Project, project_dir: Path) -> list[Resource]:
     """Extract every source into its own tree, failing loud on any of them.
 
     A source's folder is declared relative to the project's folder and
@@ -70,35 +65,28 @@ def extract(project: Project) -> list[Resource]:
     """
     roots: list[Resource] = []
     for source in project.sources:
-        source = dataclasses.replace(source, dir=project_dir(project) / source.dir)
+        source = dataclasses.replace(source, dir=project_dir / source.dir)
         logger.info(f"Extracting {type(source).__name__} into {source.dir}")
         roots.append(source.extract())
     return roots
 
 
-def transform(roots: list[Resource], project: Project, refresh: str | None = None) -> list[Resource]:
+def transform(
+    roots: list[Resource], project: Project, project_dir: Path, refresh: str | None = None
+) -> list[Resource]:
     """Run the fixed transform sequence over the trees."""
-
-    def cache(name: str) -> Cache:
-        return Cache(project_dir(project) / "cache" / name, refresh=refresh == name)
-
-    # The work area mirrors the cache: one folder per transformer that writes
-    # files. Transformers write there and in their cache only, never in the sources
-    def work(name: str) -> Path:
-        return project_dir(project) / "work" / name
-
     transformers: list[Transformer] = [
-        NormalizeTransformer(work_root=work(NormalizeTransformer.name)),
+        NormalizeTransformer(project_dir=project_dir),
         MaterializeTransformer(
-            cache=cache(MaterializeTransformer.name),
-            work_root=work(MaterializeTransformer.name),
+            project_dir=project_dir,
+            refresh=refresh == MaterializeTransformer.name,
             detector=GraphAISlideDetector(),
             mediaspace_url=os.environ.get("DEFAULT_MEDIASPACE_BASE_URL"),
             language=project.language,
         ),
-        JudgeTransformer(overrides=project.overrides),
-        CutTransformer(cache=cache(CutTransformer.name)),
-        EmbedTransformer(cache=cache(EmbedTransformer.name)),
+        JudgeTransformer(project_dir=project_dir, overrides=project.overrides),
+        CutTransformer(project_dir=project_dir, refresh=refresh == CutTransformer.name),
+        EmbedTransformer(project_dir=project_dir, refresh=refresh == EmbedTransformer.name),
     ]
 
     for transformer in transformers:
@@ -108,17 +96,17 @@ def transform(roots: list[Resource], project: Project, refresh: str | None = Non
     return roots
 
 
-def load(roots: list[Resource], project: Project, dry: bool = False) -> None:
+def load(roots: list[Resource], project: Project, project_dir: Path, dry: bool = False) -> None:
     """Record the run in a manifest and, unless dry, publish it."""
     # The trees are final: every chunk gets the id the manifest and the index both carry
     assign_ids(roots)
     now = datetime.now(UTC)
 
-    loaders: list[Loader] = [
-        ManifestLoader(project_dir(project), project=project.id, timestamp=now, dry=dry)
-    ]
+    loaders: list[Loader] = [ManifestLoader(project_dir=project_dir, project=project.id, timestamp=now, dry=dry)]
     if not dry:
-        loaders.append(ElasticsearchLoader(project=project.id, timestamp=now, language=project.language))
+        loaders.append(
+            ElasticsearchLoader(project_dir=project_dir, project=project.id, timestamp=now, language=project.language)
+        )
 
     for loader in loaders:
         logger.info(f"Loading {type(loader).__name__}")

@@ -20,12 +20,10 @@ three materializers, which own their own caching conventions.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from pathlib import Path
 
 import ragtools.mime_types as mt
 from ragtools.video import SlideDetector
 
-from rag_etl.cache import Cache
 from rag_etl.core import Resource
 from rag_etl.transformers.base import Transformer
 from rag_etl.transformers.materialize.image import ImageMaterializer
@@ -47,24 +45,19 @@ class MaterializeTransformer(Transformer):
 
     name = "materialize"
 
-    cache: Cache
-    # The scratch work area for rendered pages, extracted frames and read
-    # transcripts: outside every source tree (generated files must never
-    # sit next to the sources they came from), wiped by the pipeline at
-    # every run start — everything in it is re-derivable
-    work_root: Path
     detector: SlideDetector
     mediaspace_url: str | None = None
     min_slide_seconds: int = 40
     language: str | None = None
 
     def transform(self, roots: list[Resource]) -> list[Resource]:
-        pdf = PdfMaterializer(cache=self.cache, work_root=self.work_root)
-        image = ImageMaterializer(cache=self.cache, work_root=self.work_root)
-        markdown = MarkdownMaterializer(cache=self.cache, work_root=self.work_root)
+        cache, work_root = self.cache, self.work_root
+        pdf = PdfMaterializer(cache=cache, work_root=work_root)
+        image = ImageMaterializer(cache=cache, work_root=work_root)
+        markdown = MarkdownMaterializer(cache=cache, work_root=work_root)
         video = VideoMaterializer(
-            cache=self.cache,
-            work_root=self.work_root,
+            cache=cache,
+            work_root=work_root,
             detector=self.detector,
             mediaspace_url=self.mediaspace_url,
             min_slide_seconds=self.min_slide_seconds,

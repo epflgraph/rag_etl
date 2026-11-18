@@ -40,7 +40,7 @@ def tree() -> list[Resource]:
 
 
 def write(project_dir: Path, roots: list[Resource], dry: bool = False) -> dict:
-    ManifestLoader(project_dir, project="demo", timestamp=TIMESTAMP, dry=dry).load(roots)
+    ManifestLoader(project_dir=project_dir, project="demo", timestamp=TIMESTAMP, dry=dry).load(roots)
     [path] = (project_dir / "output").glob("*.json")
     return json.loads(path.read_text(encoding="utf-8"))
 

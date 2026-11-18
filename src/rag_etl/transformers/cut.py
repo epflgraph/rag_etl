@@ -220,7 +220,6 @@ class CutTransformer(Transformer):
 
     name = "cut"
 
-    cache: Cache
     stitch_fallback: bool = False  # the LLM stitch fallback, off by default
 
     def transform(self, roots: list[Resource]) -> list[Resource]:

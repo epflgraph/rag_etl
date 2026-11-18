@@ -9,7 +9,6 @@ import pymupdf
 import pytest
 
 import ragtools.mime_types as mt
-from rag_etl.cache import Cache
 from rag_etl.core import Resource
 from rag_etl.core.resource import hash_bytes
 from rag_etl.transformers.materialize import MaterializeTransformer
@@ -39,9 +38,7 @@ def transformer(tmp_path, monkeypatch):
 
     detector = SimpleNamespace(detect=lambda *args, **kwargs: [0, 40, 80])
 
-    return MaterializeTransformer(
-        cache=Cache(tmp_path / "cache" / "materialize"), work_root=tmp_path / "material" / "work", detector=detector
-    )
+    return MaterializeTransformer(project_dir=tmp_path, detector=detector)
 
 
 def fake_extract_frame(video_url: str, seconds: int, output_path: Path) -> bool:
@@ -75,7 +72,7 @@ def test_pdf_gains_one_child_per_page(tmp_path, transformer, monkeypatch):
     # The page children carry the parent's descriptive metadata
     assert all(child.week == 3 and child.type == "theory" for child in lecture.children)
     # And the generated pages live in the work area, not beside the pdf
-    pages_dir = tmp_path / "material" / "work" / hash_bytes(pdf_path.read_bytes())
+    pages_dir = transformer.work_root / hash_bytes(pdf_path.read_bytes())
     assert (pages_dir / "page_1.png").exists()
     assert (pages_dir / "page_1.md").exists()
     assert not (tmp_path / "lecture").exists()
@@ -92,9 +89,7 @@ def test_pdf_one_changed_page_reOCRs_one_page(tmp_path, transformer, monkeypatch
         "ragtools.llm.RCPClient.vision",
         lambda self, prompt, images, **kwargs: calls.append(kwargs.get("name")) or "slide text",
     )
-    counting = MaterializeTransformer(
-        cache=transformer.cache, work_root=transformer.work_root, detector=transformer.detector
-    )
+    counting = MaterializeTransformer(project_dir=transformer.project_dir, detector=transformer.detector)
 
     make_pdf(pdf_path, ["alpha", "beta, slightly changed"])
     root = Resource(title="root", children=[Resource(title="lecture", path=pdf_path, mime_type=mt.PDF)])
@@ -130,7 +125,7 @@ def test_warm_pdf_rerun_adopts_the_whole_subtree(tmp_path, transformer, monkeypa
     assert [child.title for child in root.children[0].children] == ["page 1", "page 2"]
     # Only the transcripts are staged back into the work area: no page is
     # rendered, so no png exists at all
-    work_dir = tmp_path / "material" / "work" / hash_bytes(pdf_path.read_bytes())
+    work_dir = transformer.work_root / hash_bytes(pdf_path.read_bytes())
     assert (work_dir / "page_1.md").is_file()
     assert not (work_dir / "page_1.png").exists()
 
@@ -184,7 +179,7 @@ def test_image_read_into_work_dir(tmp_path, transformer):
     transformer.transform([root])
 
     slide = root.children[0]
-    work_dir = tmp_path / "material" / "work" / hash_bytes(image_path.read_bytes())
+    work_dir = transformer.work_root / hash_bytes(image_path.read_bytes())
     assert slide.mime_type == mt.MARKDOWN
     assert slide.path == work_dir / "slide.md"
     # Nothing is written beside the source image
@@ -293,8 +288,7 @@ def test_youtube_video_left_untouched(tmp_path, transformer):
 
 def test_video_with_no_frames_dropped(tmp_path, transformer):
     one_timestamp = MaterializeTransformer(
-        cache=transformer.cache,
-        work_root=transformer.work_root,
+        project_dir=transformer.project_dir,
         detector=SimpleNamespace(detect=lambda *args, **kwargs: [0]),
     )
     root = Resource(title="root", children=[mediaspace_video()])
@@ -319,8 +313,7 @@ def test_warm_video_rerun_adopts_the_cached_slides(tmp_path, transformer, monkey
         lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("no frame may be extracted either")),
     )
     warm = MaterializeTransformer(
-        cache=transformer.cache,
-        work_root=transformer.work_root,
+        project_dir=transformer.project_dir,
         detector=SimpleNamespace(detect=no_detect),
     )
     root = Resource(title="root", children=[mediaspace_video()])
@@ -340,8 +333,8 @@ def test_refreshed_video_redetects_and_leaves_no_stale_frames(tmp_path, transfor
     assert len(root.children[0].children) == 2
 
     refreshed = MaterializeTransformer(
-        cache=Cache(transformer.cache.cache_path, refresh=True),
-        work_root=transformer.work_root,
+        project_dir=transformer.project_dir,
+        refresh=True,
         detector=SimpleNamespace(detect=lambda *args, **kwargs: [0]),
     )
     root = Resource(title="root", children=[mediaspace_video()])

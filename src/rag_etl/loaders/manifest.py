@@ -23,8 +23,7 @@ from pathlib import Path
 from typing import Any
 
 from rag_etl.core import Resource, iter_chunks
-from rag_etl.loaders.base import Loader
-from rag_etl.loaders.elasticsearch import alias_name, index_name
+from rag_etl.loaders.base import Loader, alias_name, index_name
 
 logger = logging.getLogger(__name__)
 
@@ -104,7 +103,6 @@ def _summary(rows: list[dict[str, Any]], keys: tuple[str, ...]) -> dict[str, Any
 class ManifestLoader(Loader):
     """Writes one manifest per run into the project folder's output/."""
 
-    project_dir: Path
     project: str
     timestamp: datetime
     dry: bool

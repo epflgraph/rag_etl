@@ -1,6 +1,7 @@
 """Unit tests for the Elasticsearch loader: fake client, no network."""
 
 from datetime import UTC, datetime
+from pathlib import Path
 
 import pytest
 
@@ -10,6 +11,9 @@ from rag_etl.core import Resource, assign_ids
 from rag_etl.loaders.elasticsearch import ElasticsearchLoader
 
 TIMESTAMP = datetime(2026, 10, 19, 15, 30, 45, tzinfo=UTC)
+
+# The index lives outside the project folder: the loader never touches it
+PROJECT_DIR = Path("/project")
 
 
 class FakeIndices:
@@ -39,7 +43,9 @@ class FakeClient:
 
 
 def loader(client: FakeClient, language: str | None = "en") -> ElasticsearchLoader:
-    return ElasticsearchLoader(project="demo", timestamp=TIMESTAMP, language=language, client=client)
+    return ElasticsearchLoader(
+        project_dir=PROJECT_DIR, project="demo", timestamp=TIMESTAMP, language=language, client=client
+    )
 
 
 def bulk_into(monkeypatch, sink: list) -> None:
@@ -127,7 +133,7 @@ def test_same_day_runs_get_distinct_indices(monkeypatch):
 
     loader(client).load(roots)
     later = ElasticsearchLoader(
-        project="demo", timestamp=TIMESTAMP.replace(second=46), language="en", client=client
+        project_dir=PROJECT_DIR, project="demo", timestamp=TIMESTAMP.replace(second=46), language="en", client=client
     )
     later.load(roots)
 

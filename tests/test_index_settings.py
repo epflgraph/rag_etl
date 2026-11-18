@@ -2,7 +2,8 @@
 
 from datetime import datetime
 
-from rag_etl.loaders.elasticsearch import alias_name, index_name, index_settings
+from rag_etl.loaders.base import alias_name, index_name
+from rag_etl.loaders.elasticsearch import index_settings
 
 FIELDS = {
     "id",

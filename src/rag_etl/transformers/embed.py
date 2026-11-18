@@ -14,7 +14,6 @@ from dataclasses import dataclass
 
 from ragtools.llm import get_model
 
-from rag_etl.cache import Cache
 from rag_etl.core import Resource, iter_chunks
 from rag_etl.transformers.base import Transformer
 
@@ -45,8 +44,6 @@ class EmbedTransformer(Transformer):
     """Annotates every chunk with its vector, in place."""
 
     name = "embed"
-
-    cache: Cache
 
     def _embed_batch(self, batch: list[Resource]) -> None:
         """One request for the batch; each vector cached by its chunk's content hash."""

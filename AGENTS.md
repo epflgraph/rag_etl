@@ -74,8 +74,10 @@ materialize → judge → cut → embed → load. One fixed sequence; projects n
 list steps. The contracts:
 
 - `Extractor.extract() -> Resource` — one root per source. Extractors are frozen dataclasses with a `dir` (relative to the project folder, resolved by the pipeline with `dataclasses.replace`).
-- `Transformer.transform(roots) -> roots` — frozen dataclasses with a `name` (ClassVar) that names their work folder and, for those that cache, their cache and their `--refresh` value. Trees are reshaped in place.
-- `Loader.load(roots) -> None` — frozen dataclasses configured by their fields.
+- `Transformer.transform(roots) -> roots` — frozen dataclasses with a `name` (ClassVar) and a `project_dir`; the base class derives `work_root` (`<project>/work/<name>`) and `cache` (`<project>/cache/<name>`, bypassed when `refresh`). Trees are reshaped in place.
+- `Loader.load(roots) -> None` — frozen dataclasses with a `project_dir`, configured by their fields. Index naming (`alias_name`, `index_name`) lives in `loaders/base.py`.
+
+The pipeline resolves the project's folder once (`$BASE_PATH / project.dir`) and hands it to every step.
 
 The work area (`<project>/work/`) is scratch, wiped at every run start:
 everything in it can be rebuilt from the sources and the cache without a

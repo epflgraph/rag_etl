@@ -5,7 +5,6 @@ from pathlib import Path
 import pytest
 
 import ragtools.mime_types as mt
-from rag_etl.cache import Cache
 from rag_etl.core import Resource
 from rag_etl.transformers.cut import CutTransformer
 from rag_etl.transformers.embed import MAX_CHUNK_CHARS
@@ -14,7 +13,7 @@ from ragtools.documents import MAX_SECTION_LINES, Exercise, ExerciseList, Exerci
 
 @pytest.fixture
 def transformer(tmp_path, monkeypatch):
-    return CutTransformer(cache=Cache(tmp_path / "cache" / "cut"))
+    return CutTransformer(project_dir=tmp_path)
 
 
 def write_page(tmp_path: Path, name: str, content: str) -> Path:

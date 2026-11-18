@@ -16,7 +16,7 @@ from rag_etl.transformers.normalize import NormalizeTransformer
 
 @pytest.fixture
 def transformer(tmp_path, monkeypatch):
-    return NormalizeTransformer(work_root=tmp_path / "work" / "normalize")
+    return NormalizeTransformer(project_dir=tmp_path)
 
 
 def make_zip(path: Path, files: dict[str, bytes]) -> Path:

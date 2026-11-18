@@ -6,7 +6,6 @@ import logging
 
 from collections.abc import Sequence
 from dataclasses import dataclass
-from pathlib import Path
 
 import ragtools.mime_types as mt
 from ragtools.archives import untar_file, unzip_file
@@ -67,7 +66,6 @@ class NormalizeTransformer(Transformer):
 
     name = "normalize"
 
-    work_root: Path
     mime_types: Sequence[str] = mt.DEFAULT_MIME_TYPES
 
     def transform(self, roots: list[Resource]) -> list[Resource]:

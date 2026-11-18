@@ -31,28 +31,25 @@ def make_project(**kwargs) -> Project:
     return Project(**{**defaults, **kwargs})
 
 
-def test_extract_builds_one_tree_per_source(tmp_path, monkeypatch):
-    monkeypatch.setenv("BASE_PATH", str(tmp_path))
-    roots = extract(make_project(sources=(FakeExtractor(dir=tmp_path), FakeExtractor(dir=tmp_path))))
+def test_extract_builds_one_tree_per_source(tmp_path):
+    roots = extract(make_project(sources=(FakeExtractor(dir=tmp_path), FakeExtractor(dir=tmp_path))), tmp_path)
     assert [root.title for root in roots] == ["tree of FakeExtractor", "tree of FakeExtractor"]
 
 
-def test_extract_resolves_relative_folders_under_the_project(tmp_path, monkeypatch):
-    monkeypatch.setenv("BASE_PATH", str(tmp_path))
-    project = make_project(dir=Path("FAKE"), sources=(FakeExtractor(dir=Path("moodle")), FakeExtractor(dir=Path("/abs"))))
+def test_extract_resolves_relative_folders_under_the_project(tmp_path):
+    project = make_project(sources=(FakeExtractor(dir=Path("moodle")), FakeExtractor(dir=Path("/abs"))))
 
-    roots = extract(project)
+    roots = extract(project, tmp_path / "FAKE")
 
-    # Relative folders land under $BASE_PATH/<project dir>; absolute ones are kept
+    # Relative folders land under the project's folder; absolute ones are kept
     assert [root.path for root in roots] == [tmp_path / "FAKE" / "moodle", Path("/abs")]
     # The project itself is untouched: the folders are resolved for this run only
     assert project.sources[0].dir == Path("moodle")
 
 
-def test_extract_fails_loud(tmp_path, monkeypatch):
-    monkeypatch.setenv("BASE_PATH", str(tmp_path))
+def test_extract_fails_loud(tmp_path):
     with pytest.raises(SourceUnavailable):
-        extract(make_project(sources=(FakeExtractor(dir=tmp_path), BrokenExtractor(dir=tmp_path))))
+        extract(make_project(sources=(FakeExtractor(dir=tmp_path), BrokenExtractor(dir=tmp_path))), tmp_path)
 
 
 def test_transform_runs_the_sequence(tmp_path, monkeypatch):
@@ -75,23 +72,18 @@ def test_transform_runs_the_sequence(tmp_path, monkeypatch):
     monkeypatch.setattr("rag_etl.pipeline.EmbedTransformer", FakeStep)
 
     roots = [Resource(title="root")]
-    transform(roots, make_project())
+    transform(roots, make_project(), tmp_path)
 
     assert ran == ["FakeStep"] * 5
 
 
 def test_transform_bypasses_only_the_refreshed_cache(tmp_path, monkeypatch):
-    monkeypatch.setenv("BASE_PATH", str(tmp_path / "base"))
-    caches = []
-
-    class RecordingCache:
-        def __init__(self, cache_path, refresh=False):
-            caches.append((cache_path, refresh))
+    built = {}
 
     def stub(name: str):
         class Stub:
             def __init__(self, **kwargs):
-                pass
+                built[name] = kwargs
 
             def transform(self, roots):
                 return roots
@@ -99,25 +91,24 @@ def test_transform_bypasses_only_the_refreshed_cache(tmp_path, monkeypatch):
         Stub.name = name
         return Stub
 
-    monkeypatch.setattr("rag_etl.pipeline.Cache", RecordingCache)
     monkeypatch.setattr("rag_etl.pipeline.NormalizeTransformer", stub("normalize"))
     monkeypatch.setattr("rag_etl.pipeline.MaterializeTransformer", stub("materialize"))
     monkeypatch.setattr("rag_etl.pipeline.JudgeTransformer", stub("judge"))
     monkeypatch.setattr("rag_etl.pipeline.CutTransformer", stub("cut"))
     monkeypatch.setattr("rag_etl.pipeline.EmbedTransformer", stub("embed"))
 
-    transform([Resource(title="root")], make_project(), refresh="materialize")
+    transform([Resource(title="root")], make_project(), tmp_path, refresh="materialize")
 
-    # each step's cache lives in the project's folder
-    project_cache = tmp_path / "base" / "fake" / "cache"
-    assert (project_cache / "cut", False) in caches
-    assert (project_cache / "materialize", True) in caches
+    # every step works in the project's folder; only the named one refreshes
+    assert all(kwargs["project_dir"] == tmp_path for kwargs in built.values())
+    assert built["materialize"]["refresh"] is True
+    assert built["cut"]["refresh"] is False and built["embed"]["refresh"] is False
 
 
 def test_run_pipeline_writes_a_manifest(tmp_path, monkeypatch):
     monkeypatch.setenv("BASE_PATH", str(tmp_path / "base"))
-    monkeypatch.setattr("rag_etl.pipeline.extract", lambda project: [Resource(title="root")])
-    monkeypatch.setattr("rag_etl.pipeline.transform", lambda roots, project, refresh=None: roots)
+    monkeypatch.setattr("rag_etl.pipeline.extract", lambda project, project_dir: [Resource(title="root")])
+    monkeypatch.setattr("rag_etl.pipeline.transform", lambda roots, project, project_dir, refresh=None: roots)
     monkeypatch.setattr(
         "rag_etl.pipeline.ElasticsearchLoader",
         lambda **kwargs: SimpleNamespace(load=lambda roots: None),
@@ -134,8 +125,8 @@ def test_run_pipeline_writes_a_manifest(tmp_path, monkeypatch):
 
 def test_run_pipeline_marks_dry_manifests(tmp_path, monkeypatch):
     monkeypatch.setenv("BASE_PATH", str(tmp_path / "base"))
-    monkeypatch.setattr("rag_etl.pipeline.extract", lambda project: [Resource(title="root")])
-    monkeypatch.setattr("rag_etl.pipeline.transform", lambda roots, project, refresh=None: roots)
+    monkeypatch.setattr("rag_etl.pipeline.extract", lambda project, project_dir: [Resource(title="root")])
+    monkeypatch.setattr("rag_etl.pipeline.transform", lambda roots, project, project_dir, refresh=None: roots)
 
     run_pipeline(make_project(), dry=True)
 

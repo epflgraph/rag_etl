@@ -18,8 +18,8 @@ class MOOCExtractor(Extractor):
     facts the export states; what the material is, the judge decides.
     """
 
-    # Selects which of the subtitle tracks shipped with the export is kept
-    # for each video. Accepts a name ("French") or a code ("fr").
+    # The MOOC's language, as an ISO code ("fr", "en"): which of the subtitle
+    # tracks shipped with the export is kept for each video
     language: str | None = None
     course_url: str | None = None
     # Which chapter opens week one, and how many weeks follow it. The

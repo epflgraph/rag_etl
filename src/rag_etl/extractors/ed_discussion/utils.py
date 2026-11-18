@@ -275,35 +275,24 @@ def extract_qa_content(messages: list[dict]) -> dict[str, Any]:
 
 
 def format_qa(qa_data: dict[str, Any], language: str) -> str:
-    """Format Q&A data."""
+    """Format Q&A data, its headings in the forum's language (an ISO code: French for "fr", English otherwise)."""
 
     lines = []
 
-    if language.lower() == "french":
-        question_label = "# Question :"
-        answer_label = "# Réponse"
-    else:
-        question_label = "# Question:"
-        answer_label = "# Answer"
+    # French puts a space before the colon
+    french = language == "fr"
+    colon = " :" if french else ":"
+    answer_label = "# Réponse" if french else "# Answer"
 
     if qa_data["question"]:
-        lines.append(question_label)
+        lines.append(f"# Question{colon}")
         lines.append(qa_data["question"])
         lines.append("")
 
     num_answers = len(qa_data["answers"])
     for i, answer in enumerate(qa_data["answers"], 1):
-        if num_answers == 1:
-            if language.lower() == "french":
-                lines.append(f"{answer_label} :")
-            else:
-                lines.append(f"{answer_label}:")
-
-        else:
-            if language.lower() == "french":
-                lines.append(f"{answer_label} {i} :")
-            else:
-                lines.append(f"{answer_label} {i}:")
+        number = "" if num_answers == 1 else f" {i}"
+        lines.append(f"{answer_label}{number}{colon}")
         lines.append(answer)
         if i < num_answers:
             lines.append("")

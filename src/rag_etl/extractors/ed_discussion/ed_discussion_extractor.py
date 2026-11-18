@@ -38,7 +38,7 @@ class EdDiscussionExtractor(Extractor):
     """
 
     academic_year: str  # as "2025_2026"
-    language: str       # of the Q&A headings: "french" or anything else for English
+    language: str       # the forum's, as an ISO code ("fr", "en"): the language of the Q&A headings
     # A student's answer is kept only once staff endorsed it, and only if asked
     include_student_endorsed: bool = False
 

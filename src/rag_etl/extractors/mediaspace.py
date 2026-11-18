@@ -118,7 +118,7 @@ class MediaspaceExtractor(Extractor):
     """
 
     playlist_or_channel_url: str
-    language: str | None = None
+    language: str | None = None  # the videos', as an ISO code ("fr", "en"): which captions are kept
     created_after: str | date | datetime | float | None = None
     mime_types: Sequence[str] = (mt.SRT,)
 

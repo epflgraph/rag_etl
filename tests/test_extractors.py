@@ -12,6 +12,7 @@ import requests
 import ragtools.mime_types as mt
 from rag_etl.extractors.base import Extractor, SourceUnavailable
 from rag_etl.extractors.ed_discussion.ed_discussion_extractor import EdDiscussionExtractor
+from rag_etl.extractors.ed_discussion.utils import format_qa
 from rag_etl.extractors.git import GitExtractor, branch_from_url, repo_from_url
 from rag_etl.extractors.local_folder import LocalFolderExtractor
 from rag_etl.extractors.mediaspace import MediaspaceExtractor
@@ -432,7 +433,7 @@ def test_ed_discussion(tmp_path):
     _write_thread(ed_dir, "t2", "Room change?", "Logistics", "", answered=True)
     _write_thread(ed_dir, "t3", "Nobody answered", "Exams", "Exam 2024", answered=False)
 
-    root = EdDiscussionExtractor(dir=tmp_path / "ed_discussion", academic_year="2025_2026", language="english").extract()
+    root = EdDiscussionExtractor(dir=tmp_path / "ed_discussion", academic_year="2025_2026", language="en").extract()
 
     # Ed's own filing shapes the tree; facts only on the leaves; unanswered threads are left out
     tree = {category.title: {child.title: [leaf.title for leaf in child.children] for child in category.children}
@@ -444,9 +445,15 @@ def test_ed_discussion(tmp_path):
     assert leaf.path and "# Answer:" in leaf.path.read_text()
 
 
+def test_ed_discussion_headings_follow_the_forums_language():
+    qa = {"question": "Q?", "answers": ["A1", "A2"]}
+    assert format_qa(qa, "fr") == "# Question :\nQ?\n\n# Réponse 1 :\nA1\n\n# Réponse 2 :\nA2"
+    assert format_qa({"question": "Q?", "answers": ["A"]}, "en") == "# Question:\nQ?\n\n# Answer:\nA"
+
+
 def test_ed_discussion_without_export(tmp_path):
     with pytest.raises(SourceUnavailable):
-        EdDiscussionExtractor(dir=tmp_path, academic_year="2025_2026", language="english").extract()
+        EdDiscussionExtractor(dir=tmp_path, academic_year="2025_2026", language="en").extract()
 
 
 def test_git_branch_parsing():

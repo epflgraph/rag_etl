@@ -44,7 +44,7 @@ MICRO303 = Project(
         # EdDiscussionExtractor(
         #     dir=Path("ed_discussion"),
         #     academic_year="2025_2026",
-        #     language="english",
+        #     language="en",
         # ),
     ),
 )

@@ -189,14 +189,14 @@ hybrid (vectors + text); query vectors must be unit-normalized.
 **Cache** (`cache.py`): on disk under `$CACHE_DIR/<project>/<step>/`, keyed
 by content hash only, values are files or directories, no eviction.
 
-- No model, prompt or setting in the key. A change is applied deliberately: `--refresh <step>` reruns one step, or a materializer bumps its recipe version (`CACHE_VERSION`, e.g. `pdf-ocr-1`), which starts a fresh scope.
+- No model, prompt or setting in the key. A change is applied deliberately: every cached recipe has a version (`CACHE_VERSION`: `notebook-md-1` in normalize, `pdf-ocr-1`, `image-ocr-1`, `video-slides-1` in materialize, `exercises-1` in cut, `embedding-1` in embed), and bumping it starts a fresh scope, the old one kept for rollback. `--refresh <step>` overwrites a step's current scope in place, for a rerun of the same recipe.
 - PDFs and videos cache as Merkle trees: transcripts are leaves under their own hash, and the parent keeps a small node record (`children.json`) of its ordered leaves. A node hit adopts the whole subtree without rendering; a miss falls back to the leaves, so one changed page re-reads one page.
 
 **Models**: every call goes through `RCPClient`. `catalog.py` holds the
 settled model + parameter pairings and one entry per task (`ocr`, `judge`,
 `split_exercises`, `stitch`, `embedding`); each capability asks
 `get_model(task)` itself. Changing a model is a one-line edit there, followed
-by a `--refresh`.
+by a bump of the `CACHE_VERSION` of each step that uses it.
 
 ## Decided, do not reopen without the maintainer
 

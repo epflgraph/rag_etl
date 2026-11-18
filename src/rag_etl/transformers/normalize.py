@@ -25,6 +25,11 @@ PDF_SIZE_LIMIT = 50 * 1024**2
 IMAGE_SIZE_LIMIT = 10 * 1024**2
 TEXT_SIZE_LIMIT = 5 * 1024**2
 
+# The cache scope converted notebooks live in. Bumped whenever converting
+# changes what the same notebook yields (layout, alt-text prompt, model):
+# the new scope starts empty
+CACHE_VERSION = "notebook-md-1"
+
 
 def size_limit(mime_type: str | None) -> int | None:
     """Return the size limit of a mime type, or None when it has none."""
@@ -104,6 +109,7 @@ class NormalizeTransformer(Transformer):
                 node.detach()
 
     def _convert_notebooks(self, root: Resource) -> None:
+        cache = self.cache.scope(CACHE_VERSION)
         for node in list(root.walk()):
             if node.mime_type != mt.IPYNB or node.path is None:
                 continue
@@ -111,10 +117,10 @@ class NormalizeTransformer(Transformer):
             md_path = node.path.with_suffix(".md")
             content_hash = node.content_hash
 
-            if not self.cache.get(content_hash, md_path):
+            if not cache.get(content_hash, md_path):
                 logger.info(f"Converting notebook {node.title}")
                 convert_ipynb_to_md(node.path, md_path)
-                self.cache.set(content_hash, md_path)
+                cache.set(content_hash, md_path)
 
             node.path = md_path
             node.mime_type = mt.MARKDOWN

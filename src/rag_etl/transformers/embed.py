@@ -2,8 +2,7 @@
 
 Vectors live in the cache as JSON files keyed by the chunk text's hash,
 so a chunk that changed is embedded again and a chunk that did not is
-not; there is no eviction, a model change is handled manually with
-``--refresh embed``.
+not; there is no eviction. A model change bumps CACHE_VERSION.
 """
 
 from __future__ import annotations
@@ -23,6 +22,11 @@ logger = logging.getLogger(__name__)
 
 # The vector of one chunk, cached by the chunk text's content hash
 EMBEDDING_FILE = "embedding.json"
+
+# The cache scope the vectors live in. Bumped whenever the model changes:
+# vectors of two models are not comparable, and a refresh that stops halfway
+# would leave both in one scope, so a new model starts an empty one
+CACHE_VERSION = "embedding-1"
 
 # Embedding calls are batched: at most BATCH_SIZE chunks per request, and at
 # most REQUEST_CHAR_BUDGET chars of text, so one request cannot overflow the
@@ -49,15 +53,16 @@ class EmbedTransformer(Transformer):
         vectors = get_model("embedding").embeddings([chunk.text or "" for chunk in batch])
 
         for chunk, vector in zip(batch, vectors):
-            self.cache.write(chunk.content_hash, EMBEDDING_FILE, json.dumps(vector))
+            self.cache.scope(CACHE_VERSION).write(chunk.content_hash, EMBEDDING_FILE, json.dumps(vector))
             chunk.embedding = vector
 
     def transform(self, roots: list[Resource]) -> list[Resource]:
         chunks = list(iter_chunks(roots))
         missing: list[Resource] = []
 
+        cache = self.cache.scope(CACHE_VERSION)
         for chunk in chunks:
-            cached = self.cache.read(chunk.content_hash, EMBEDDING_FILE)
+            cached = cache.read(chunk.content_hash, EMBEDDING_FILE)
             if cached is None:
                 missing.append(chunk)
             else:

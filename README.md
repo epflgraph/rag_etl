@@ -46,9 +46,11 @@ rag-etl run --project micro303                # publish to rag_micro303
 rag-etl run --project micro303 --refresh materialize   # redo one step, ignoring its cache
 ```
 
-`--refresh` accepts `normalize`, `materialize`, `cut` and `embed`. Use it
-after changing a prompt or a model: the cache is keyed by content only and
-would otherwise serve the old results.
+`--refresh` accepts `normalize`, `materialize`, `cut` and `embed`, and
+overwrites that step's cache in place. After changing a prompt or a model,
+bump the `CACHE_VERSION` of the steps that use it instead: the cache is keyed
+by content only and would otherwise serve the old results, and a new version
+starts an empty scope that a half-finished run cannot mix with the old one.
 
 What a run leaves behind:
 

@@ -29,7 +29,7 @@ class MATH111cCourse(BaseCourse):
     """
 
     course_info = {
-        "course_title": "Linear Algebra",
+        "course_title": "Algèbre linéaire",
         "course_id": "MATH111c",
         "academic_course": "2026-2027",
         "semester": 1,

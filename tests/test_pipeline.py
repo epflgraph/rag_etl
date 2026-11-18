@@ -81,11 +81,12 @@ def test_transform_runs_the_sequence(tmp_path, monkeypatch):
 
 
 def test_transform_bypasses_only_the_refreshed_cache(tmp_path, monkeypatch):
+    monkeypatch.setenv("BASE_PATH", str(tmp_path / "base"))
     caches = []
 
     class RecordingCache:
-        def __init__(self, project, transform, refresh=False):
-            caches.append((transform, refresh))
+        def __init__(self, cache_path, refresh=False):
+            caches.append((cache_path, refresh))
 
     def stub(name: str):
         class Stub:
@@ -107,12 +108,13 @@ def test_transform_bypasses_only_the_refreshed_cache(tmp_path, monkeypatch):
 
     transform([Resource(title="root")], make_project(), refresh="materialize")
 
-    assert ("normalize", False) in caches
-    assert ("materialize", True) in caches
+    # each step's cache lives in the project's folder
+    project_cache = tmp_path / "base" / "fake" / "cache"
+    assert (project_cache / "normalize", False) in caches
+    assert (project_cache / "materialize", True) in caches
 
 
 def test_run_pipeline_writes_a_manifest(tmp_path, monkeypatch):
-    monkeypatch.setenv("CACHE_DIR", str(tmp_path / "cache"))
     monkeypatch.setenv("BASE_PATH", str(tmp_path / "base"))
     monkeypatch.setattr("rag_etl.pipeline.extract", lambda project: [Resource(title="root")])
     monkeypatch.setattr("rag_etl.pipeline.transform", lambda roots, project, refresh=None: roots)
@@ -131,7 +133,6 @@ def test_run_pipeline_writes_a_manifest(tmp_path, monkeypatch):
 
 
 def test_run_pipeline_marks_dry_manifests(tmp_path, monkeypatch):
-    monkeypatch.setenv("CACHE_DIR", str(tmp_path / "cache"))
     monkeypatch.setenv("BASE_PATH", str(tmp_path / "base"))
     monkeypatch.setattr("rag_etl.pipeline.extract", lambda project: [Resource(title="root")])
     monkeypatch.setattr("rag_etl.pipeline.transform", lambda roots, project, refresh=None: roots)

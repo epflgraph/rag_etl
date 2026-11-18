@@ -14,10 +14,7 @@ from ragtools.documents import MAX_SECTION_LINES, Exercise, ExerciseList, Exerci
 
 @pytest.fixture
 def transformer(tmp_path, monkeypatch):
-    monkeypatch.setenv("CACHE_DIR", str(tmp_path / "cache"))
-    (tmp_path / "cache").mkdir()
-
-    return CutTransformer(cache=Cache("micro303", "cut"))
+    return CutTransformer(cache=Cache(tmp_path / "cache" / "cut"))
 
 
 def write_page(tmp_path: Path, name: str, content: str) -> Path:

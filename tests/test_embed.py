@@ -11,9 +11,7 @@ from rag_etl.transformers.embed import BATCH_SIZE, REQUEST_CHAR_BUDGET, EmbedTra
 
 @pytest.fixture
 def cache(tmp_path, monkeypatch):
-    monkeypatch.setenv("CACHE_DIR", str(tmp_path / "cache"))
-    (tmp_path / "cache").mkdir()
-    return Cache("micro303", "embed")
+    return Cache(tmp_path / "cache" / "embed")
 
 
 def fake_llm(monkeypatch, calls: list):

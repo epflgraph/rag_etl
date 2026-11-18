@@ -38,7 +38,7 @@ CACHED_STEPS = (NormalizeTransformer.name, MaterializeTransformer.name, CutTrans
 
 
 def project_dir(project: Project) -> Path:
-    """The project's folder: its sources, its work area and its manifests.
+    """The project's folder: its sources, its work area, its cache and its manifests.
 
     Declared relative to $BASE_PATH (the id when not declared), resolved
     here, at run time; an absolute folder is taken as it is.
@@ -80,7 +80,7 @@ def transform(roots: list[Resource], project: Project, refresh: str | None = Non
     """Run the fixed transform sequence over the trees."""
 
     def cache(name: str) -> Cache:
-        return Cache(project.id, name, refresh=refresh == name)
+        return Cache(project_dir(project) / "cache" / name, refresh=refresh == name)
 
     transformers: list[Transformer] = [
         NormalizeTransformer(cache=cache(NormalizeTransformer.name)),

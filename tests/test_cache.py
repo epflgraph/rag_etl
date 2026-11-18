@@ -6,21 +6,13 @@ from rag_etl.cache import Cache
 
 
 @pytest.fixture
-def cache_dir(tmp_path, monkeypatch):
-    directory = tmp_path / "cache"
-    directory.mkdir()
-    monkeypatch.setenv("CACHE_DIR", str(directory))
-    return directory
-
-
-def test_missing_cache_dir_fails(tmp_path, monkeypatch):
-    monkeypatch.setenv("CACHE_DIR", str(tmp_path / "nowhere"))
-    with pytest.raises(ValueError):
-        Cache("micro303", "materialize")
+def cache_dir(tmp_path):
+    # Not created: the cache makes its folders on first write
+    return tmp_path / "project" / "cache"
 
 
 def test_file_roundtrip(cache_dir, tmp_path):
-    cache = Cache("micro303", "materialize")
+    cache = Cache(cache_dir / "materialize")
     source = tmp_path / "out.md"
     source.write_text("hello", encoding="utf-8")
 
@@ -31,18 +23,18 @@ def test_file_roundtrip(cache_dir, tmp_path):
     assert destination.read_text(encoding="utf-8") == "hello"
 
 
-def test_entries_land_under_project_and_transform(cache_dir, tmp_path):
-    cache = Cache("micro303", "materialize")
+def test_entries_land_in_the_cache_folder(cache_dir, tmp_path):
+    cache = Cache(cache_dir / "materialize")
     source = tmp_path / "out.md"
     source.write_text("hello", encoding="utf-8")
 
     cache.set("hash1", source)
 
-    assert (cache_dir / "micro303" / "materialize" / "hash1" / "out.md").is_file()
+    assert (cache_dir / "materialize" / "hash1" / "out.md").is_file()
 
 
 def test_dir_roundtrip_copies_nested(cache_dir, tmp_path):
-    cache = Cache("micro303", "materialize")
+    cache = Cache(cache_dir / "materialize")
     out = tmp_path / "pages"
     (out / "nested").mkdir(parents=True)
     (out / "page_1.md").write_text("one", encoding="utf-8")
@@ -57,42 +49,31 @@ def test_dir_roundtrip_copies_nested(cache_dir, tmp_path):
 
 
 def test_miss_returns_false(cache_dir, tmp_path):
-    cache = Cache("micro303", "materialize")
+    cache = Cache(cache_dir / "materialize")
     assert cache.get("unknown-hash", tmp_path / "x.md") is False
 
 
 def test_refresh_bypasses_lookup(cache_dir, tmp_path):
-    cache = Cache("micro303", "materialize")
+    cache = Cache(cache_dir / "materialize")
     source = tmp_path / "out.md"
     source.write_text("hello", encoding="utf-8")
     cache.set("hash1", source)
 
-    refreshed = Cache("micro303", "materialize", refresh=True)
+    refreshed = Cache(cache_dir / "materialize", refresh=True)
     assert refreshed.get("hash1", tmp_path / "other.md") is False
 
 
-def test_projects_are_isolated(cache_dir, tmp_path):
-    """Same content, same transform: one entry per project."""
-    cache = Cache("micro303", "materialize")
-    source = tmp_path / "out.md"
-    source.write_text("hello", encoding="utf-8")
-    cache.set("hash1", source)
-
-    other = Cache("cmi", "materialize")
-    assert other.get("hash1", tmp_path / "sub" / "out.md") is False
-
-
 def test_text_roundtrip(cache_dir):
-    cache = Cache("micro303", "embed")
+    cache = Cache(cache_dir / "embed")
     cache.write("hash1", "embedding.json", "[0.1, 0.2]")
 
     assert cache.read("hash1", "embedding.json") == "[0.1, 0.2]"
 
 
 def test_text_read_misses_and_respects_refresh(cache_dir):
-    cache = Cache("micro303", "embed")
+    cache = Cache(cache_dir / "embed")
     assert cache.read("unknown-hash", "embedding.json") is None
 
     cache.write("hash1", "embedding.json", "[0.1]")
-    refreshed = Cache("micro303", "embed", refresh=True)
+    refreshed = Cache(cache_dir / "embed", refresh=True)
     assert refreshed.read("hash1", "embedding.json") is None

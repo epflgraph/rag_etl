@@ -27,7 +27,6 @@ directory upwards fills in what the environment lacks. The main ones:
 | Variable | What for |
 |---|---|
 | `BASE_PATH` | where the project folders live |
-| `CACHE_DIR` | the disk cache (must exist) |
 | `RCP_BASE_URL`, `RCP_API_KEY` | the models (OCR, labelling, exercise splitting, embeddings) |
 | `MOODLE_URL`, `MOODLE_TOKEN` | Moodle sources |
 | `KALTURA_*`, `SWITCH_API_URL`, `DEFAULT_MEDIASPACE_BASE_URL` | videos |
@@ -58,9 +57,11 @@ What a run leaves behind:
 $BASE_PATH/<project>/
 ├── moodle/, mooc/, …     what each source downloaded or holds
 ├── work/                 scratch, wiped at the start of every run
+├── cache/<step>/…        everything a model produced, reused across runs
 └── output/               one manifest per run: <timestamp>_manifest[_dry].json
-$CACHE_DIR/<project>/<step>/…   everything a model produced, reused across runs
 ```
+
+**Warning**: Deleting a project's folder deletes its cache with it!
 
 A real run publishes into a fresh index `rag_<project>_<YYYYMMDD>_<HHMMSS>`
 and then moves the alias `rag_<project>` to it in one step. A failed run

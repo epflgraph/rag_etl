@@ -139,7 +139,7 @@
   <!-- Cache -->
   <path d="M452,322 L452,366 A549,12 0 0 0 1550,366 L1550,322" fill="#F1F5F9" stroke="#475569" stroke-width="1.2"/>
   <ellipse cx="1001" cy="322" rx="549" ry="12" fill="#F1F5F9" stroke="#475569" stroke-width="1.2"/>
-  <text x="1001" y="350" class="b" text-anchor="middle">content-hash cache — $CACHE_DIR/&lt;project&gt;/&lt;step&gt;/</text>
+  <text x="1001" y="350" class="b" text-anchor="middle">content-hash cache — &lt;project&gt;/cache/&lt;step&gt;/</text>
   <text x="1001" y="366" class="t" text-anchor="middle">no model or prompt in the key: --refresh &lt;step&gt; or a recipe version bump · PDFs and videos as Merkle trees: one changed page re-reads one page</text>
   <path d="M522,266 L522,306" class="dash" marker-end="url(#arrow)" marker-start="url(#arrow)"/>
   <path d="M684,266 L684,306" class="dash" marker-end="url(#arrow)" marker-start="url(#arrow)"/>

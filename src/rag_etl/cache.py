@@ -1,6 +1,7 @@
 """Content-hash disk cache: the one cache every transform shares.
 
-The scope is the project and the transform's name; the key is the sha256
+Each project keeps its own, in its folder's cache/, one scope per
+transform (`<project>/cache/<step>/`); the key is the sha256
 of the content the transform would recompute from, so identical content
 within one project shares an entry. Values are files or whole
 directories (nested), copied in and out as they are. A per-run
@@ -22,7 +23,6 @@ from __future__ import annotations
 
 import copy
 import json
-import os
 import shutil
 
 from collections.abc import Sequence
@@ -35,15 +35,9 @@ NODE_FILE = "children.json"
 class Cache:
     """Disk cache for one project's transform, keyed by content hash only."""
 
-    def __init__(self, project: str, transform: str, refresh: bool = False):
-        self.project = project
-        self.transform = transform
+    def __init__(self, cache_path: Path, refresh: bool = False):
+        self.cache_path = cache_path
         self.refresh = refresh
-
-        cache_path = Path(os.environ["CACHE_DIR"])
-        if not cache_path.exists():
-            raise ValueError(f"Cache path {cache_path} does not exist.")
-        self.cache_path = cache_path / project / transform
 
     def scope(self, name: str) -> Cache:
         """The cache nested under this one in its own folder, e.g. one per recipe version."""

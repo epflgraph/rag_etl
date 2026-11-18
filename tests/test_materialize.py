@@ -27,8 +27,6 @@ class FakeResolver:
 
 @pytest.fixture
 def transformer(tmp_path, monkeypatch):
-    monkeypatch.setenv("CACHE_DIR", str(tmp_path / "cache"))
-    (tmp_path / "cache").mkdir()
     monkeypatch.setattr("ragtools.llm.RCPClient.vision", lambda self, prompt, images, **kwargs: "slide text")
 
     fake_resolver = FakeResolver()
@@ -42,7 +40,7 @@ def transformer(tmp_path, monkeypatch):
     detector = SimpleNamespace(detect=lambda *args, **kwargs: [0, 40, 80])
 
     return MaterializeTransformer(
-        cache=Cache("micro303", "materialize"), work_root=tmp_path / "material" / "work", detector=detector
+        cache=Cache(tmp_path / "cache" / "materialize"), work_root=tmp_path / "material" / "work", detector=detector
     )
 
 
@@ -95,7 +93,7 @@ def test_pdf_one_changed_page_reOCRs_one_page(tmp_path, transformer, monkeypatch
         lambda self, prompt, images, **kwargs: calls.append(kwargs.get("name")) or "slide text",
     )
     counting = MaterializeTransformer(
-        cache=Cache("micro303", "materialize"), work_root=transformer.work_root, detector=transformer.detector
+        cache=transformer.cache, work_root=transformer.work_root, detector=transformer.detector
     )
 
     make_pdf(pdf_path, ["alpha", "beta, slightly changed"])
@@ -163,7 +161,7 @@ def test_missing_leaf_self_heals(tmp_path, transformer, monkeypatch):
     root = Resource(title="root", children=[Resource(title="lecture", path=pdf_path, mime_type=mt.PDF)])
     transformer.transform([root])
 
-    shutil.rmtree(next((tmp_path / "cache" / "micro303" / "materialize").glob("*/*/page_1.md")).parent)
+    shutil.rmtree(next((tmp_path / "cache" / "materialize").glob("*/*/page_1.md")).parent)
 
     calls = []
     monkeypatch.setattr(
@@ -342,7 +340,7 @@ def test_refreshed_video_redetects_and_leaves_no_stale_frames(tmp_path, transfor
     assert len(root.children[0].children) == 2
 
     refreshed = MaterializeTransformer(
-        cache=Cache("micro303", "materialize", refresh=True),
+        cache=Cache(transformer.cache.cache_path, refresh=True),
         work_root=transformer.work_root,
         detector=SimpleNamespace(detect=lambda *args, **kwargs: [0]),
     )

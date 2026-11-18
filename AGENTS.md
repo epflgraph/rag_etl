@@ -186,7 +186,7 @@ hybrid (vectors + text); query vectors must be unit-normalized.
 
 ## Cache and models
 
-**Cache** (`cache.py`): on disk under `$CACHE_DIR/<project>/<step>/`, keyed
+**Cache** (`cache.py`): on disk in the project's folder, `<project>/cache/<step>/` (projects never share one), keyed
 by content hash only, values are files or directories, no eviction.
 
 - No model, prompt or setting in the key. A change is applied deliberately: every cached recipe has a version (`CACHE_VERSION`: `notebook-md-1` in normalize, `pdf-ocr-1`, `image-ocr-1`, `video-slides-1` in materialize, `exercises-1` in cut, `embedding-1` in embed), and bumping it starts a fresh scope, the old one kept for rollback. `--refresh <step>` overwrites a step's current scope in place, for a rerun of the same recipe.

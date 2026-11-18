@@ -1,5 +1,6 @@
 import json
 import logging
+import shutil
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -31,7 +32,9 @@ class EdDiscussionExtractor(Extractor):
     ("Exams", "Series 3", ...) are what both read.
 
     The export is read from `dir / academic_year`: one JSON file per
-    thread, the images its posts embed under `files/`.
+    thread, the images its posts embed under `files/` (where a remote
+    image is downloaded to, once). The Q&A Markdown is written under
+    `markdown/`, rewritten at every extraction.
     """
 
     academic_year: str  # as "2025_2026"
@@ -46,8 +49,10 @@ class EdDiscussionExtractor(Extractor):
         if not ed_dir.is_dir():
             raise SourceUnavailable(f"No Ed Discussion export at {ed_dir}")
 
+        # Rewritten from scratch, so a thread the export lost does not linger
         markdown_dir = ed_dir / "markdown"
-        markdown_dir.mkdir(parents=True, exist_ok=True)
+        shutil.rmtree(markdown_dir, ignore_errors=True)
+        markdown_dir.mkdir(parents=True)
 
         root = Resource(title=f"Ed Discussion {self.academic_year}")
         containers: dict[tuple[str, ...], Resource] = {}

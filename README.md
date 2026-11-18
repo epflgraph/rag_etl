@@ -55,8 +55,8 @@ What a run leaves behind:
 
 ```
 $BASE_PATH/<project>/
-├── moodle/, mooc/, …     what each source downloaded or holds
-├── work/                 scratch, wiped at the start of every run
+├── moodle/, mooc/, …     what each source downloaded or holds; written by its extractor only
+├── work/<step>/…         scratch, wiped at the start of every run
 ├── cache/<step>/…        everything a model produced, reused across runs
 └── output/               one manifest per run: <timestamp>_manifest[_dry].json
 ```
@@ -72,7 +72,7 @@ leaves the alias where it was; older indices stay for rollback.
 One fixed sequence, the same for every project:
 
 1. **extract** — each source becomes a tree of resources (folders, files, threads), with the facts the source states: titles, urls, release dates, weeks.
-2. **normalize** — archives are unpacked, notebooks become markdown, oversized files are dropped.
+2. **normalize** — archives are unpacked, notebooks and HTML pages become markdown, oversized files are dropped.
 3. **materialize** — every PDF page and image is read by a vision model, including the images a markdown file shows; videos become one slide per slide change, with what was said over it.
 4. **judge** — every resource gets a type, a subtype and a cut. Today a stub reads cues from the titles; the project's overrides correct it.
 5. **cut** — resources become chunks: the whole document, one per child (page, slide), one per exercise, or one per heading section.

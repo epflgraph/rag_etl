@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 class QuizParser:
     """
-    Parse an Open edX problem into two leaves, its markdown written beside the export:
+    Parse an Open edX problem into two leaves, its markdown written in the export's markdown folder:
     - the quiz without its solutions
     - the quiz again, its answers marked and its explanation added
     """
@@ -41,7 +41,7 @@ class QuizParser:
             # Unsupported quiz type
             return []
 
-        out_dir = export.dir / "quiz"
+        out_dir = export.markdown_dir
         out_dir.mkdir(parents=True, exist_ok=True)
 
         quiz_md_path = out_dir / f"{url_name}.quiz.md"

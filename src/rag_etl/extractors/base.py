@@ -23,9 +23,15 @@ class Extractor(ABC):
     (title, path, mime type, dates) and whatever labels the source itself
     already infers; the judge fills in the rest. Any failure to reach the
     source raises SourceUnavailable.
+
+    Extraction reads the source's own format (an API's answers, an export's
+    XML or JSON) into files a later step can read; general formats (archives,
+    notebooks, HTML) are normalize's. An extractor writes only under `dir`,
+    and is idempotent: what it leaves there depends on the current source
+    alone, never on an earlier run.
     """
 
-    dir: Path  # where the extractor hands files over: downloads, copies, clones
+    dir: Path  # where the extractor hands files over: downloads, copies, clones, and nowhere else
 
     @abstractmethod
     def extract(self) -> Resource:

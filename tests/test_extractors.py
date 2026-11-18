@@ -321,6 +321,27 @@ def test_mooc_tree(tmp_path):
     assert video.children[0].mime_type == mt.SRT
 
 
+def test_mooc_extraction_is_idempotent(tmp_path):
+    base = tmp_path / "export"
+    _write_mooc_export(base)
+    delivered = sorted(path.relative_to(base) for path in base.rglob("*"))
+    # A quiz written by an earlier extraction, of a problem the export no longer holds
+    (base / "markdown").mkdir()
+    (base / "markdown" / "gone.quiz.md").write_text("stale")
+
+    for _ in range(2):
+        root = MOOCExtractor(dir=base, language="en", first_week_chapter=1, week_count=1).extract()
+
+    # The export is left as delivered, but for the quizzes the extractor writes into markdown/
+    written = sorted(path.relative_to(base) for path in base.rglob("*"))
+    assert sorted(set(written) - set(delivered)) == [
+        Path("markdown"), Path("markdown/p1.quiz.md"), Path("markdown/p1.quiz_solutions.md")
+    ]
+    # The page goes as the export holds it, for normalize to convert
+    page = next(node for node in root.walk() if node.title == "Lecture")
+    assert page.mime_type == mt.HTML and page.path == base / "html" / "h1.html"
+
+
 def test_mooc_page_marked_no_bot_is_left_out(tmp_path):
     base = tmp_path / "export"
     _write_mooc_export(base)

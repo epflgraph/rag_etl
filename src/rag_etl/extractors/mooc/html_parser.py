@@ -3,7 +3,6 @@ from pathlib import Path
 from lxml.etree import _Element
 from pathlib import PurePosixPath
 from urllib.parse import unquote
-import re
 import unicodedata
 
 from bs4 import BeautifulSoup
@@ -16,20 +15,12 @@ from rag_etl.extractors.mooc.utils import (
     url_exists,
 )
 
-from ragtools.encoding import sanitize_for_filename
-from ragtools.html import html_to_markdown
 from rag_etl.extractors.markers import NO_BOT, split_tag_number_text, split_tag_text
 
 import ragtools.mime_types as mt
 
 
 logger = logging.getLogger(__name__)
-
-# A tag as it is written into a page, as in "[MOOC_EXERCICE_6_SOLUTION]": a
-# capital and at least one more capital, digit or underscore, so citations
-# ("[1]") and single letters ("[A]") are not taken for one. Spaces are allowed
-# because a tag split across two HTML elements gains one when they are joined
-TAG_MARKER = re.compile(r"\[[A-Z][A-Z_0-9 ]+\]")
 
 
 class HtmlParser:
@@ -106,22 +97,6 @@ class HtmlParser:
             return None
 
         return inferred_url
-
-    def strip_tag_markers(self, md_text: str) -> str:
-        """
-        Remove the tag markers a page carries from the text taken out of it.
-
-        A marker says how to file the thing it sits next to; it is not something
-        a student reads, and left in place it is indexed as course content and
-        read back by later stages as if it were a heading. A marker is capitals,
-        digits and underscores, so citations ([1]) and bracketed prose survive.
-        """
-
-        for marker in set(TAG_MARKER.findall(md_text)):
-            md_text = md_text.replace(marker, "")
-
-        # Taking a marker out of a line can leave the space it sat in
-        return "\n".join(line.strip() for line in md_text.splitlines()).strip()
 
     def resolve_link(self, linked: str, export: Export) -> tuple[Path, str | None]:
         """Return where a linked file is in the export, and the url it is published at."""
@@ -203,25 +178,12 @@ class HtmlParser:
             logger.info(f"Skipping the page {html_display_name!r} because it is marked NO_BOT")
             return []
 
-        # HTML to MarkDown
-        md_text = html_to_markdown(soup)
-        md_text = self.strip_tag_markers(md_text)
-
-        # Write MarkDown to file in the same HTML folder, under a name the filesystem takes
-        markdown_path = export.dir / "html" / sanitize_for_filename(f"{html_url_name}.md")
-
-        Path(markdown_path).write_text(md_text, encoding="utf-8")
-        logger.debug(
-            "markdown_path exists? %s (%s)",
-            Path(markdown_path).exists(),
-            repr(markdown_path),
-        )
-
+        # The page is handed over as the export holds it; normalize turns HTML into Markdown
         mooc_resources.append(
             Resource(
                 title=page_title,
-                path=markdown_path,
-                mime_type=mt.guess_mime_type(str(markdown_path)),
+                path=html_path,
+                mime_type=mt.HTML,
                 number=str(module_number) if module_number is not None else None,
                 week=week,
             )

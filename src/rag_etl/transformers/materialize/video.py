@@ -13,7 +13,6 @@ top again. The frames themselves are scratch: re-derivable, never cached.
 from __future__ import annotations
 
 import logging
-import shutil
 
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
@@ -85,10 +84,6 @@ class VideoMaterializer:
 
         key = _node_key(entry_id, self.language)
         work_dir = self.work_root / key
-
-        # A crashed run can leave slides behind: they must not survive into
-        # the new ones
-        shutil.rmtree(work_dir, ignore_errors=True)
 
         cache = self.cache.scope(CACHE_VERSION)
         md_paths = cache.adopt(key, work_dir)

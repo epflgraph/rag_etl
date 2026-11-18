@@ -16,7 +16,7 @@ from rag_etl.transformers.normalize import NormalizeTransformer
 
 @pytest.fixture
 def transformer(tmp_path, monkeypatch):
-    return NormalizeTransformer(cache=Cache(tmp_path / "cache" / "normalize"))
+    return NormalizeTransformer(cache=Cache(tmp_path / "cache" / "normalize"), work_root=tmp_path / "work" / "normalize")
 
 
 def make_zip(path: Path, files: dict[str, bytes]) -> Path:
@@ -38,6 +38,30 @@ def test_zip_expands_into_container(tmp_path, transformer):
     bundle = root.children[0]
     assert [child.title for child in bundle.children] == ["lecture.pdf", "notes.txt"]
     assert [child.mime_type for child in bundle.children] == [mt.PDF, mt.TXT]
+
+
+def test_normalize_writes_nothing_beside_the_sources(tmp_path, transformer):
+    # A source folder that is not wiped between runs would extract what was
+    # written into it as material of its own on the next run
+    source = tmp_path / "local"
+    source.mkdir()
+    zip_path = make_zip(source / "bundle.zip", {"notes.txt": b"notes"})
+    notebook_path = source / "tp.ipynb"
+    notebook_path.write_text(
+        json.dumps({"cells": [], "metadata": {}, "nbformat": 4, "nbformat_minor": 5}), encoding="utf-8"
+    )
+    root = Resource(
+        title="root",
+        children=[
+            Resource(title="bundle", path=zip_path, mime_type=mt.ZIP),
+            Resource(title="tp", path=notebook_path, mime_type=mt.IPYNB),
+        ],
+    )
+
+    transformer.transform([root])
+
+    assert sorted(path.name for path in source.iterdir()) == ["bundle.zip", "tp.ipynb"]
+    assert all(node.path.is_relative_to(transformer.work_root) for node in root.walk() if node.path and node.is_leaf)
 
 
 def test_targz_expands_into_container(tmp_path, transformer):
@@ -87,7 +111,47 @@ def test_notebook_converted(tmp_path, transformer):
 
     notebook = root.children[0]
     assert notebook.mime_type == mt.MARKDOWN
-    assert notebook.path == notebook_path.with_suffix(".md")
+    assert notebook.path.name == "notebook.md"
+    assert notebook.path.is_relative_to(transformer.work_root)
+
+
+def test_notebook_images_still_resolve_from_the_work_area(tmp_path, transformer, monkeypatch):
+    monkeypatch.setattr("ragtools.notebooks.alt_text", lambda path: "a plot")
+    source = tmp_path / "local"
+    (source / "figures").mkdir(parents=True)
+    (source / "figures" / "plot.png").write_bytes(b"png fake")
+    notebook_path = source / "tp.ipynb"
+    notebook_path.write_text(
+        json.dumps(
+            {
+                "cells": [{"cell_type": "markdown", "metadata": {}, "source": ["![](figures/plot.png)"]}],
+                "metadata": {},
+                "nbformat": 4,
+                "nbformat_minor": 5,
+            }
+        ),
+        encoding="utf-8",
+    )
+    root = Resource(title="root", children=[Resource(title="tp", path=notebook_path, mime_type=mt.IPYNB)])
+
+    transformer.transform([root])
+
+    md_path = root.children[0].path
+    target = md_path.read_text(encoding="utf-8").split("](<", 1)[1].split(">)", 1)[0]
+    assert (md_path.parent / target).resolve() == (source / "figures" / "plot.png").resolve()
+
+
+def test_html_converted(tmp_path, transformer):
+    html_path = tmp_path / "page.html"
+    html_path.write_text("<html><body><h2>Title</h2><p>Some <b>text</b>.</p></body></html>", encoding="utf-8")
+    root = Resource(title="root", children=[Resource(title="page", path=html_path, mime_type=mt.HTML)])
+
+    transformer.transform([root])
+
+    page = root.children[0]
+    assert page.mime_type == mt.MARKDOWN
+    assert page.path.is_relative_to(transformer.work_root)
+    assert page.path.read_text(encoding="utf-8") == "## Title\n\nSome **text** ."
 
 
 def test_oversized_files_dropped(tmp_path, transformer):

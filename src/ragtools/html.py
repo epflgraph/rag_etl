@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import re
 from html import unescape
+from pathlib import Path
 
 from bs4 import BeautifulSoup
 from bs4.element import NavigableString, Tag
@@ -62,6 +63,14 @@ def html_to_markdown(soup: BeautifulSoup) -> str:
     _walk(root, out)
 
     return "\n".join(out).strip()
+
+
+def convert_html_to_md(html_path: str | Path, md_path: str | Path) -> None:
+    """Convert an HTML file to a Markdown file."""
+    html = Path(html_path).read_text(encoding="utf-8", errors="replace")
+    md_path = Path(md_path)
+    md_path.parent.mkdir(parents=True, exist_ok=True)
+    md_path.write_text(html_to_markdown(BeautifulSoup(html, "html.parser")), encoding="utf-8")
 
 
 def _remove_noise(soup: BeautifulSoup) -> None:

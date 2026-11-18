@@ -9,6 +9,7 @@ left with nothing in it is dropped.
 import json
 import logging
 import re
+import shutil
 from pathlib import Path
 
 from lxml.etree import _Element
@@ -34,7 +35,11 @@ def parse_course(
     first_week_chapter: int | None = None,
     week_count: int | None = None,
 ) -> Resource:
-    """Parse a MOOC export into a resource tree: one container per chapter."""
+    """Parse a MOOC export into a resource tree: one container per chapter.
+
+    The export is read as it is, but for its markdown folder, rewritten
+    from scratch: the quizzes, which only this parser can read, as Markdown.
+    """
 
     course = _course_element(export_dir)
 
@@ -45,6 +50,9 @@ def parse_course(
         asset_base_url=asset_base_url or load_asset_base_url(export_dir),
         language=language,
     )
+
+    # What an earlier extraction wrote goes, so a quiz the export lost does not linger
+    shutil.rmtree(export.markdown_dir, ignore_errors=True)
 
     root = Resource(title=(course.get("display_name") if course is not None else None) or "", url=course_url)
 

@@ -53,7 +53,7 @@ src/
 │   ├── video.py              ffmpeg frames, SRT parsing, SlideDetector interface
 │   ├── graphai.py            GraphAI client + GraphAISlideDetector
 │   ├── kaltura.py            Kaltura client, session_from_env, KalturaVideoResolver
-│   ├── html.py               html_to_markdown + the shared text clean-ups
+│   ├── html.py               html_to_markdown, convert_html_to_md + the shared text clean-ups
 │   ├── edx_quiz.py           parse_quiz, quiz_to_markdown (Open edX single/multiple choice)
 │   ├── archives.py, notebooks.py, files.py (iter_files), encoding.py, mime_types.py
 └── rag_etl/
@@ -79,7 +79,10 @@ list steps. The contracts:
 
 The work area (`<project>/work/`) is scratch, wiped at every run start:
 everything in it can be rebuilt from the sources and the cache without a
-model call. A dry run does everything except publishing (model calls
+model call. Where each step writes:
+
+- *Extractors* write only into their own `dir`, and are idempotent: what they leave there depends on the current source alone, never on an earlier run (Moodle, Git and Mediaspace wipe `dir` first; MOOC and Ed, whose `dir` is a hand-delivered export, write into one `markdown/` folder of it, wiped first).
+- *Transformers* write only into the work area, which mirrors the cache (`work/<step>/<content hash>/`), and their cache; never into the sources, where an unwiped folder (a local folder, an export) would extract it as material on the next run. Equal content shares its folder, as it is processed the same way. A dry run does everything except publishing (model calls
 included) and writes a `_dry` manifest.
 
 ## The resource tree
@@ -115,7 +118,9 @@ is the only manual channel:
 
 ## Steps in detail
 
-**Extractors.** Return everything includable; professors exclude with a
+**Extractors.** Read a source's own format (an API's answers, an export's
+XML or JSON) into files; general formats any source can carry (archives,
+notebooks, HTML) are normalize's. Return everything includable; professors exclude with a
 `NO_BOT` marker (Moodle, file and folder names, MOOC pages). Those that filter
 by type keep `mime_types.DEFAULT_MIME_TYPES` unless a project passes its own:
 everything the pipeline can read, code, archives and images included. "Text"
@@ -124,13 +129,14 @@ everything the pipeline can read, code, archives and images included. "Text"
 constants: never remove or rename one, only add.
 
 - *Moodle*: sections → modules → files; availability dates become `from_`/`until`, written in Lausanne's time with its offset (`2026-09-07T08:00:00.000000+02:00`) so they name one instant. Requests time out after 60 s without data. A type Moodle names its own way (`document/unknown`, `application/g-zip`) falls back to the file name's type. Assignments cannot be fetched (no API access) — accepted.
-- *MOOC* (edX export): course → chapters (weeks, from `first_week_chapter`/`week_count`) → sequentials → verticals → pages, linked documents, quizzes (statement and statement + solution files), videos with their subtitles. Documents linked on a video page are skipped as duplicates of the video's slides. A video naming no source stops the run.
+- *MOOC* (edX export): course → chapters (weeks, from `first_week_chapter`/`week_count`) → sequentials → verticals → pages (their HTML, as the export holds it; `[TAG_N]` markers still in the text until their fate is settled), linked documents, quizzes (statement and statement + solution files, written to the export's `markdown/`), videos with their subtitles. Documents linked on a video page are skipped as duplicates of the video's slides. A video naming no source stops the run.
 - *Mediaspace*: a channel or playlist; videos with their Kaltura captions. Videos have no `path`; overrides reach them by `url` (`url="https://mediaspace.epfl.ch/*"`).
 - *Local folder*, *Git* (repo or branch url; everything indexed by default).
 - *Ed Discussion*: threads filed under Ed's categories and subcategories, one markdown Q&A per answered thread (staff answers; endorsed student answers if asked). A post's image is downloaded and shown as a markdown image, which materialize reads. Which categories to keep and how to label them is done by overrides.
 
 **Normalize.** zip and tar.gz unpack into children (UTF-8 names fixed),
-notebooks become markdown (alt texts by a vision model), files over their
+notebooks become markdown (alt texts by a vision model), HTML becomes
+markdown (MOOC pages, a repository's pages), files over their
 family's limit are dropped (PDF 50 MB, images 10 MB, text 5 MB).
 
 **Materialize** (facade over pdf, image and video materializers).

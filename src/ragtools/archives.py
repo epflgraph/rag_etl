@@ -1,9 +1,9 @@
 """Archives: zip and tar.gz archives turned into plain files.
 
-An archive handed over by a source is extracted next to itself into a
-folder named after it, so the material that was one file becomes a
-directory of files. Names are made readable and written in one normal
-form, since course material travels between systems with different
+An archive is extracted into a folder named after it, next to itself
+unless the caller names another folder, so the material that was one file
+becomes a directory of files. Names are made readable and written in one
+normal form, since course material travels between systems with different
 opinions about accents and encodings.
 """
 
@@ -21,8 +21,8 @@ from ragtools.encoding import zip_entry_filename
 logger = logging.getLogger(__name__)
 
 
-def _extract_dir(archive_path: Path) -> Path:
-    """The folder an archive is extracted into, named after it, composed."""
+def _extract_dir(archive_path: Path, out_dir: str | Path | None) -> Path:
+    """The folder an archive is extracted into: named after it, composed, under out_dir or next to it."""
     name = archive_path.name
     for suffix in (".tar.gz", ".tgz"):
         if name.endswith(suffix):
@@ -31,13 +31,14 @@ def _extract_dir(archive_path: Path) -> Path:
     else:
         name = archive_path.stem
 
-    return archive_path.with_name(unicodedata.normalize("NFC", name))
+    parent = Path(out_dir) if out_dir is not None else archive_path.parent
+    return parent / unicodedata.normalize("NFC", name)
 
 
-def unzip_file(zip_path: str | Path) -> Path:
-    """Extract a zip archive next to itself and return the folder."""
+def unzip_file(zip_path: str | Path, out_dir: str | Path | None = None) -> Path:
+    """Extract a zip archive into a folder named after it, under out_dir or next to it, and return the folder."""
     zip_path = Path(zip_path)
-    extract_dir = _extract_dir(zip_path)
+    extract_dir = _extract_dir(zip_path, out_dir)
     extract_dir.mkdir(parents=True, exist_ok=True)
 
     with zipfile.ZipFile(zip_path, "r") as zip_ref:
@@ -53,10 +54,10 @@ def unzip_file(zip_path: str | Path) -> Path:
     return extract_dir
 
 
-def untar_file(tar_path: str | Path) -> Path:
-    """Extract a tar archive (any compression) next to itself and return the folder."""
+def untar_file(tar_path: str | Path, out_dir: str | Path | None = None) -> Path:
+    """Extract a tar archive (any compression) like unzip_file and return the folder."""
     tar_path = Path(tar_path)
-    extract_dir = _extract_dir(tar_path)
+    extract_dir = _extract_dir(tar_path, out_dir)
     extract_dir.mkdir(parents=True, exist_ok=True)
 
     with tarfile.open(tar_path, "r:*") as tar_ref:

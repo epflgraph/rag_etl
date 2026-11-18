@@ -82,11 +82,16 @@ def transform(roots: list[Resource], project: Project, refresh: str | None = Non
     def cache(name: str) -> Cache:
         return Cache(project_dir(project) / "cache" / name, refresh=refresh == name)
 
+    # The work area mirrors the cache: one folder per transformer that writes
+    # files. Transformers write there and in their cache only, never in the sources
+    def work(name: str) -> Path:
+        return project_dir(project) / "work" / name
+
     transformers: list[Transformer] = [
-        NormalizeTransformer(cache=cache(NormalizeTransformer.name)),
+        NormalizeTransformer(cache=cache(NormalizeTransformer.name), work_root=work(NormalizeTransformer.name)),
         MaterializeTransformer(
             cache=cache(MaterializeTransformer.name),
-            work_root=project_dir(project) / "work",
+            work_root=work(MaterializeTransformer.name),
             detector=GraphAISlideDetector(),
             mediaspace_url=os.environ.get("DEFAULT_MEDIASPACE_BASE_URL"),
             language=project.language,

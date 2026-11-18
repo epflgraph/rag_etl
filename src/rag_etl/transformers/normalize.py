@@ -1,4 +1,4 @@
-"""Normalize: archives into files, notebooks into Markdown, oversized files dropped."""
+"""Normalize: archives into files, notebooks and HTML into Markdown, oversized files dropped."""
 
 from __future__ import annotations
 
@@ -6,11 +6,13 @@ import logging
 
 from collections.abc import Sequence
 from dataclasses import dataclass
+from pathlib import Path
 
 import ragtools.mime_types as mt
 from ragtools.archives import untar_file, unzip_file
 from ragtools.files import iter_files
 from ragtools.encoding import ensure_utf8
+from ragtools.html import convert_html_to_md
 from ragtools.notebooks import convert_ipynb_to_md
 
 from rag_etl.cache import Cache
@@ -61,19 +63,24 @@ class NormalizeTransformer(Transformer):
 
     - zip and tar.gz archives are extracted, replaced by a container holding
       one child per extracted file,
-    - Jupyter notebooks are converted to Markdown,
+    - Jupyter notebooks and HTML pages are converted to Markdown,
     - files bigger than their mime family's size limit are dropped.
+
+    What it writes goes to the work area, in a folder named by the content
+    it came from, never next to the sources.
     """
 
     name = "normalize"
 
     cache: Cache
+    work_root: Path
     mime_types: Sequence[str] = mt.DEFAULT_MIME_TYPES
 
     def transform(self, roots: list[Resource]) -> list[Resource]:
         for root in roots:
             self._expand_archives(root)
             self._convert_notebooks(root)
+            self._convert_html(root)
             self._drop_oversized(root)
         return roots
 
@@ -84,10 +91,11 @@ class NormalizeTransformer(Transformer):
 
             logger.info(f"Extracting {node.title}")
 
+            out_dir = self.work_root / node.content_hash
             if node.mime_type == mt.ZIP:
-                extract_dir = unzip_file(node.path)
+                extract_dir = unzip_file(node.path, out_dir)
             else:
-                extract_dir = untar_file(node.path)
+                extract_dir = untar_file(node.path, out_dir)
 
             # The archive node keeps its identity and gains one child per
             # extracted file, becoming the container of its contents
@@ -114,14 +122,25 @@ class NormalizeTransformer(Transformer):
             if node.mime_type != mt.IPYNB or node.path is None:
                 continue
 
-            md_path = node.path.with_suffix(".md")
             content_hash = node.content_hash
+            md_path = self.work_root / content_hash / f"{node.path.stem}.md"
 
             if not cache.get(content_hash, md_path):
                 logger.info(f"Converting notebook {node.title}")
                 convert_ipynb_to_md(node.path, md_path)
                 cache.set(content_hash, md_path)
 
+            node.path = md_path
+            node.mime_type = mt.MARKDOWN
+
+    def _convert_html(self, root: Resource) -> None:
+        # Deterministic and cheap: converted at every run, never cached
+        for node in list(root.walk()):
+            if node.mime_type != mt.HTML or node.path is None:
+                continue
+
+            md_path = self.work_root / node.content_hash / f"{node.path.stem}.md"
+            convert_html_to_md(node.path, md_path)
             node.path = md_path
             node.mime_type = mt.MARKDOWN
 

@@ -37,6 +37,11 @@ class Export:
     asset_base_url: str | None = None  # the prefix the course's files are published under
     language: str | None = None        # which subtitle track a video keeps
 
+    @property
+    def markdown_dir(self) -> Path:
+        """The one folder the extractor writes into the export (the quizzes as Markdown), wiped at every extraction."""
+        return self.dir / "markdown"
+
     def xml_path(self, kind: str, url_name: str) -> Path:
         """Where the block of this kind and name is described in the export."""
         return self.dir / kind / f"{url_name}.xml"

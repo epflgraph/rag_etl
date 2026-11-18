@@ -2,6 +2,7 @@ import mimetypes
 
 MARKDOWN = "text/markdown"
 TXT = "text/plain"
+HTML = "text/html"
 SRT = "application/x-subrip"
 
 JPEG = "image/jpeg"

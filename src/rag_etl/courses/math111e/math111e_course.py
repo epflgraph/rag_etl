@@ -38,14 +38,7 @@ class MATH111eCourse(BaseCourse):
         "course_language": "fr",
     }
 
-    # Tags he declared in the form:
-    # THEORY
-    # THEORY_SLIDES
-    # SERIE_x
-    # SERIE_x_SOLUTION
-
     # From what I see on his Moodle he added a few tags so we use this:
-    # MATH-101(d)
     # THEORY
     # THEORY_SLIDES
     # SERIE_x
@@ -113,6 +106,40 @@ class MATH111eCourse(BaseCourse):
             "one_chunk_per_doc": True,
             "pdf_to_markdown": True,
             "split_exercises": True,
+        },
+        "EXAM": {
+            "type": "exam",
+            "subtype": "exam",
+            "one_chunk_per_page": False,
+            "one_chunk_per_doc": True,
+            "pdf_to_markdown": True,
+            "split_exercises": True,
+        },
+        "EXAM_SOLUTION": {
+            "type": "exam",
+            "subtype": "exam",
+            "one_chunk_per_page": False,
+            "one_chunk_per_doc": True,
+            "pdf_to_markdown": True,
+            "split_exercises": True,
+            "is_solution": True,
+        },
+        "MIDTERM_EXAM": {
+            "type": "exam",
+            "subtype": "midterm_exam",
+            "one_chunk_per_page": False,
+            "one_chunk_per_doc": True,
+            "pdf_to_markdown": True,
+            "split_exercises": True,
+        },
+        "MIDTERM_EXAM_SOLUTION": {
+            "type": "exam",
+            "subtype": "midterm_exam",
+            "one_chunk_per_page": False,
+            "one_chunk_per_doc": True,
+            "pdf_to_markdown": True,
+            "split_exercises": True,
+            "is_solution": True,
         },
         "MEDIASPACE_VIDEO": {
             "type": "theory",

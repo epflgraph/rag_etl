@@ -2,29 +2,24 @@
 
 Each level is a block described in its own file and listing the blocks it
 holds; the walk below follows that nesting down to the items (html pages,
-problems, videos), which their own parsers turn into leaves. A container
-left with nothing in it is dropped.
+problems, videos), which page.py, quiz.py and video.py turn into leaves. A
+container left with nothing in it is dropped.
 """
 
-import json
 import logging
-import re
 import shutil
+
 from pathlib import Path
 
 from lxml.etree import _Element
 
 from rag_etl.core import Resource
-from rag_etl.extractors.mooc.html_parser import HtmlParser
-from rag_etl.extractors.mooc.quiz_parser import QuizParser
-from rag_etl.extractors.mooc.utils import Export, cmp_key, load_root_elem_from_mooc_xml
-from rag_etl.extractors.mooc.video_parser import VideoParser
+from rag_etl.extractors.mooc.export import Export, load_asset_base_url, load_assets_map, load_xml
+from rag_etl.extractors.mooc.page import parse_page
+from rag_etl.extractors.mooc.quiz import parse_quiz_item
+from rag_etl.extractors.mooc.video import parse_video
 
 logger = logging.getLogger(__name__)
-
-# The part of an edX asset link that is the same for every asset of a course,
-# as in "https://courses.edx.org/asset-v1:EPFLx+init-prog-cpp+1T2025+type@asset+"
-ASSET_BASE_URL = re.compile(r"https://[^\"\']*?type@asset\+")
 
 
 def parse_course(
@@ -132,52 +127,13 @@ def _item(export: Export, element: _Element, vertical_title: str, has_video: boo
     """The leaves one item of a vertical yields; an item of any other kind yields none."""
 
     if element.tag == "html":
-        return HtmlParser().parse(export, element, vertical_title, has_video)
+        return parse_page(export, element, vertical_title, has_video)
     if element.tag == "problem":
-        return QuizParser().parse(export, element, vertical_title)
+        return parse_quiz_item(export, element, vertical_title)
     if element.tag == "video":
-        video = VideoParser().parse(export, element, vertical_title)
+        video = parse_video(export, element)
         return [video] if video is not None else []
     return []
-
-
-def load_assets_map(export_dir: Path) -> dict[str, str]:
-    """Read policies/assets.json: the comparison key of each asset's name -> its file."""
-
-    data = json.loads((export_dir / "policies" / "assets.json").read_text(encoding="utf-8"))
-
-    assets: dict[str, str] = {}
-    for asset_key, value in data.items():
-        assets[cmp_key(asset_key)] = value.get("import_path") or value.get("displayname") or asset_key
-
-    return assets
-
-
-def load_asset_base_url(export_dir: Path) -> str | None:
-    """
-    Return the prefix an asset of this course is published under, or None.
-
-    The export's own course key is not usable: course.xml and assets.json
-    are rewritten on re-export and name a course that does not exist
-    publicly. The absolute links the authors wrote into the pages do name
-    the published run, so the prefix is read back from those.
-    """
-
-    found: dict[str, int] = {}
-    for html_path in (export_dir / "html").glob("*.html"):
-        for match in ASSET_BASE_URL.findall(html_path.read_text(encoding="utf-8")):
-            found[match] = found.get(match, 0) + 1
-
-    if not found:
-        logger.warning(f"No absolute asset link in {export_dir}, so linked files will carry no url")
-        return None
-
-    # One course publishes its assets under one prefix, so the most common
-    # is the right one even if a stale link survives somewhere
-    base_url = max(found, key=lambda name: found[name])
-    logger.info(f"Asset base url: {base_url}")
-
-    return base_url
 
 
 def _course_element(export_dir: Path) -> _Element | None:
@@ -188,7 +144,7 @@ def _course_element(export_dir: Path) -> _Element | None:
         logger.warning(f"No course file under {export_dir}, so it has no title and no resource will carry a week")
         return None
 
-    return load_root_elem_from_mooc_xml(course_xml_path)
+    return load_xml(course_xml_path)
 
 
 def chapter_weeks(

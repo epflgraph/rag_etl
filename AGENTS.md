@@ -59,7 +59,8 @@ src/
 └── rag_etl/
     ├── core/                 resource.py (Resource, METADATA_FIELDS, iter_chunks, assign_ids), overrides.py
     ├── extractors/           base.py (Extractor, SourceUnavailable), markers.py (NO_BOT),
-    │                         moodle.py, local_folder.py, git.py, mediaspace.py, mooc/, ed_discussion/
+    │                         moodle.py, local_folder.py, git.py, mediaspace.py, ed_discussion/,
+    │                         mooc/ (MOOCExtractor; course.py the walk, export.py, page.py, quiz.py, video.py)
     ├── transformers/         base.py, normalize.py, images.py, pdf.py, video.py (ocr.py: their shared cached read), judge.py, cut.py, embed.py
     ├── loaders/              base.py, manifest.py, elasticsearch.py, index_settings.json
     ├── projects/             Project, load_project; semester_2627_autumn/<project>.py
@@ -123,7 +124,9 @@ is the only manual channel:
 **Extractors.** Read a source's own format (an API's answers, an export's
 XML or JSON) into files; general formats any source can carry (archives,
 notebooks, HTML) are normalize's. Return everything includable; professors exclude with a
-`NO_BOT` marker (Moodle, file and folder names, MOOC pages). Those that filter
+`NO_BOT` marker (Moodle, file and folder names, MOOC pages), the one marker
+read: titles stay as the source wrote them (the legacy `[TAG_N]` labels of
+old exports are not parsed). Those that filter
 by type keep `mime_types.DEFAULT_MIME_TYPES` unless a project passes its own:
 everything the pipeline can read, code, archives and images included. "Text"
 (`mt.is_text`) is wider than `text/*`: code Python files under `application/`
@@ -131,7 +134,7 @@ everything the pipeline can read, code, archives and images included. "Text"
 constants: never remove or rename one, only add.
 
 - *Moodle*: sections → modules → files; availability dates become `from_`/`until`, written in Lausanne's time with its offset (`2026-09-07T08:00:00.000000+02:00`) so they name one instant. Requests time out after 60 s without data. A type Moodle names its own way (`document/unknown`, `application/g-zip`) falls back to the file name's type. Assignments cannot be fetched (no API access) — accepted.
-- *MOOC* (edX export): course → chapters (weeks, from `first_week_chapter`/`week_count`) → sequentials → verticals → pages (their HTML, as the export holds it; `[TAG_N]` markers still in the text until their fate is settled), linked documents, quizzes (statement and statement + solution files, written to the export's `markdown/`), videos with their subtitles. Documents linked on a video page are skipped as duplicates of the video's slides. A video naming no source stops the run.
+- *MOOC* (edX export): course → chapters (weeks, from `first_week_chapter`/`week_count`) → sequentials → verticals → pages (their HTML, as the export holds it), linked documents, quizzes (statement and statement + solution files, written to the export's `markdown/`), videos with their subtitles. Documents linked on a video page are skipped as duplicates of the video's slides. A video naming no source stops the run.
 - *Mediaspace*: a channel or playlist; videos with their Kaltura captions. Videos have no `path`; overrides reach them by `url` (`url="https://mediaspace.epfl.ch/*"`).
 - *Local folder*, *Git* (repo or branch url; everything indexed by default).
 - *Ed Discussion*: threads filed under Ed's categories and subcategories, one markdown Q&A per answered thread (staff answers; endorsed student answers if asked). A post's image is downloaded and shown as a markdown image, which the images step reads. Which categories to keep and how to label them is done by overrides.

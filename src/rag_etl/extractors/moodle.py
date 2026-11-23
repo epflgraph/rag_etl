@@ -15,7 +15,7 @@ import requests
 import ragtools.mime_types as mt
 from rag_etl.core import Resource
 from rag_etl.extractors.base import Extractor, SourceUnavailable
-from rag_etl.extractors.markers import NO_BOT, split_tag_text
+from rag_etl.extractors.markers import NO_BOT
 from ragtools.encoding import sanitize_for_filename
 
 logger = logging.getLogger(__name__)
@@ -31,11 +31,6 @@ LOCAL_TIME = ZoneInfo("Europe/Zurich")
 def local_iso(epoch: int) -> str:
     """An epoch as an ISO date in Lausanne's time, with its offset, so it names one instant."""
     return datetime.fromtimestamp(epoch, LOCAL_TIME).isoformat(timespec="microseconds")
-
-
-def display(name: str) -> str:
-    """Return the name with its legacy tag marker stripped, as a student reads it."""
-    return split_tag_text(name)[1]
 
 
 def extract_url(module, module_contents):
@@ -154,7 +149,7 @@ class MoodleExtractor(Extractor):
                     logger.debug(f"Skipping module {module['name']} because it is marked NO_BOT")
                     continue
 
-                module_title = display(module["name"])
+                module_title = module["name"]
                 from_, until = extract_from_and_until(module)
 
                 # One folder per module, named by its kind (resource, folder), name and id
@@ -184,7 +179,7 @@ class MoodleExtractor(Extractor):
                         logger.debug(f"Skipping file {module_contents['filename']} because it is marked NO_BOT")
                         continue
 
-                    title = display(module_contents["filename"])
+                    title = module_contents["filename"]
 
                     # Download file from url, failing loud when it fails
                     try:

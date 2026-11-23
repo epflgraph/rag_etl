@@ -16,7 +16,7 @@ from rag_etl.extractors.ed_discussion.utils import format_qa
 from rag_etl.extractors.git import GitExtractor, branch_from_url, repo_from_url
 from rag_etl.extractors.local_folder import LocalFolderExtractor
 from rag_etl.extractors.mediaspace import MediaspaceExtractor
-from rag_etl.extractors.mooc.mooc_extractor import MOOCExtractor
+from rag_etl.extractors.mooc import MOOCExtractor
 from rag_etl.extractors.moodle import MoodleExtractor
 
 
@@ -87,7 +87,8 @@ def test_moodle_tree(monkeypatch, tmp_path):
     assert section.title == "Week 1"
     assert len(section.children) == 1
     leaf = section.children[0]
-    assert leaf.title == "Lecture 1 > lecture1.pdf"
+    # Titles stay as Moodle writes them, brackets and all
+    assert leaf.title == "[SLIDES] Lecture 1 > lecture1.pdf"
     assert leaf.url == "https://moodle.epfl.ch/pluginfile.php/1"
     assert leaf.mime_type == mt.PDF
     assert leaf.from_ is None and leaf.until is None

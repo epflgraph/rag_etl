@@ -1,23 +1,35 @@
-import requests
+"""An edX export as the parsers read it: its blocks, its assets and where they are published."""
+
+import json
 import logging
+import re
+import unicodedata
+
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
-from lxml import etree
-import re
 from urllib.parse import unquote, urlparse
-import unicodedata
+
+import requests
+from lxml import etree
 
 from ragtools.encoding import sanitize_for_filename
 
 logger = logging.getLogger(__name__)
 
+# The part of an edX asset link that is the same for every asset of a course,
+# as in "https://courses.edx.org/asset-v1:EPFLx+init-prog-cpp+1T2025+type@asset+"
+ASSET_BASE_URL = re.compile(r"https://[^\"\']*?type@asset\+")
 
-def load_root_elem_from_mooc_xml(xml_path: Path) -> etree._Element | None:
-    """Load an XML element from a MOOC"""
+# The key naming a published course, as in "course-v1:EPFL+mems+2023"
+COURSE_KEY = re.compile(r"course-v1:([^/?#]+)")
 
+URL_CHECK_TIMEOUT = 20
+
+
+def load_xml(xml_path: Path) -> etree._Element | None:
+    """The root element of one of the export's XML files, or None (logged) when missing or unreadable."""
     try:
-        tree = etree.parse(str(xml_path))
-        return tree.getroot()
+        return etree.parse(str(xml_path)).getroot()
     except (OSError, etree.XMLSyntaxError):
         logger.exception("Error loading xml file: %s", xml_path)
         return None
@@ -48,39 +60,37 @@ class Export:
 
     def load(self, kind: str, url_name: str) -> etree._Element | None:
         """The block's root element, or None (logged) when it is missing or unreadable."""
-        return load_root_elem_from_mooc_xml(self.xml_path(kind, url_name))
+        return load_xml(self.xml_path(kind, url_name))
 
 
-# For comparison only
 def cmp_key(s: str) -> str:
-    # Standardize text (except accents) for comparison
-    # .casefold() -> like .lower() but unicode-aware
+    """A file name as names are compared: case, accents and punctuation set aside."""
+    # .casefold() is like .lower() but unicode-aware
     s = unicodedata.normalize("NFKC", s).casefold()
 
-    # Strip accents
+    # "é" can be one character or two ("e" + a combining accent): decomposed,
+    # the combining characters are dropped
     s = unicodedata.normalize("NFKD", s)
+    s = "".join(ch for ch in s if not unicodedata.combining(ch))
 
-    filtered_chars = []
-    for ch in s:
-        # Is the character a combining character in Unicode?
-        # "é" can be one character or two: "e" + " ́" (combining acute accent)
-        if not unicodedata.combining(ch):
-            filtered_chars.append(ch)
+    return re.sub(r"[^0-9a-z]+", "", s)
 
-    s = "".join(filtered_chars)
 
-    # Keep only letters+digits
-    s = re.sub(r"[^0-9a-z]+", "", s)
+def load_assets_map(export_dir: Path) -> dict[str, str]:
+    """Read policies/assets.json: the comparison key of each asset's name -> its file."""
 
-    return s
+    data = json.loads((export_dir / "policies" / "assets.json").read_text(encoding="utf-8"))
+
+    assets: dict[str, str] = {}
+    for asset_key, value in data.items():
+        assets[cmp_key(asset_key)] = value.get("import_path") or value.get("displayname") or asset_key
+
+    return assets
 
 
 def get_filename_via_assets(export_dir: Path, href: str, assets_map: dict[str, str]) -> Path:
-    """
-    Find actual file path using previously loaded assets.json into assets_map
-    """
-    # unquote: %20 to space, etc.
-    # URLs are POSIX-style, not tied to OS running
+    """Find the file a link names, through the names assets.json lists."""
+    # unquote: %20 to space, etc.; URLs are POSIX-style, not tied to the OS running
     url_path = PurePosixPath(unquote(href))
 
     try:
@@ -91,11 +101,7 @@ def get_filename_via_assets(export_dir: Path, href: str, assets_map: dict[str, s
     if not rel.parts or rel.parts[0] != "static":
         return export_dir / rel
 
-    href_name = rel.name
-
-    compare_key = cmp_key(href_name)
-
-    real_name = assets_map.get(compare_key, href_name)
+    real_name = assets_map.get(cmp_key(rel.name), rel.name)
 
     # assets.json names the file as the export wrote it, punctuation and all,
     # so it is tried untouched first. Sanitising is only a fallback, for a name
@@ -107,36 +113,57 @@ def get_filename_via_assets(export_dir: Path, href: str, assets_map: dict[str, s
     return export_dir / "static" / sanitize_for_filename(real_name)
 
 
-def extract_number(resource_title: str) -> str | None:
+def load_asset_base_url(export_dir: Path) -> str | None:
     """
-    Extract the numbering from a MOOC resource title.
+    Return the prefix an asset of this course is published under, or None.
 
-    The number is the first run of digits and dots, wherever it sits in the
-    title: some MOOCs open with it ("1.3.3. Digital Images - ...")
-
-    Returns None for a title carrying no digits at all.
+    The export's own course key is not usable: course.xml and assets.json
+    are rewritten on re-export and name a course that does not exist
+    publicly. The absolute links the authors wrote into the pages do name
+    the published run, so the prefix is read back from those.
     """
 
-    number = ""
-    for character in resource_title:
-        if character.isdigit() or character == "." and number:
-            number += character
-        elif number:
-            break
+    found: dict[str, int] = {}
+    for html_path in (export_dir / "html").glob("*.html"):
+        for match in ASSET_BASE_URL.findall(html_path.read_text(encoding="utf-8")):
+            found[match] = found.get(match, 0) + 1
 
-    resource_number = number.strip(".")
-
-    if not resource_number:
+    if not found:
+        logger.warning(f"No absolute asset link in {export_dir}, so linked files will carry no url")
         return None
 
-    return resource_number
+    # One course publishes its assets under one prefix, so the most common
+    # is the right one even if a stale link survives somewhere
+    base_url = max(found, key=lambda name: found[name])
+    logger.info(f"Asset base url: {base_url}")
+
+    return base_url
+
+
+def asset_base_url_from_course_url(course_url: str) -> str | None:
+    """
+    Return the prefix a course's files are published under, read from the
+    address of the course itself.
+
+    A course is known by the page a student opens, as in
+    "https://courseware.epfl.ch/learning/course/course-v1:EPFL+mems+2023/home".
+    Its files live elsewhere on the same host, under the same key but an
+    asset address, which is what this builds.
+    """
+
+    parsed = urlparse(course_url)
+    match = COURSE_KEY.search(course_url)
+
+    if not (parsed.scheme and parsed.netloc and match):
+        logger.warning(f"No course key in {course_url}, so linked files will carry no url")
+        return None
+
+    return f"{parsed.scheme}://{parsed.netloc}/asset-v1:{match.group(1)}+type@asset+"
 
 
 # One course links the same asset from several pages, so each url is only
 # ever asked about once
 _url_exists_cache: dict[str, bool] = {}
-
-URL_CHECK_TIMEOUT = 20
 
 
 def url_exists(url: str) -> bool:
@@ -176,28 +203,3 @@ def url_exists(url: str) -> bool:
     _url_exists_cache[url] = exists
 
     return exists
-
-
-# The key naming a published course, as in "course-v1:EPFL+mems+2023"
-COURSE_KEY = re.compile(r"course-v1:([^/?#]+)")
-
-
-def asset_base_url_from_course_url(course_url: str) -> str | None:
-    """
-    Return the prefix a course's files are published under, read from the
-    address of the course itself.
-
-    A course is known by the page a student opens, as in
-    "https://courseware.epfl.ch/learning/course/course-v1:EPFL+mems+2023/home".
-    Its files live elsewhere on the same host, under the same key but an
-    asset address, which is what this builds.
-    """
-
-    parsed = urlparse(course_url)
-    match = COURSE_KEY.search(course_url)
-
-    if not (parsed.scheme and parsed.netloc and match):
-        logger.warning(f"No course key in {course_url}, so linked files will carry no url")
-        return None
-
-    return f"{parsed.scheme}://{parsed.netloc}/asset-v1:{match.group(1)}+type@asset+"

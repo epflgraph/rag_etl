@@ -229,7 +229,7 @@ def create_message(
 
     is_img, remote_url, local_path = find_image_path(content, images_dir)
 
-    # The post's image is shown as a markdown image; materialize reads it
+    # The post's image is shown as a markdown image; the images step reads it
     if is_img and local_path and not local_path.startswith("ERROR"):
         document = f"{document}\n\n![](<{local_path}>)"
     elif is_img:

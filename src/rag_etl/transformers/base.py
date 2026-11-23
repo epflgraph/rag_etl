@@ -21,8 +21,15 @@ class Transformer(ABC):
     the project's work area and its own cache, never in the sources.
     """
 
-    # The step's name: its work folder, its cache, its `--refresh` value, its log label
+    # The step's name: its work folder, its `--refresh` value, its log label
     name: ClassVar[str]
+
+    # The recipe a caching step's results come from, naming its cache folder
+    # (`pdf-ocr-1`): a step that caches declares it, unique across steps.
+    # Bumped whenever the recipe changes what the same input yields
+    # (prompts, model, settings): the new folder starts empty, the old one
+    # stays for rollback
+    cache_version: ClassVar[str]
 
     project_dir: Path = field(kw_only=True)
     refresh: bool = field(default=False, kw_only=True)  # bypass the cache's lookups, overwriting them
@@ -34,8 +41,8 @@ class Transformer(ABC):
 
     @property
     def cache(self) -> Cache:
-        """The step's cache, kept across runs."""
-        return Cache(self.project_dir / "cache" / self.name, refresh=self.refresh)
+        """The step's cache, kept across runs, under its recipe's version."""
+        return Cache(self.project_dir / "cache" / self.cache_version, refresh=self.refresh)
 
     @abstractmethod
     def transform(self, roots: list[Resource]) -> list[Resource]:

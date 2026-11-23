@@ -42,14 +42,14 @@ touches Moodle needs no Moodle token.
 ```bash
 rag-etl run --project micro303 --dry          # everything but publishing
 rag-etl run --project micro303                # publish to rag_micro303
-rag-etl run --project micro303 --refresh materialize   # redo one step, ignoring its cache
+rag-etl run --project micro303 --refresh pdf   # redo one step, ignoring its cache
 ```
 
-`--refresh` accepts `materialize`, `cut` and `embed`, and
+`--refresh` accepts `images`, `pdf`, `video`, `cut` and `embed`, and
 overwrites that step's cache in place. After changing a prompt or a model,
-bump the `CACHE_VERSION` of the steps that use it instead: the cache is keyed
+bump the `cache_version` of the steps that use it instead: the cache is keyed
 by content only and would otherwise serve the old results, and a new version
-starts an empty scope that a half-finished run cannot mix with the old one.
+starts an empty folder that a half-finished run cannot mix with the old one.
 
 What a run leaves behind:
 
@@ -57,7 +57,7 @@ What a run leaves behind:
 $BASE_PATH/<project>/
 ├── moodle/, mooc/, …     what each source downloaded or holds; written by its extractor only
 ├── work/<step>/…         scratch, wiped at the start of every run
-├── cache/<step>/…        everything a model produced, reused across runs
+├── cache/<version>/…     everything a model produced, reused across runs (pdf-ocr-1/, …)
 └── output/               one manifest per run: <timestamp>_manifest[_dry].json
 ```
 
@@ -73,11 +73,13 @@ One fixed sequence, the same for every project:
 
 1. **extract** — each source becomes a tree of resources (folders, files, threads), with the facts the source states: titles, urls, release dates, weeks.
 2. **normalize** — archives are unpacked, notebooks and HTML pages become markdown, oversized files are dropped.
-3. **materialize** — every PDF page and image is read by a vision model, including the images a markdown file shows; videos become one slide per slide change, with what was said over it.
-4. **judge** — every resource gets a type, a subtype and a cut. Today a stub reads cues from the titles; the project's overrides correct it.
-5. **cut** — resources become chunks: the whole document, one per child (page, slide), one per exercise, or one per heading section.
-6. **embed** — every chunk gets its vector (Qwen3-Embedding-8B).
-7. **load** — the manifest is written, and unless dry the index is published.
+3. **images** — every image is read by a vision model, image files and the images a markdown file shows alike.
+4. **pdf** — every PDF page is rendered and read by a vision model, one child per page.
+5. **video** — videos become one slide per slide change, each read by a vision model, with what was said over it.
+6. **judge** — every resource gets a type, a subtype and a cut. Today a stub reads cues from the titles; the project's overrides correct it.
+7. **cut** — resources become chunks: the whole document, one per child (page, slide), one per exercise, or one per heading section.
+8. **embed** — every chunk gets its vector (Qwen3-Embedding-8B).
+9. **load** — the manifest is written, and unless dry the index is published.
 
 The manifest is for people: it summarizes what the run produced (counts per
 source, type, subtype, number…) and mirrors the trees without their text.

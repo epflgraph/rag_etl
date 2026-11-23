@@ -60,7 +60,7 @@ src/
     ├── core/                 resource.py (Resource, METADATA_FIELDS, iter_chunks, assign_ids), overrides.py
     ├── extractors/           base.py (Extractor, SourceUnavailable), markers.py (NO_BOT),
     │                         moodle.py, local_folder.py, git.py, mediaspace.py, mooc/, ed_discussion/
-    ├── transformers/         base.py, normalize.py, materialize/ (facade + pdf, image, markdown, video; ocr.py the shared cached read), judge.py, cut.py, embed.py
+    ├── transformers/         base.py, normalize.py, images.py, pdf.py, video.py (ocr.py: their shared cached read), judge.py, cut.py, embed.py
     ├── loaders/              base.py, manifest.py, elasticsearch.py, index_settings.json
     ├── projects/             Project, load_project; semester_2627_autumn/<project>.py
     ├── cache.py, pipeline.py, cli.py
@@ -70,11 +70,11 @@ legacy/                       pre-rewrite code, reference only, not packaged; de
 ## The pipeline
 
 `pipeline.run_pipeline(project, dry, refresh)`: extract → normalize →
-materialize → judge → cut → embed → load. One fixed sequence; projects never
-list steps. The contracts:
+images → pdf → video → judge → cut → embed → load. One fixed sequence;
+projects never list steps. The contracts:
 
 - `Extractor.extract() -> Resource` — one root per source. Extractors are frozen dataclasses with a `dir` (relative to the project folder, resolved by the pipeline with `dataclasses.replace`).
-- `Transformer.transform(roots) -> roots` — frozen dataclasses with a `name` (ClassVar) and a `project_dir`; the base class derives `work_root` (`<project>/work/<name>`) and `cache` (`<project>/cache/<name>`, bypassed when `refresh`). Trees are reshaped in place.
+- `Transformer.transform(roots) -> roots` — frozen dataclasses with a `name` (ClassVar) and a `project_dir`; the base class derives `work_root` (`<project>/work/<name>`) and, for a step declaring its `cache_version` (ClassVar), `cache` (`<project>/cache/<cache_version>`, bypassed when `refresh`). Trees are reshaped in place.
 - `Loader.load(roots) -> None` — frozen dataclasses with a `project_dir`, configured by their fields. Index naming (`alias_name`, `index_name`) lives in `loaders/base.py`.
 
 The pipeline resolves the project's folder once (`$BASE_PATH / project.dir`) and hands it to every step.
@@ -134,19 +134,18 @@ constants: never remove or rename one, only add.
 - *MOOC* (edX export): course → chapters (weeks, from `first_week_chapter`/`week_count`) → sequentials → verticals → pages (their HTML, as the export holds it; `[TAG_N]` markers still in the text until their fate is settled), linked documents, quizzes (statement and statement + solution files, written to the export's `markdown/`), videos with their subtitles. Documents linked on a video page are skipped as duplicates of the video's slides. A video naming no source stops the run.
 - *Mediaspace*: a channel or playlist; videos with their Kaltura captions. Videos have no `path`; overrides reach them by `url` (`url="https://mediaspace.epfl.ch/*"`).
 - *Local folder*, *Git* (repo or branch url; everything indexed by default).
-- *Ed Discussion*: threads filed under Ed's categories and subcategories, one markdown Q&A per answered thread (staff answers; endorsed student answers if asked). A post's image is downloaded and shown as a markdown image, which materialize reads. Which categories to keep and how to label them is done by overrides.
+- *Ed Discussion*: threads filed under Ed's categories and subcategories, one markdown Q&A per answered thread (staff answers; endorsed student answers if asked). A post's image is downloaded and shown as a markdown image, which the images step reads. Which categories to keep and how to label them is done by overrides.
 
 **Normalize.** zip and tar.gz unpack into children (UTF-8 names fixed),
-notebooks become markdown (their output images written beside it, read in
-materialize like any markdown's images), HTML becomes markdown (MOOC pages,
+notebooks become markdown (their output images written beside it, read by
+the images step like any markdown's images), HTML becomes markdown (MOOC pages,
 a repository's pages), files over their
 family's limit are dropped (PDF 50 MB, images 10 MB, text 5 MB).
 
-**Materialize** (facade over pdf, image and video materializers).
+**Images, pdf, video**: three steps turning pixels into text with the vision model, sharing the cached read in `transformers/ocr.py`. A file-backed node without its file fails loud.
 
+- *Images*: an image file is transcribed in place; a markdown file that shows local images (`![alt](figures/plot.png)`, relative or absolute, `<…>` for paths with spaces) gets each one replaced by its transcript, where it was, in a scratch copy. One cache for both: an image is read once, wherever it is shown. A missing image only warns and stays a reference (folders ship markdown without its figures); web images are left as they are. The step runs before pdf and video, so it only ever reads the sources' markdown, never pages or slides.
 - *PDF*: each page rendered deterministically (stable settings: the render is what gets hashed) and transcribed by the vision model; one child per page. No text-layer shortcut.
-- *Image*: transcribed in place.
-- *Markdown*: a source's markdown file that shows local images (`![alt](figures/plot.png)`, relative or absolute, `<…>` for paths with spaces) gets each one replaced by its transcript, where it was, in a scratch copy; images share the image cache scope. A missing image only warns and stays a reference (folders ship markdown without its figures); web images are left as they are. Only markdown the sources gave is read this way, never transcripts made in this step.
 - *Video*: one path for Mediaspace and MOOC videos. Kaltura entry id from the url → slides entry → GraphAI `detect_slides` (behind `SlideDetector`, swappable) → changes closer than `min_slide_seconds` dropped → one ffmpeg frame per segment, read from the url (never downloaded) → each slide transcribed, with the subtitles spoken over it appended as a quote; a slide links to its moment. GraphAI failing on one video drops that video, not the run. YouTube videos have no Kaltura entry and pass through.
 
 **Judge.** Fills `type`, `subtype` and `cut` for every resource, or drops it.
@@ -201,17 +200,17 @@ hybrid (vectors + text); query vectors must be unit-normalized.
 
 ## Cache and models
 
-**Cache** (`cache.py`): on disk in the project's folder, `<project>/cache/<step>/` (projects never share one), keyed
+**Cache** (`cache.py`): on disk in the project's folder, one folder per recipe version, `<project>/cache/<cache_version>/` (projects never share one), keyed
 by content hash only, values are files or directories, no eviction.
 
-- No model, prompt or setting in the key. A change is applied deliberately: every cached recipe has a version (`CACHE_VERSION`: `pdf-ocr-1`, `image-ocr-1`, `video-slides-1` in materialize, `exercises-1` in cut, `embedding-1` in embed), and bumping it starts a fresh scope, the old one kept for rollback. `--refresh <step>` overwrites a step's current scope in place, for a rerun of the same recipe.
+- No model, prompt or setting in the key. A change is applied deliberately: every caching step declares its recipe's version (`cache_version`: `image-ocr-1` in images, `pdf-ocr-1` in pdf, `video-slides-1` in video, `exercises-1` in cut, `embedding-1` in embed; unique across steps, named after what the step does), and bumping it starts a fresh folder, the old one kept for rollback. `--refresh <step>` overwrites a step's current folder in place, for a rerun of the same recipe.
 - PDFs and videos cache as Merkle trees: transcripts are leaves under their own hash, and the parent keeps a small node record (`children.json`) of its ordered leaves. A node hit adopts the whole subtree without rendering; a miss falls back to the leaves, so one changed page re-reads one page.
 
 **Models**: every call goes through `RCPClient`. `catalog.py` holds the
 settled model + parameter pairings and one entry per task (`ocr`, `judge`,
 `split_exercises`, `stitch`, `embedding`); each capability asks
 `get_model(task)` itself. Changing a model is a one-line edit there, followed
-by a bump of the `CACHE_VERSION` of each step that uses it.
+by a bump of the `cache_version` of each step that uses it.
 
 ## Decided, do not reopen without the maintainer
 

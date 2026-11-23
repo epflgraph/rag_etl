@@ -34,11 +34,11 @@ def test_run_requires_project():
 
 
 def test_run_flags_parse():
-    args = build_parser().parse_args(["run", "--project", "COM202", "--dry", "--refresh", "materialize"])
+    args = build_parser().parse_args(["run", "--project", "COM202", "--dry", "--refresh", "pdf"])
     assert args.command == "run"
     assert args.project == "COM202"
     assert args.dry is True
-    assert args.refresh == "materialize"
+    assert args.refresh == "pdf"
 
 
 def test_misspelled_refresh_is_rejected(capsys):

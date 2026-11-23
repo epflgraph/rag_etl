@@ -52,33 +52,21 @@ def test_extract_fails_loud(tmp_path):
         extract(make_project(sources=(FakeExtractor(dir=tmp_path), BrokenExtractor(dir=tmp_path))), tmp_path)
 
 
-def test_transform_runs_the_sequence(tmp_path, monkeypatch):
-    ran = []
-
-    class FakeStep:
-        name = "fake"
-
-        def __init__(self, *args, **kwargs):
-            pass
-
-        def transform(self, roots):
-            ran.append(type(self).__name__)
-            return roots
-
-    monkeypatch.setattr("rag_etl.pipeline.NormalizeTransformer", FakeStep)
-    monkeypatch.setattr("rag_etl.pipeline.MaterializeTransformer", FakeStep)
-    monkeypatch.setattr("rag_etl.pipeline.JudgeTransformer", FakeStep)
-    monkeypatch.setattr("rag_etl.pipeline.CutTransformer", FakeStep)
-    monkeypatch.setattr("rag_etl.pipeline.EmbedTransformer", FakeStep)
-
-    roots = [Resource(title="root")]
-    transform(roots, make_project(), tmp_path)
-
-    assert ran == ["FakeStep"] * 5
+STEPS = {
+    "Normalize": "normalize",
+    "Images": "images",
+    "Pdf": "pdf",
+    "Video": "video",
+    "Judge": "judge",
+    "Cut": "cut",
+    "Embed": "embed",
+}
 
 
-def test_transform_bypasses_only_the_refreshed_cache(tmp_path, monkeypatch):
-    built = {}
+def stub_steps(monkeypatch) -> tuple[dict, list]:
+    """Every transformer replaced by a stub recording how it was built and when it ran."""
+    built: dict = {}
+    ran: list = []
 
     def stub(name: str):
         class Stub:
@@ -86,23 +74,35 @@ def test_transform_bypasses_only_the_refreshed_cache(tmp_path, monkeypatch):
                 built[name] = kwargs
 
             def transform(self, roots):
+                ran.append(name)
                 return roots
 
         Stub.name = name
         return Stub
 
-    monkeypatch.setattr("rag_etl.pipeline.NormalizeTransformer", stub("normalize"))
-    monkeypatch.setattr("rag_etl.pipeline.MaterializeTransformer", stub("materialize"))
-    monkeypatch.setattr("rag_etl.pipeline.JudgeTransformer", stub("judge"))
-    monkeypatch.setattr("rag_etl.pipeline.CutTransformer", stub("cut"))
-    monkeypatch.setattr("rag_etl.pipeline.EmbedTransformer", stub("embed"))
+    for prefix, name in STEPS.items():
+        monkeypatch.setattr(f"rag_etl.pipeline.{prefix}Transformer", stub(name))
+    return built, ran
 
-    transform([Resource(title="root")], make_project(), tmp_path, refresh="materialize")
+
+def test_transform_runs_the_sequence(tmp_path, monkeypatch):
+    _, ran = stub_steps(monkeypatch)
+
+    transform([Resource(title="root")], make_project(), tmp_path)
+
+    # Images before pdf and video: it reads only the sources' markdown
+    assert ran == list(STEPS.values())
+
+
+def test_transform_bypasses_only_the_refreshed_cache(tmp_path, monkeypatch):
+    built, _ = stub_steps(monkeypatch)
+
+    transform([Resource(title="root")], make_project(), tmp_path, refresh="pdf")
 
     # every step works in the project's folder; only the named one refreshes
     assert all(kwargs["project_dir"] == tmp_path for kwargs in built.values())
-    assert built["materialize"]["refresh"] is True
-    assert built["cut"]["refresh"] is False and built["embed"]["refresh"] is False
+    assert built["pdf"]["refresh"] is True
+    assert all(built[name]["refresh"] is False for name in ("images", "video", "cut", "embed"))
 
 
 def test_run_pipeline_writes_a_manifest(tmp_path, monkeypatch):

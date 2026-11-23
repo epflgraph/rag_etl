@@ -1,4 +1,4 @@
-"""The one OCR step every materializer shares, cached by content."""
+"""The one OCR step the images, pdf and video transformers share, cached by content."""
 
 from __future__ import annotations
 
@@ -6,7 +6,15 @@ from collections.abc import Callable
 from pathlib import Path
 
 from rag_etl.cache import Cache
+from rag_etl.core import Resource
 from rag_etl.core.resource import hash_bytes
+
+
+def file_to_read(node: Resource) -> Path:
+    """The node's file; a file-backed node without one is an extractor's bug, raised."""
+    if node.path is None:
+        raise ValueError(f"{node.title!r} ({node.mime_type}) has no file to read")
+    return node.path
 
 # Page and frame reads run bounded: twenty concurrent calls is what kept
 # the old pipeline well behaved against RCP

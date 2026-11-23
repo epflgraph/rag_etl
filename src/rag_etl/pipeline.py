@@ -1,6 +1,6 @@
 """The fixed sequence orchestrator.
 
-Extract → normalize → materialize → judge → cut → embed, then load:
+Extract → normalize → images → pdf → video → judge → cut → embed, then load:
 one sequence for every project, the steps constructed from the project.
 Extractors take nothing and produce trees, transformers take trees and
 produce trees, loaders take trees and produce nothing. Failures
@@ -23,17 +23,21 @@ from rag_etl.projects import Project
 from rag_etl.transformers import (
     CutTransformer,
     EmbedTransformer,
+    ImagesTransformer,
     JudgeTransformer,
-    MaterializeTransformer,
     NormalizeTransformer,
+    PdfTransformer,
     Transformer,
+    VideoTransformer,
 )
 from ragtools.graphai import GraphAISlideDetector
 
 logger = logging.getLogger(__name__)
 
 # The transformers that keep a cache, by name: what `--refresh` accepts
-CACHED_STEPS = (MaterializeTransformer.name, CutTransformer.name, EmbedTransformer.name)
+CACHED_STEPS = tuple(
+    step.name for step in (ImagesTransformer, PdfTransformer, VideoTransformer, CutTransformer, EmbedTransformer)
+)
 
 
 def run_pipeline(project: Project, dry: bool = False, refresh: str | None = None) -> None:
@@ -77,9 +81,12 @@ def transform(
     """Run the fixed transform sequence over the trees."""
     transformers: list[Transformer] = [
         NormalizeTransformer(project_dir=project_dir),
-        MaterializeTransformer(
+        # Images first: the markdown it reads is the sources', never the pages and slides read after
+        ImagesTransformer(project_dir=project_dir, refresh=refresh == ImagesTransformer.name),
+        PdfTransformer(project_dir=project_dir, refresh=refresh == PdfTransformer.name),
+        VideoTransformer(
             project_dir=project_dir,
-            refresh=refresh == MaterializeTransformer.name,
+            refresh=refresh == VideoTransformer.name,
             detector=GraphAISlideDetector(),
             mediaspace_url=os.environ.get("DEFAULT_MEDIASPACE_BASE_URL"),
             language=project.language,

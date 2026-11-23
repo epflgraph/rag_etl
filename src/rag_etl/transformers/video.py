@@ -1,4 +1,4 @@
-"""Video materialization: slide changes detected, one frame per segment read.
+"""Video: slide changes detected, one frame per segment read, subtitles appended.
 
 Cached as a Merkle tree, like the pdf: the leaves are the per-segment
 transcripts, each stored exactly once under its frame's hash; the video's
@@ -15,7 +15,7 @@ from __future__ import annotations
 import logging
 
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 import ragtools.mime_types as mt
@@ -33,7 +33,8 @@ from ragtools.video import (
 from rag_etl.cache import Cache
 from rag_etl.core import Resource
 from rag_etl.core.resource import hash_bytes, hash_text
-from rag_etl.transformers.materialize.ocr import MAX_CONCURRENT_OCR, ocr_cached
+from rag_etl.transformers.base import Transformer
+from rag_etl.transformers.ocr import MAX_CONCURRENT_OCR, ocr_cached
 from ragtools.graphai import GraphAIError
 from ragtools.kaltura import KalturaVideoResolver, build_entry_url, extract_entry_id_from_url
 
@@ -51,12 +52,6 @@ def entry_id_of(node: Resource) -> str | None:
 # The transcript is quoted rather than put under a heading
 TRANSCRIPT_PREFIX = "> "
 
-# The cache scope the slides live in. Bumped whenever detecting, extracting
-# or reading changes what the same video means (detector, min slide seconds,
-# frame naming, prompts, model): the new scope starts empty, so every video
-# is detected and every frame read again
-CACHE_VERSION = "video-slides-1"
-
 
 def _node_key(entry_id: str, language: str | None) -> str:
     """The video's key, for its cache node and its work folder: its entry plus the detection language."""
@@ -64,17 +59,29 @@ def _node_key(entry_id: str, language: str | None) -> str:
 
 
 @dataclass(frozen=True)
-class VideoMaterializer:
-    """Turns one video into one slide child per segment, captions appended."""
+class VideoTransformer(Transformer):
+    """Turns every video into one slide child per segment, subtitles appended."""
 
-    cache: Cache
-    work_root: Path
+    name = "video"
+    # The slides (detector, min slide seconds, frame naming, prompts, model)
+    cache_version = "video-slides-1"
+
     detector: SlideDetector
     mediaspace_url: str | None = None
     min_slide_seconds: int = 40
     language: str | None = None
+    # Opens its Kaltura session on the first video asked for, so building it reaches nothing
+    resolver: KalturaVideoResolver = field(default_factory=KalturaVideoResolver)
 
-    def materialize(self, node: Resource, resolver: KalturaVideoResolver) -> None:
+    def transform(self, roots: list[Resource]) -> list[Resource]:
+        cache = self.cache
+        for root in roots:
+            for node in list(root.walk()):
+                if node.mime_type == mt.MP4:
+                    self._read(cache, node)
+        return roots
+
+    def _read(self, cache: Cache, node: Resource) -> None:
         entry_id = entry_id_of(node)
         if entry_id is None:
             # A YouTube video has no Kaltura entry to reach: its captions
@@ -85,10 +92,9 @@ class VideoMaterializer:
         key = _node_key(entry_id, self.language)
         work_dir = self.work_root / key
 
-        cache = self.cache.scope(CACHE_VERSION)
         md_paths = cache.adopt(key, work_dir)
         if md_paths is None:
-            video_url = resolver.url(entry_id)
+            video_url = self.resolver.url(entry_id)
             if not video_url:
                 logger.warning(f"Dropping {node.title}: no video file for entry {entry_id}")
                 node.detach()

@@ -1,4 +1,4 @@
-"""PDF materialization: one child per page, cached as a Merkle tree.
+"""PDF: one child per page, every page rendered and read, cached as a Merkle tree.
 
 The leaves are the per-page transcripts, each stored exactly once under
 its own rendered-page hash; the pdf's node record, keyed by the pdf's
@@ -23,14 +23,10 @@ from ragtools.pdf import save_pdf_pages
 from rag_etl.cache import Cache
 from rag_etl.core import Resource
 from rag_etl.core.resource import hash_bytes
-from rag_etl.transformers.materialize.ocr import MAX_CONCURRENT_OCR, ocr_cached
+from rag_etl.transformers.base import Transformer
+from rag_etl.transformers.ocr import MAX_CONCURRENT_OCR, file_to_read, ocr_cached
 
 logger = logging.getLogger(__name__)
-
-# The cache scope the transcripts live in. Bumped whenever rendering or
-# reading changes what the same page pixels mean (dpi, prompts, model): the
-# new scope starts empty, so every page is read again
-CACHE_VERSION = "pdf-ocr-1"
 
 
 def _page_number(md_path: Path) -> int:
@@ -39,18 +35,22 @@ def _page_number(md_path: Path) -> int:
 
 
 @dataclass(frozen=True)
-class PdfMaterializer:
-    """Turns one PDF into one child per page, under a Merkle node."""
+class PdfTransformer(Transformer):
+    """Turns every PDF into one child per page."""
 
-    cache: Cache
-    work_root: Path
+    name = "pdf"
+    cache_version = "pdf-ocr-1"  # the page reads (rendering settings, prompts, model)
 
-    def materialize(self, node: Resource) -> None:
-        pdf_path = node.path
-        if pdf_path is None:
-            return
+    def transform(self, roots: list[Resource]) -> list[Resource]:
+        cache = self.cache
+        for root in roots:
+            for node in list(root.walk()):
+                if node.mime_type == mt.PDF:
+                    self._read(cache, node)
+        return roots
 
-        cache = self.cache.scope(CACHE_VERSION)
+    def _read(self, cache: Cache, node: Resource) -> None:
+        pdf_path = file_to_read(node)
         pdf_hash = node.content_hash
         work_dir = self.work_root / pdf_hash
 

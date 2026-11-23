@@ -1,17 +1,13 @@
 """Content-hash disk cache: the one cache every transform shares.
 
-Each project keeps its own, in its folder's cache/, one scope per
-transform (`<project>/cache/<step>/`); the key is the sha256
-of the content the transform would recompute from, so identical content
-within one project shares an entry. Values are files or whole
-directories (nested), copied in and out as they are. A per-run
-`--refresh TRANSFORM` flag bypasses lookups for the named transform;
-there is no eviction — the cache grows until cleaned.
-
-A transform whose output depends on a recipe (prompts, model, rendering
-settings) works in a scope named after the recipe's version: bumping the
-version starts a fresh scope, so nothing made under the old recipe is ever
-served again.
+Each project keeps its own, in its folder's cache/, one folder per
+recipe version (`<project>/cache/pdf-ocr-1/`): bumping a step's version
+starts a fresh folder, so nothing made under the old recipe is ever served
+again. The key is the sha256 of the content the transform would recompute
+from, so identical content within one project shares an entry. Values are
+files or whole directories (nested), copied in and out as they are. A
+per-run `--refresh STEP` flag bypasses lookups for the named step; there is
+no eviction — the cache grows until cleaned.
 
 Subtrees are cached as Merkle trees: the leaves are ordinary entries, keyed
 by their own content, and a parent's entry is a small node record listing
@@ -21,7 +17,6 @@ while the leaves stay the single copy of the content.
 
 from __future__ import annotations
 
-import copy
 import json
 import shutil
 
@@ -38,12 +33,6 @@ class Cache:
     def __init__(self, cache_path: Path, refresh: bool = False):
         self.cache_path = cache_path
         self.refresh = refresh
-
-    def scope(self, name: str) -> Cache:
-        """The cache nested under this one in its own folder, e.g. one per recipe version."""
-        scoped = copy.copy(self)
-        scoped.cache_path = self.cache_path / name
-        return scoped
 
     def _entry_path(self, content_hash: str, value: Path) -> Path:
         return self.cache_path / content_hash / value.name

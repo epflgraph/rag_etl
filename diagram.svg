@@ -81,14 +81,14 @@
   <rect x="452" y="168" width="140" height="96" rx="8" class="step"/>
   <text x="522" y="192" class="b" text-anchor="middle">2 — normalize</text>
   <text x="522" y="212" class="t" text-anchor="middle">zip, tar.gz → files</text>
-  <text x="522" y="228" class="t" text-anchor="middle">notebooks → md</text>
+  <text x="522" y="228" class="t" text-anchor="middle">notebooks, HTML → md</text>
   <text x="522" y="244" class="t" text-anchor="middle">oversized files dropped</text>
 
   <rect x="614" y="168" width="140" height="96" rx="8" class="step"/>
-  <text x="684" y="192" class="b" text-anchor="middle">3 — materialize</text>
-  <text x="684" y="212" class="t" text-anchor="middle">PDF → one page each</text>
-  <text x="684" y="228" class="t" text-anchor="middle">video → one slide each</text>
-  <text x="684" y="244" class="t" text-anchor="middle">all read by a vision model</text>
+  <text x="684" y="192" class="b" text-anchor="middle">3 — images, pdf, video</text>
+  <text x="684" y="212" class="t" text-anchor="middle">images read, md's too</text>
+  <text x="684" y="228" class="t" text-anchor="middle">PDF → one page each</text>
+  <text x="684" y="244" class="t" text-anchor="middle">video → one slide each</text>
 
   <!-- Judge, with its planned inference -->
   <rect x="776" y="168" width="450" height="96" rx="8" class="step"/>
@@ -139,7 +139,7 @@
   <!-- Cache -->
   <path d="M452,322 L452,366 A549,12 0 0 0 1550,366 L1550,322" fill="#F1F5F9" stroke="#475569" stroke-width="1.2"/>
   <ellipse cx="1001" cy="322" rx="549" ry="12" fill="#F1F5F9" stroke="#475569" stroke-width="1.2"/>
-  <text x="1001" y="350" class="b" text-anchor="middle">content-hash cache — &lt;project&gt;/cache/&lt;step&gt;/</text>
+  <text x="1001" y="350" class="b" text-anchor="middle">content-hash cache — &lt;project&gt;/cache/&lt;version&gt;/</text>
   <text x="1001" y="366" class="t" text-anchor="middle">no model or prompt in the key: --refresh &lt;step&gt; or a recipe version bump · PDFs and videos as Merkle trees: one changed page re-reads one page</text>
   <path d="M522,266 L522,306" class="dash" marker-end="url(#arrow)" marker-start="url(#arrow)"/>
   <path d="M684,266 L684,306" class="dash" marker-end="url(#arrow)" marker-start="url(#arrow)"/>

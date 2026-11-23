@@ -61,7 +61,7 @@ class NormalizeTransformer(Transformer):
 
     What it writes goes to the work area, in a folder named by the content
     it came from, never next to the sources. Every conversion is cheap and
-    calls no model, so nothing is cached: images are read in materialize.
+    calls no model, so nothing is cached: images are read by the images step.
     """
 
     name = "normalize"
@@ -113,7 +113,7 @@ class NormalizeTransformer(Transformer):
             if node.mime_type != mt.IPYNB or node.path is None:
                 continue
 
-            # Its output images land beside the Markdown, for materialize to read
+            # Its output images land beside the Markdown, for the images step to read
             md_path = self.work_root / node.content_hash / f"{node.path.stem}.md"
             convert_ipynb_to_md(node.path, md_path)
             node.path = md_path

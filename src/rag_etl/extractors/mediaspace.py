@@ -107,7 +107,7 @@ class MediaspaceExtractor(Extractor):
     playlist or channel.
 
     One resource is produced per video entry, its watch url naming the
-    entry. The video itself is never downloaded: materialize reads its
+    entry. The video itself is never downloaded: the video step reads its
     frames over HTTP.
 
     Subtitles are downloaded (when available) and travel beside the video as
@@ -265,7 +265,7 @@ class MediaspaceExtractor(Extractor):
                     logger.info(f"Entry {entry_id}: wrote {caption_path}")
                     subtitles_path = caption_path
 
-            # The watch url names the entry: it is all materialize needs to
+            # The watch url names the entry: it is all the video step needs to
             # reach the video
             video = resources.add_child(
                 title=entry_name,

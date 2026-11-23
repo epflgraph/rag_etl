@@ -1,4 +1,4 @@
-"""Unit tests for materialize: PDF pages, images, videos. Models are stubbed."""
+"""Unit tests for the steps that read pixels: images, PDF pages, videos. Models are stubbed."""
 
 import shutil
 
@@ -11,7 +11,7 @@ import pytest
 import ragtools.mime_types as mt
 from rag_etl.core import Resource
 from rag_etl.core.resource import hash_bytes
-from rag_etl.transformers.materialize import MaterializeTransformer
+from rag_etl.transformers import ImagesTransformer, PdfTransformer, VideoTransformer
 
 
 class FakeResolver:
@@ -24,21 +24,39 @@ class FakeResolver:
         return self.url_value
 
 
-@pytest.fixture
-def transformer(tmp_path, monkeypatch):
+@pytest.fixture(autouse=True)
+def vision(monkeypatch):
     monkeypatch.setattr("ragtools.llm.RCPClient.vision", lambda self, prompt, images, **kwargs: "slide text")
+    monkeypatch.setattr("rag_etl.transformers.video.extract_frame", fake_extract_frame)
 
-    fake_resolver = FakeResolver()
+
+def count_reads(monkeypatch) -> list:
+    calls: list = []
     monkeypatch.setattr(
-        "rag_etl.transformers.materialize.KalturaVideoResolver", lambda: fake_resolver
+        "ragtools.llm.RCPClient.vision",
+        lambda self, prompt, images, **kwargs: calls.append(kwargs.get("name")) or "slide text",
     )
-    monkeypatch.setattr(
-        "rag_etl.transformers.materialize.video.extract_frame", fake_extract_frame
-    )
+    return calls
 
-    detector = SimpleNamespace(detect=lambda *args, **kwargs: [0, 40, 80])
 
-    return MaterializeTransformer(project_dir=tmp_path, detector=detector)
+@pytest.fixture
+def images(tmp_path):
+    return ImagesTransformer(project_dir=tmp_path)
+
+
+@pytest.fixture
+def pdf(tmp_path):
+    return PdfTransformer(project_dir=tmp_path)
+
+
+def video_step(project_dir: Path, timestamps: list[int] | None = None, **kwargs) -> VideoTransformer:
+    detector = SimpleNamespace(detect=lambda *args, **_: [0, 40, 80] if timestamps is None else timestamps)
+    return VideoTransformer(project_dir=project_dir, detector=detector, resolver=FakeResolver(), **kwargs)
+
+
+@pytest.fixture
+def video(tmp_path):
+    return video_step(tmp_path)
 
 
 def fake_extract_frame(video_url: str, seconds: int, output_path: Path) -> bool:
@@ -57,14 +75,15 @@ def make_pdf(path: Path, page_texts: list[str]) -> Path:
     return path
 
 
-def test_pdf_gains_one_child_per_page(tmp_path, transformer, monkeypatch):
-    pdf_path = make_pdf(tmp_path / "lecture.pdf", ["alpha", "beta"])
-    root = Resource(
-        title="root",
-        children=[Resource(title="lecture", path=pdf_path, mime_type=mt.PDF, week=3, type="theory", cut="whole_document")],
-    )
+def pdf_tree(pdf_path: Path, **fields) -> Resource:
+    return Resource(title="root", children=[Resource(title="lecture", path=pdf_path, mime_type=mt.PDF, **fields)])
 
-    transformer.transform([root])
+
+def test_pdf_gains_one_child_per_page(tmp_path, pdf):
+    pdf_path = make_pdf(tmp_path / "lecture.pdf", ["alpha", "beta"])
+    root = pdf_tree(pdf_path, week=3, type="theory", cut="whole_document")
+
+    pdf.transform([root])
 
     lecture = root.children[0]
     assert [child.title for child in lecture.children] == ["page 1", "page 2"]
@@ -72,132 +91,115 @@ def test_pdf_gains_one_child_per_page(tmp_path, transformer, monkeypatch):
     # The page children carry the parent's descriptive metadata
     assert all(child.week == 3 and child.type == "theory" for child in lecture.children)
     # And the generated pages live in the work area, not beside the pdf
-    pages_dir = transformer.work_root / hash_bytes(pdf_path.read_bytes())
+    pages_dir = pdf.work_root / hash_bytes(pdf_path.read_bytes())
     assert (pages_dir / "page_1.png").exists()
     assert (pages_dir / "page_1.md").exists()
     assert not (tmp_path / "lecture").exists()
 
 
-def test_pdf_one_changed_page_reOCRs_one_page(tmp_path, transformer, monkeypatch):
+def test_pdf_without_a_file_fails_loud(pdf):
+    root = Resource(title="root", children=[Resource(title="lecture", mime_type=mt.PDF)])
+    with pytest.raises(ValueError, match="no file to read"):
+        pdf.transform([root])
+
+
+def test_pdf_one_changed_page_reOCRs_one_page(tmp_path, pdf, monkeypatch):
     """One comma in 200 pages re-OCRs one page: per-page cache keys on the rendered page."""
     pdf_path = make_pdf(tmp_path / "lecture.pdf", ["alpha", "beta"])
-    root = Resource(title="root", children=[Resource(title="lecture", path=pdf_path, mime_type=mt.PDF)])
-    transformer.transform([root])
+    pdf.transform([pdf_tree(pdf_path)])
 
-    calls = []
-    monkeypatch.setattr(
-        "ragtools.llm.RCPClient.vision",
-        lambda self, prompt, images, **kwargs: calls.append(kwargs.get("name")) or "slide text",
-    )
-    counting = MaterializeTransformer(project_dir=transformer.project_dir, detector=transformer.detector)
-
+    calls = count_reads(monkeypatch)
     make_pdf(pdf_path, ["alpha", "beta, slightly changed"])
-    root = Resource(title="root", children=[Resource(title="lecture", path=pdf_path, mime_type=mt.PDF)])
-    counting.transform([root])
+    pdf.transform([pdf_tree(pdf_path)])
 
     assert len(calls) == 1
 
 
-def test_warm_pdf_rerun_adopts_the_whole_subtree(tmp_path, transformer, monkeypatch):
+def test_warm_pdf_rerun_adopts_the_whole_subtree(tmp_path, pdf, monkeypatch):
     """A second run over an unchanged pdf renders nothing and reads nothing."""
     pdf_path = make_pdf(tmp_path / "lecture.pdf", ["alpha", "beta"])
-    first = Resource(title="root", children=[Resource(title="lecture", path=pdf_path, mime_type=mt.PDF)])
-    transformer.transform([first])
+    pdf.transform([pdf_tree(pdf_path)])
 
     def no_render(*args, **kwargs):
         raise AssertionError("rendering must not happen on a warm run")
 
-    monkeypatch.setattr("rag_etl.transformers.materialize.pdf.save_pdf_pages", no_render)
-    calls = []
-    monkeypatch.setattr(
-        "ragtools.llm.RCPClient.vision",
-        lambda self, prompt, images, **kwargs: calls.append(kwargs.get("name")) or "slide text",
-    )
+    monkeypatch.setattr("rag_etl.transformers.pdf.save_pdf_pages", no_render)
+    calls = count_reads(monkeypatch)
 
     # As the pipeline does at every run start: the work area is scratch, so
     # the warm run must rebuild it from the cache alone
-    shutil.rmtree(transformer.work_root)
+    shutil.rmtree(pdf.work_root)
 
-    root = Resource(title="root", children=[Resource(title="lecture", path=pdf_path, mime_type=mt.PDF)])
-    transformer.transform([root])
+    root = pdf_tree(pdf_path)
+    pdf.transform([root])
 
     assert calls == []
     assert [child.title for child in root.children[0].children] == ["page 1", "page 2"]
     # Only the transcripts are staged back into the work area: no page is
     # rendered, so no png exists at all
-    work_dir = transformer.work_root / hash_bytes(pdf_path.read_bytes())
+    work_dir = pdf.work_root / hash_bytes(pdf_path.read_bytes())
     assert (work_dir / "page_1.md").is_file()
     assert not (work_dir / "page_1.png").exists()
 
 
-def test_cache_version_bump_reOCRs_every_page(tmp_path, transformer, monkeypatch):
-    """A bumped cache version starts an empty scope: every page is read again."""
+def test_cache_version_bump_reOCRs_every_page(tmp_path, pdf, monkeypatch):
+    """A bumped cache version starts an empty folder: every page is read again."""
     pdf_path = make_pdf(tmp_path / "lecture.pdf", ["alpha", "beta"])
-    root = Resource(title="root", children=[Resource(title="lecture", path=pdf_path, mime_type=mt.PDF)])
-    transformer.transform([root])
+    pdf.transform([pdf_tree(pdf_path)])
+    assert (tmp_path / "cache" / "pdf-ocr-1").is_dir()
 
-    calls = []
-    monkeypatch.setattr(
-        "ragtools.llm.RCPClient.vision",
-        lambda self, prompt, images, **kwargs: calls.append(kwargs.get("name")) or "slide text",
-    )
-    monkeypatch.setattr("rag_etl.transformers.materialize.pdf.CACHE_VERSION", "pdf-ocr-2")
+    calls = count_reads(monkeypatch)
+    monkeypatch.setattr(PdfTransformer, "cache_version", "pdf-ocr-2")
 
-    root = Resource(title="root", children=[Resource(title="lecture", path=pdf_path, mime_type=mt.PDF)])
-    transformer.transform([root])
+    root = pdf_tree(pdf_path)
+    pdf.transform([root])
 
     assert len(calls) == 2
     assert [child.title for child in root.children[0].children] == ["page 1", "page 2"]
 
 
-def test_missing_leaf_self_heals(tmp_path, transformer, monkeypatch):
+def test_missing_leaf_self_heals(tmp_path, pdf, monkeypatch):
     """A leaf lost from the cache costs its own page, not the whole subtree."""
     pdf_path = make_pdf(tmp_path / "lecture.pdf", ["alpha", "beta"])
-    root = Resource(title="root", children=[Resource(title="lecture", path=pdf_path, mime_type=mt.PDF)])
-    transformer.transform([root])
+    pdf.transform([pdf_tree(pdf_path)])
 
-    shutil.rmtree(next((tmp_path / "cache" / "materialize").glob("*/*/page_1.md")).parent)
+    shutil.rmtree(next((tmp_path / "cache" / "pdf-ocr-1").glob("*/page_1.md")).parent)
 
-    calls = []
-    monkeypatch.setattr(
-        "ragtools.llm.RCPClient.vision",
-        lambda self, prompt, images, **kwargs: calls.append(kwargs.get("name")) or "slide text",
-    )
-
-    root = Resource(title="root", children=[Resource(title="lecture", path=pdf_path, mime_type=mt.PDF)])
-    transformer.transform([root])
+    calls = count_reads(monkeypatch)
+    root = pdf_tree(pdf_path)
+    pdf.transform([root])
 
     assert len(calls) == 1
     assert [child.title for child in root.children[0].children] == ["page 1", "page 2"]
 
 
-def test_image_read_into_work_dir(tmp_path, transformer):
+def test_image_read_into_work_dir(tmp_path, images):
     image_path = tmp_path / "slide.png"
     image_path.write_bytes(b"png fake")
     root = Resource(title="root", children=[Resource(title="slide", path=image_path, mime_type=mt.PNG)])
 
-    transformer.transform([root])
+    images.transform([root])
 
     slide = root.children[0]
-    work_dir = transformer.work_root / hash_bytes(image_path.read_bytes())
+    work_dir = images.work_root / hash_bytes(image_path.read_bytes())
     assert slide.mime_type == mt.MARKDOWN
     assert slide.path == work_dir / "slide.md"
     # Nothing is written beside the source image
     assert not image_path.with_suffix(".md").exists()
 
 
-def test_unreadable_image_dropped(tmp_path, transformer, monkeypatch):
+def test_unreadable_image_dropped(tmp_path, images, monkeypatch):
     monkeypatch.setattr("ragtools.llm.RCPClient.vision", lambda self, prompt, images, **kwargs: "")
     image_path = tmp_path / "slide.png"
     image_path.write_bytes(b"png fake")
     root = Resource(title="root", children=[Resource(title="slide", path=image_path, mime_type=mt.PNG)])
 
-    transformer.transform([root])
+    images.transform([root])
 
     assert root.children == []
 
 
-def test_markdown_images_read_where_they_are_shown(tmp_path, transformer, caplog):
+def test_markdown_images_read_where_they_are_shown(tmp_path, images, caplog):
     (tmp_path / "figures").mkdir()
     (tmp_path / "figures" / "plot.png").write_bytes(b"png fake")
     md_path = tmp_path / "notes.md"
@@ -205,7 +207,7 @@ def test_markdown_images_read_where_they_are_shown(tmp_path, transformer, caplog
     md_path.write_text(source)
     root = Resource(title="root", children=[Resource(title="notes", path=md_path, mime_type=mt.MARKDOWN)])
 
-    transformer.transform([root])
+    images.transform([root])
 
     notes = root.children[0]
     text = notes.path.read_text()
@@ -217,12 +219,31 @@ def test_markdown_images_read_where_they_are_shown(tmp_path, transformer, caplog
     assert md_path.read_text() == source
 
 
-def test_markdown_without_local_images_is_left_alone(tmp_path, transformer):
+def test_an_image_is_read_once_wherever_it_is_shown(tmp_path, images, monkeypatch):
+    image_path = tmp_path / "plot.png"
+    image_path.write_bytes(b"png fake")
+    md_path = tmp_path / "notes.md"
+    md_path.write_text("![a plot](plot.png)\n")
+    calls = count_reads(monkeypatch)
+    root = Resource(
+        title="root",
+        children=[
+            Resource(title="plot", path=image_path, mime_type=mt.PNG),
+            Resource(title="notes", path=md_path, mime_type=mt.MARKDOWN),
+        ],
+    )
+
+    images.transform([root])
+
+    assert len(calls) == 1
+
+
+def test_markdown_without_local_images_is_left_alone(tmp_path, images):
     md_path = tmp_path / "notes.md"
     md_path.write_text("# Notes\n\nNo figures here.\n")
     root = Resource(title="root", children=[Resource(title="notes", path=md_path, mime_type=mt.MARKDOWN)])
 
-    transformer.transform([root])
+    images.transform([root])
 
     assert root.children[0].path == md_path
 
@@ -232,20 +253,19 @@ def mediaspace_video() -> Resource:
     return Resource(title="lecture 1", url="https://mediaspace.epfl.ch/media/t/0_abc", mime_type=mt.MP4)
 
 
-def test_video_gains_one_slide_child_per_segment(tmp_path, transformer, monkeypatch):
+def test_video_gains_one_slide_child_per_segment(tmp_path, video):
     srt_path = tmp_path / "0_abc_fr.srt"
     srt_path.write_text(
         "1\n00:00:00,000 --> 00:00:10,000\nhello\n\n2\n00:00:45,000 --> 00:00:60,000\nworld\n",
         encoding="utf-8",
     )
 
-    video = mediaspace_video()
-    video.add_child(path=srt_path, mime_type=mt.SRT)
-    root = Resource(title="root", children=[video])
+    lecture = mediaspace_video()
+    lecture.add_child(path=srt_path, mime_type=mt.SRT)
+    root = Resource(title="root", children=[lecture])
 
-    transformer.transform([root])
+    video.transform([root])
 
-    lecture = root.children[0]
     # Two slide segments: [0, 40) and [40, end); each frame is named after
     # the second its interval starts at, which is where the title reads back
     assert [child.title for child in lecture.children] == ["0:00", "0:40"]
@@ -259,63 +279,56 @@ def test_video_gains_one_slide_child_per_segment(tmp_path, transformer, monkeypa
     assert lecture.children[0].cut is None
 
 
-def test_slide_holding_a_quote_still_gets_its_speech(tmp_path, transformer, monkeypatch):
+def test_slide_holding_a_quote_still_gets_its_speech(tmp_path, video, monkeypatch):
     monkeypatch.setattr(
         "ragtools.llm.RCPClient.vision", lambda self, prompt, images, **kwargs: "# Motto\n\n> Measure twice"
     )
     srt_path = tmp_path / "0_abc_fr.srt"
     srt_path.write_text("1\n00:00:00,000 --> 00:00:10,000\nhello\n", encoding="utf-8")
-    video = mediaspace_video()
-    video.add_child(path=srt_path, mime_type=mt.SRT)
-    root = Resource(title="root", children=[video])
+    lecture = mediaspace_video()
+    lecture.add_child(path=srt_path, mime_type=mt.SRT)
+    root = Resource(title="root", children=[lecture])
 
-    transformer.transform([root])
+    video.transform([root])
 
-    assert root.children[0].children[0].path.read_text(encoding="utf-8").endswith("> hello\n")
+    assert lecture.children[0].path.read_text(encoding="utf-8").endswith("> hello\n")
 
 
-def test_youtube_video_left_untouched(tmp_path, transformer):
+def test_youtube_video_left_untouched(tmp_path, video):
     video_xml = tmp_path / "1_2_1.xml"
     video_xml.write_text("<video/>", encoding="utf-8")
-    video = Resource(title="mooc video", url="https://www.youtube.com/watch?v=abc", path=video_xml, mime_type=mt.MP4)
-    root = Resource(title="root", children=[video])
+    lecture = Resource(title="mooc video", url="https://www.youtube.com/watch?v=abc", path=video_xml, mime_type=mt.MP4)
+    root = Resource(title="root", children=[lecture])
 
-    transformer.transform([root])
+    video.transform([root])
 
     # No Kaltura entry id: the node passes through untouched
-    assert root.children == [video]
+    assert root.children == [lecture]
 
 
-def test_video_with_no_frames_dropped(tmp_path, transformer):
-    one_timestamp = MaterializeTransformer(
-        project_dir=transformer.project_dir,
-        detector=SimpleNamespace(detect=lambda *args, **kwargs: [0]),
-    )
+def test_video_with_no_frames_dropped(tmp_path):
     root = Resource(title="root", children=[mediaspace_video()])
 
-    one_timestamp.transform([root])
+    video_step(tmp_path, timestamps=[0]).transform([root])
 
     assert root.children == []
 
 
-def test_warm_video_rerun_adopts_the_cached_slides(tmp_path, transformer, monkeypatch):
-    """An entry already materialized is neither detected, extracted nor read again."""
+def test_warm_video_rerun_adopts_the_cached_slides(tmp_path, video, monkeypatch):
+    """An entry already read is neither detected, extracted nor read again."""
     root = Resource(title="root", children=[mediaspace_video()])
 
-    transformer.transform([root])
+    video.transform([root])
     assert len(root.children[0].children) == 2
 
     def no_detect(*args, **kwargs):
         raise AssertionError("detection must not run for an unchanged entry")
 
     monkeypatch.setattr(
-        "rag_etl.transformers.materialize.video.extract_frame",
+        "rag_etl.transformers.video.extract_frame",
         lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("no frame may be extracted either")),
     )
-    warm = MaterializeTransformer(
-        project_dir=transformer.project_dir,
-        detector=SimpleNamespace(detect=no_detect),
-    )
+    warm = VideoTransformer(project_dir=tmp_path, detector=SimpleNamespace(detect=no_detect), resolver=FakeResolver())
     root = Resource(title="root", children=[mediaspace_video()])
 
     warm.transform([root])
@@ -324,22 +337,16 @@ def test_warm_video_rerun_adopts_the_cached_slides(tmp_path, transformer, monkey
     assert [child.title for child in root.children[0].children] == ["0:00", "0:40"]
 
 
-def test_refreshed_video_redetects_and_leaves_no_stale_frames(tmp_path, transformer):
-    """`--refresh materialize` re-detects from scratch: the run's slides are
+def test_refreshed_video_redetects_and_leaves_no_stale_frames(tmp_path, video):
+    """`--refresh video` re-detects from scratch: the run's slides are
     only what the new detection found, nothing survives from the old video."""
     root = Resource(title="root", children=[mediaspace_video()])
 
-    transformer.transform([root])
+    video.transform([root])
     assert len(root.children[0].children) == 2
 
-    refreshed = MaterializeTransformer(
-        project_dir=transformer.project_dir,
-        refresh=True,
-        detector=SimpleNamespace(detect=lambda *args, **kwargs: [0]),
-    )
     root = Resource(title="root", children=[mediaspace_video()])
-
-    refreshed.transform([root])
+    video_step(tmp_path, timestamps=[0], refresh=True).transform([root])
 
     # No frames detected this time: nothing must be left over from the old video
     assert root.children == []

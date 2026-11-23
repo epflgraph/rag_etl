@@ -2,7 +2,7 @@
 
 Vectors live in the cache as JSON files keyed by the chunk text's hash,
 so a chunk that changed is embedded again and a chunk that did not is
-not; there is no eviction. A model change bumps CACHE_VERSION.
+not; there is no eviction. A model change bumps the cache version.
 """
 
 from __future__ import annotations
@@ -22,11 +22,6 @@ logger = logging.getLogger(__name__)
 # The vector of one chunk, cached by the chunk text's content hash
 EMBEDDING_FILE = "embedding.json"
 
-# The cache scope the vectors live in. Bumped whenever the model changes:
-# vectors of two models are not comparable, and a refresh that stops halfway
-# would leave both in one scope, so a new model starts an empty one
-CACHE_VERSION = "embedding-1"
-
 # Embedding calls are batched: at most BATCH_SIZE chunks per request, and at
 # most REQUEST_CHAR_BUDGET chars of text, so one request cannot overflow the
 # model's context (40,960 tokens; 96,000 chars leaves headroom even at a
@@ -44,20 +39,24 @@ class EmbedTransformer(Transformer):
     """Annotates every chunk with its vector, in place."""
 
     name = "embed"
+    # Vectors of two models are not comparable, and a refresh that stops
+    # halfway would leave both in one folder, so a new model bumps this
+    cache_version = "embedding-1"
 
     def _embed_batch(self, batch: list[Resource]) -> None:
         """One request for the batch; each vector cached by its chunk's content hash."""
         vectors = get_model("embedding").embeddings([chunk.text or "" for chunk in batch])
 
+        cache = self.cache
         for chunk, vector in zip(batch, vectors):
-            self.cache.scope(CACHE_VERSION).write(chunk.content_hash, EMBEDDING_FILE, json.dumps(vector))
+            cache.write(chunk.content_hash, EMBEDDING_FILE, json.dumps(vector))
             chunk.embedding = vector
 
     def transform(self, roots: list[Resource]) -> list[Resource]:
         chunks = list(iter_chunks(roots))
         missing: list[Resource] = []
 
-        cache = self.cache.scope(CACHE_VERSION)
+        cache = self.cache
         for chunk in chunks:
             cached = cache.read(chunk.content_hash, EMBEDDING_FILE)
             if cached is None:

@@ -37,10 +37,6 @@ logger = logging.getLogger(__name__)
 # The exercises of one stitched document, cached by the document's content hash
 EXERCISES_FILE = "exercises.json"
 
-# The cache scope the exercise splits live in. Bumped whenever splitting
-# changes what the same text yields (prompt, model): the new scope starts empty
-CACHE_VERSION = "exercises-1"
-
 # Deep links into a pdf page, read back from the markers the stitch left
 PAGE_MARKER_RE = re.compile(PAGE_MARKER.format(position=r"(\d+)"))
 
@@ -151,7 +147,7 @@ def per_exercise(transformer: "CutTransformer", node: Resource) -> None:
 
     stitched = _stitch_pages(transformer, pages)
 
-    found = exercises(transformer.cache.scope(CACHE_VERSION), stitched)
+    found = exercises(transformer.cache, stitched)
     if not found:
         logger.warning(f"Dropping {node.title}: no exercises annotated in it")
         _drop(node)
@@ -229,6 +225,7 @@ class CutTransformer(Transformer):
     """Cuts the labelled trees into chunk leaves, one registry entry per kind of cut."""
 
     name = "cut"
+    cache_version = "exercises-1"  # the exercise splits (prompt, model)
 
     stitch_fallback: bool = False  # the LLM stitch fallback, off by default
 

@@ -1,4 +1,4 @@
-"""Judge: labels the trees the materializer produced.
+"""Judge: labels the trees once every file is text.
 
 The judge fills type, subtype and the cut for every resource
 — or drops it — and the project's overrides correct on top of its output.

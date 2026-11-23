@@ -199,6 +199,37 @@ def test_solution_file_chunks_catch_up_has_solution(tmp_path, transformer):
     assert child.has_solution
 
 
+def test_a_statement_has_a_solution_when_a_sibling_of_its_number_holds_one(tmp_path, transformer):
+    # Two files side by side, as a quiz's statement and solutions: the
+    # statement of number 2 is solved by its sibling; number 3 is not, and
+    # an unnumbered statement only counts its own
+    root = Resource(title="root")
+    unit = root.add_child(title="unit", cut="per_child")
+    files = {
+        "statement 2": ("2", "statement"),
+        "solution 2": ("2", "solution"),
+        "statement 3": ("3", "statement"),
+        "loose statement": (None, "statement"),
+    }
+    for title, (number, parts) in files.items():
+        unit.add_child(
+            title=title,
+            path=write_page(tmp_path, f"{title}.md", title),
+            mime_type=mt.MARKDOWN,
+            number=number,
+            exercise_parts=parts,
+        )
+
+    transformer.transform([root])
+
+    assert {child.title: child.has_solution for child in unit.children} == {
+        "statement 2": True,
+        "solution 2": True,
+        "statement 3": False,
+        "loose statement": False,
+    }
+
+
 def test_per_exercise_drops_when_no_exercises(tmp_path, transformer, monkeypatch):
     monkeypatch.setattr("rag_etl.transformers.cut.split_exercises", lambda *args, **kwargs: [])
 

@@ -195,7 +195,6 @@ class VideoMaterializer:
                 path=md_path,
                 mime_type=mt.MARKDOWN,
                 url=build_entry_url(entry_id, self.mediaspace_url, start),
-                cut="whole_document",
             )
 
     def _take_subtitles(self, node: Resource) -> list[Cue]:

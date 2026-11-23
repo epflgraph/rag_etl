@@ -304,7 +304,8 @@ def test_mooc_tree(tmp_path):
 
     # The leaves carry facts only; what they are, the judge decides
     assert all(leaf.type is None and leaf.subtype is None and leaf.cut is None for leaf in vertical.children)
-    assert all(leaf.week == 1 for leaf in vertical.children)
+    # The week is the chapter's fact, stated there only: the judge hands it down
+    assert all(leaf.week is None for leaf in vertical.children)
 
     quiz_leaves = sorted(
         (leaf for leaf in vertical.children if leaf.title == "Quiz 1"), key=lambda leaf: len(leaf.exercise_parts)

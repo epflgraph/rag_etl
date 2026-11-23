@@ -47,7 +47,7 @@ src/
 ├── ragtools/                 file preparation; never imports rag_etl (tests/test_layering.py)
 │   ├── llm/                  rcp.py (RCPClient: completions, structured output, embeddings, Langfuse tracing)
 │   │                         catalog.py (MODELS keyed (model, mode); get_model(task))
-│   ├── images/               transcribe_page, transcribe_slide, alt_text (+ prompts/)
+│   ├── images/               transcribe_page, transcribe_slide (+ prompts/)
 │   ├── documents/            headings (split/merge sections), stitch, exercises (split_exercises) (+ prompts/)
 │   ├── pdf.py                deterministic page rendering (PyMuPDF)
 │   ├── video.py              ffmpeg frames, SRT parsing, SlideDetector interface
@@ -155,8 +155,9 @@ stub: default cuts (readable leaves whole, containers of text per child,
 roots never), labels from title cues (practice vs theory, a subtype, a
 series number), metadata inherited down the tree, overrides, then fallbacks
 (`theory`/`unknown`). There is deliberately no type/subtype → cut mapping in
-the code. Chunk-level facts (`exercise_parts`, `has_solution`) are never
-inherited. The planned inference has three stages: infer each document's type
+the code. Every metadata field is inherited where a node leaves it empty
+(a page of a solutions file holds a solution), but for `has_solution`,
+which the cut derives. The planned inference has three stages: infer each document's type
 (theory, practice, exam, organization); an LLM jury (three models voting)
 infers subtype, number and `has_solution` for every practice/exam document of
 a course; then the course's subtype labels are normalized. Like every other
@@ -167,8 +168,13 @@ its node, top-down, replacing it by chunk leaves.
 
 - `whole_document`: one chunk, pages stitched.
 - `per_child`: each readable child becomes a chunk (pages, slides); a child with its own different cut keeps it.
-- `per_exercise`: pages stitched, split by `split_exercises` (one LLM pass, cached by the text's hash: number and statement/solution per exercise), one chunk per exercise linking to its page; `has_solution` set across the exercise. Heads-up: this pairing stays within one document. When statements and solutions are separate files (`series-3.pdf`, `series-3-solutions.pdf`), the statements' chunks keep `has_solution = False`; deliberately left so until a consumer needs it.
+- `per_exercise`: pages stitched, split by `split_exercises` (one LLM pass, cached by the text's hash: number and statement/solution per exercise), one chunk per exercise linking to its page. Heads-up: the solution pairing below stays among siblings. When statements and solutions are separate files (`series-3.pdf`, `series-3-solutions.pdf`), the statements' chunks keep `has_solution = False`; deliberately left so until a consumer needs it.
 - `text`: split at the most common heading level, sections merged up to the size limit.
+
+Once every cut is done, `has_solution` is derived in one place: a chunk has a
+solution when it holds one, or when a sibling chunk of the same number does
+(an unnumbered chunk only counts its own); an extractor may state it already
+(MOOC quizzes). Cuts never set it themselves.
 
 Stitching joins pages only where a file is merged (never slides),
 deterministically first (page markers, tables and equations split across

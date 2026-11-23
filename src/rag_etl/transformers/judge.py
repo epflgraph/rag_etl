@@ -17,9 +17,6 @@ import ragtools.mime_types as mt
 from rag_etl.core import METADATA_FIELDS, Override, Resource, apply_overrides
 from rag_etl.transformers.base import Transformer
 
-# Chunk-level facts, derived from the chunks themselves: never inherited
-CHUNK_LEVEL_FIELDS = ("exercise_parts", "has_solution")
-
 # The stub's broad regex defaults, applied where no extractor set a label
 # and corrected by the overrides. A node's own title speaks first; what
 # it leaves unset the lineage inherits; the fallbacks come last.
@@ -64,8 +61,8 @@ class JudgeTransformer(Transformer):
     and the labels its own title carries), what the lineage adds (every
     metadata field a node lacks it inherits from its parent, then the
     overrides correct), and the fallbacks that leave nothing empty.
-    Exercise parts stay with the extractors and the exercise cut; the real
-    inference lands later.
+    Exercise parts come from the extractors, the overrides and the
+    exercise cut, never from title cues; the real inference lands later.
     """
 
     name = "judge"
@@ -132,15 +129,15 @@ class JudgeTransformer(Transformer):
 
         The walk is top-down, so a parent's labels are final before its
         children are visited, and a node's own labels always beat the
-        inherited ones. cut is not inherited — an instruction for
-        splitting the node itself, a leaf with a container-cut would
-        never become a chunk — and neither are the chunk-level facts,
-        derived from the chunks themselves.
+        inherited ones: a page of a solutions file holds a solution. cut
+        is not inherited — an instruction for splitting the node itself,
+        a leaf with a container-cut would never become a chunk — and
+        has_solution, never None, is the cut's to derive.
         """
         if node.parent is None:
             return
         for name in METADATA_FIELDS:
-            if name not in CHUNK_LEVEL_FIELDS and getattr(node, name) is None:
+            if getattr(node, name) is None:
                 setattr(node, name, getattr(node.parent, name))
 
     def _fallback(self, node: Resource) -> None:

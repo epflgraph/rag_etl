@@ -135,9 +135,6 @@ def per_child(transformer: "CutTransformer", node: Resource) -> None:
 
         child.text = text
         child.cut = None
-        # A chunk holds what its file held; a chunk of a corrigé is a solution
-        if child.exercise_parts is None:
-            child.exercise_parts = node.exercise_parts
 
 
 def per_exercise(transformer: "CutTransformer", node: Resource) -> None:
@@ -177,12 +174,6 @@ def per_exercise(transformer: "CutTransformer", node: Resource) -> None:
         if page and chunk.url:
             chunk.url = f"{chunk.url}#page={page.group(1)}"
 
-    # has_solution is derived, not inherited: an exercise with any solution
-    # chunk in this sheet — its own or a sibling's — has one
-    solved = {chunk.number for chunk in node.children if "solution" in (chunk.exercise_parts or "")}
-    for chunk in node.children:
-        chunk.has_solution = chunk.number in solved
-
 
 def text(transformer: "CutTransformer", node: Resource) -> None:
     """The node's text is cut at its most common heading level, one chunk per part."""
@@ -205,6 +196,25 @@ def text(transformer: "CutTransformer", node: Resource) -> None:
         node.add_child(title=f"part {position}", text=section, path=None, mime_type=mt.MARKDOWN, cut=None)
 
 
+def _holds_solution(chunk: Resource) -> bool:
+    return "solution" in (chunk.exercise_parts or "")
+
+
+def _mark_solutions(node: Resource) -> None:
+    """has_solution for the chunks under one node, once every cut is done.
+
+    A chunk has a solution when it holds one, or when a sibling chunk of
+    the same number does (the statement of an exercise solved further down
+    the sheet). A chunk without a number only counts its own. An extractor
+    may have stated it already; this only ever adds.
+    """
+    chunks = [child for child in node.children if child.is_chunk]
+    solved = {chunk.number for chunk in chunks if chunk.number is not None and _holds_solution(chunk)}
+    for chunk in chunks:
+        if _holds_solution(chunk) or (chunk.number is not None and chunk.number in solved):
+            chunk.has_solution = True
+
+
 # The one cut catalogue; new cuts join here via PR
 CUTS: dict[str, CutFunction] = {
     "whole_document": whole_document,
@@ -225,11 +235,8 @@ class CutTransformer(Transformer):
     def transform(self, roots: list[Resource]) -> list[Resource]:
         for root in roots:
             self._cut(root)
-            # Chunks that hold a solution but were not cut by per_exercise
-            # (per_child children of a solution file inherit its parts) catch up
             for node in root.walk():
-                if "solution" in (node.exercise_parts or ""):
-                    node.has_solution = True
+                _mark_solutions(node)
         return roots
 
     def _cut(self, node: Resource) -> None:

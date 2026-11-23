@@ -74,7 +74,10 @@ def parse_course(
 
 
 def _chapter(export: Export, url_name: str, week: int | None) -> Resource | None:
-    """A chapter: a container of its sequentials, all of one week."""
+    """A chapter: a container of its sequentials, all of one week.
+
+    The week is stated here only; the judge hands it down to everything below.
+    """
 
     element = export.load("chapter", url_name)
     if element is None:
@@ -82,13 +85,13 @@ def _chapter(export: Export, url_name: str, week: int | None) -> Resource | None
 
     chapter = Resource(title=element.get("display_name", " "), week=week)
     for child in element.iterchildren():
-        if (sequential := _sequential(export, child.get("url_name"), week)) is not None:
+        if (sequential := _sequential(export, child.get("url_name"))) is not None:
             chapter.add_child(sequential)
 
     return chapter if chapter.children else None
 
 
-def _sequential(export: Export, url_name: str, week: int | None) -> Resource | None:
+def _sequential(export: Export, url_name: str) -> Resource | None:
     """A sequential (a subsection): a container of its verticals."""
 
     element = export.load("sequential", url_name)
@@ -97,13 +100,13 @@ def _sequential(export: Export, url_name: str, week: int | None) -> Resource | N
 
     sequential = Resource(title=element.get("display_name", " "))
     for child in element.iterchildren():
-        if (vertical := _vertical(export, child.get("url_name"), week)) is not None:
+        if (vertical := _vertical(export, child.get("url_name"))) is not None:
             sequential.add_child(vertical)
 
     return sequential if sequential.children else None
 
 
-def _vertical(export: Export, url_name: str, week: int | None) -> Resource | None:
+def _vertical(export: Export, url_name: str) -> Resource | None:
     """A vertical (a unit, one page a student sees): a container of its items' leaves."""
 
     element = export.load("vertical", url_name)
@@ -119,21 +122,21 @@ def _vertical(export: Export, url_name: str, week: int | None) -> Resource | Non
 
     vertical = Resource(title=title)
     for child in element.iterchildren():
-        for leaf in _item(export, child, title, has_video, week):
+        for leaf in _item(export, child, title, has_video):
             vertical.add_child(leaf)
 
     return vertical if vertical.children else None
 
 
-def _item(export: Export, element: _Element, vertical_title: str, has_video: bool, week: int | None) -> list[Resource]:
+def _item(export: Export, element: _Element, vertical_title: str, has_video: bool) -> list[Resource]:
     """The leaves one item of a vertical yields; an item of any other kind yields none."""
 
     if element.tag == "html":
-        return HtmlParser().parse(export, element, vertical_title, has_video, week)
+        return HtmlParser().parse(export, element, vertical_title, has_video)
     if element.tag == "problem":
-        return QuizParser().parse(export, element, vertical_title, week)
+        return QuizParser().parse(export, element, vertical_title)
     if element.tag == "video":
-        video = VideoParser().parse(export, element, vertical_title, week)
+        video = VideoParser().parse(export, element, vertical_title)
         return [video] if video is not None else []
     return []
 

@@ -25,7 +25,6 @@ class QuizParser:
         export: Export,
         elem_vertical: _Element,
         vertical_display_name: str,
-        week: int | None = None,
     ) -> list[Resource]:
         url_name = elem_vertical.get("url_name", "")
         if not url_name:
@@ -65,7 +64,6 @@ class QuizParser:
                 exercise_parts=parts,
                 has_solution=True,
                 number=number,
-                week=week,
             )
             for path, parts in ((quiz_md_path, "statement"), (quiz_sol_md_path, "statement + solution"))
         ]

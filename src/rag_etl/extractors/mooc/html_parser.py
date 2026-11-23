@@ -125,11 +125,10 @@ class HtmlParser:
         elem_vertical: _Element,
         vertical_display_name: str,
         vertical_has_video: bool = False,
-        week: int | None = None,
     ) -> list[Resource]:
         """Parse a MOOC HTML page: the page itself and the documents it links.
 
-        Only facts are recorded: titles, files, urls, the week and the number
+        Only facts are recorded: titles, files, urls and the number
         a tag marker carries. What the material is (type, subtype, cut) is the
         judge's to decide, corrected by the project's overrides. A page or a
         link marked [NO_BOT] is left out.
@@ -185,7 +184,6 @@ class HtmlParser:
                 path=html_path,
                 mime_type=mt.HTML,
                 number=str(module_number) if module_number is not None else None,
-                week=week,
             )
         )
 
@@ -222,7 +220,6 @@ class HtmlParser:
                     path=resource_path,
                     mime_type=mt.guess_mime_type(resource_path),
                     number=str(link_number) if link_number is not None else None,
-                    week=week,
                 )
             )
 

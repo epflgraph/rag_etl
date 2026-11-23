@@ -275,7 +275,7 @@ class MediaspaceExtractor(Extractor):
 
             # Subtitles travel beside the video as a subtitles leaf
             if subtitles_path is not None:
-                video.add_child(title="subtitles", path=subtitles_path, mime_type=mt.SRT, cut=None)
+                video.add_child(title="subtitles", path=subtitles_path, mime_type=mt.SRT)
 
         if not resources.children:
             logger.warning(f"No videos extracted from {self.playlist_or_channel_url}")

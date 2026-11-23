@@ -56,7 +56,6 @@ class VideoParser:
         export: Export,
         elem_vertical: _Element,
         vertical_display_name: str,
-        week: int | None = None,
     ) -> Resource | None:
         """Parse a MOOC video: the video itself, its subtitles as a child.
 
@@ -85,20 +84,17 @@ class VideoParser:
 
         video_title = root_video.get("display_name", "")
 
-        # The week is inherited by every slide cut from this video, while the
-        # numbering itself is not: a slide is identified by its timestamp
         video = Resource(
             # Its own name: the unit's is its parent's title already
             title=video_title,
             url=video_url,
             path=video_xml_path,
             mime_type=mt.MP4,
-            week=week,
         )
 
         # A transcript found in the export travels beside the video as a caption leaf
         srt_path = self.find_transcript(root_video, export)
         if srt_path is not None:
-            video.add_child(title="subtitles", path=srt_path, mime_type=mt.SRT, cut=None)
+            video.add_child(title="subtitles", path=srt_path, mime_type=mt.SRT)
 
         return video

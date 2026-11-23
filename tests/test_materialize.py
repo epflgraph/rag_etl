@@ -254,9 +254,9 @@ def test_video_gains_one_slide_child_per_segment(tmp_path, transformer, monkeypa
     assert "world" in lecture.children[1].path.read_text(encoding="utf-8")
     # The caption leaf is consumed: the subtitles are part of the slides now
     assert all(child.mime_type == mt.MARKDOWN for child in lecture.children)
-    # Slides carry the deep link into their own moment and a per-slide cut
+    # Slides carry the deep link into their own moment; how they are cut is the judge's
     assert lecture.children[0].url.startswith("https://")
-    assert lecture.children[0].cut == "whole_document"
+    assert lecture.children[0].cut is None
 
 
 def test_slide_holding_a_quote_still_gets_its_speech(tmp_path, transformer, monkeypatch):

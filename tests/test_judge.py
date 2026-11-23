@@ -66,6 +66,19 @@ def test_overrides_correct_the_labels():
     assert leaf.cut == "text"
 
 
+def test_exercise_parts_set_on_a_file_reach_its_pages():
+    # The pages exist before the judge (materialize made them): the override
+    # on the file reaches them by inheritance, like any other metadata
+    root = Resource(title="root")
+    pdf = root.add_child(title="corrigé 3.pdf", mime_type=mt.PDF)
+    page = pdf.add_child(title="page 1", mime_type=mt.MARKDOWN)
+
+    override = Override('title="corrigé*"', exercise_parts="solution")
+    JudgeTransformer(project_dir=PROJECT_DIR, overrides=(override,)).transform([root])
+
+    assert page.exercise_parts == "solution"
+
+
 def test_titles_without_cues_get_the_defaults():
     root = Resource(title="root")
     leaf = root.add_child(title="group lists", mime_type=mt.MARKDOWN)

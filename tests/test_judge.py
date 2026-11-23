@@ -67,7 +67,7 @@ def test_overrides_correct_the_labels():
 
 
 def test_exercise_parts_set_on_a_file_reach_its_pages():
-    # The pages exist before the judge (materialize made them): the override
+    # The pages exist before the judge (the pdf step made them): the override
     # on the file reaches them by inheritance, like any other metadata
     root = Resource(title="root")
     pdf = root.add_child(title="corrigé 3.pdf", mime_type=mt.PDF)

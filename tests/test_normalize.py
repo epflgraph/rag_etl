@@ -146,7 +146,7 @@ def test_notebook_output_images_written_beside_the_markdown(tmp_path, transforme
 
     transformer.transform([root])
 
-    # The plot's reference resolves from the Markdown, so materialize reads it
+    # The plot's reference resolves from the Markdown, so the images step reads it
     md_path = root.children[0].path
     [target] = re.findall(r"!\[[^\]]*\]\(([^)]+)\)", md_path.read_text(encoding="utf-8"))
     assert (md_path.parent / target).is_file()

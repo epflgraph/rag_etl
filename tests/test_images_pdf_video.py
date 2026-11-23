@@ -272,7 +272,7 @@ def test_video_gains_one_slide_child_per_segment(tmp_path, video):
     # The words spoken over each slide were appended as a quote
     assert "hello" in lecture.children[0].path.read_text(encoding="utf-8")
     assert "world" in lecture.children[1].path.read_text(encoding="utf-8")
-    # The caption leaf is consumed: the subtitles are part of the slides now
+    # The subtitles leaf is consumed: the subtitles are part of the slides now
     assert all(child.mime_type == mt.MARKDOWN for child in lecture.children)
     # Slides carry the deep link into their own moment; how they are cut is the judge's
     assert lecture.children[0].url.startswith("https://")

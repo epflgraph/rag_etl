@@ -14,7 +14,7 @@ from ragtools.kaltura import (
     download_caption,
     extract_category_id_from_url,
     extract_playlist_id_from_url,
-    get_subtitle_urls,
+    list_caption_assets,
     is_playlist_url,
     list_channel_entries,
     list_playlist_entries,
@@ -118,7 +118,7 @@ class MediaspaceExtractor(Extractor):
     """
 
     playlist_or_channel_url: str
-    language: str | None = None  # the videos', as an ISO code ("fr", "en"): which captions are kept
+    language: str | None = None  # the videos', as an ISO code ("fr", "en"): which caption asset is kept
     created_after: str | date | datetime | float | None = None
     mime_types: Sequence[str] = (mt.SRT,)
 
@@ -212,7 +212,7 @@ class MediaspaceExtractor(Extractor):
     def extract(self) -> Resource:
         """
         Extract video resources for this course from Mediaspace into a
-        container of video leaves, each carrying its captions beside it.
+        container of video leaves, each carrying its subtitles as a child.
         """
 
         # Reaching the source, failing loud when it cannot be reached
@@ -252,14 +252,14 @@ class MediaspaceExtractor(Extractor):
 
             # Subtitles are optional: a video published without them, or
             # without them in this course's language, still uses its extracted slide frames
-            caption = self.select_caption(get_subtitle_urls(client, entry_id), entry_id)
+            caption = self.select_caption(list_caption_assets(client, entry_id), entry_id)
 
             subtitles_path = None
 
             if caption is not None:
                 caption_path = self.build_caption_path(caption, entry_id, entry_name)
 
-                # A failed download leaves the video without a transcript
+                # A failed download leaves the video without subtitles
                 # rather than dropping it
                 if download_caption(client, caption, caption_path):
                     logger.info(f"Entry {entry_id}: wrote {caption_path}")

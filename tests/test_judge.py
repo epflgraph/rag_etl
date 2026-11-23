@@ -39,11 +39,11 @@ def test_roots_are_never_cut():
 
 def test_unreadable_leaves_stay_unlabelled():
     root = Resource(title="root")
-    caption = root.add_child(title="captions", mime_type=mt.SRT)
+    subtitles = root.add_child(title="subtitles", mime_type=mt.SRT)
 
     JudgeTransformer(project_dir=PROJECT_DIR).transform([root])
 
-    assert caption.cut is None
+    assert subtitles.cut is None
 
 
 def test_containers_without_text_children_stay_unlabelled():

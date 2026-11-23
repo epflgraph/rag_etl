@@ -370,7 +370,7 @@ def test_mediaspace(monkeypatch, tmp_path):
     monkeypatch.setattr(f"{module}.extract_playlist_id_from_url", lambda url: "playlist1")
     monkeypatch.setattr(f"{module}.list_playlist_entries", lambda client, playlist_id: entries)
     monkeypatch.setattr(
-        f"{module}.get_subtitle_urls",
+        f"{module}.list_caption_assets",
         lambda client, entry_id: [{"caption_asset_id": "cap1", "file_ext": ".srt", "language_code": "en"}],
     )
     monkeypatch.setattr(f"{module}.caption_mime_type", lambda caption: mt.SRT)
@@ -400,11 +400,11 @@ def test_mediaspace(monkeypatch, tmp_path):
     assert video.url == "https://mediaspace.epfl.ch/playlist/1/0_abc"
     assert video.path is None
 
-    # the placeholder entry (no duration) is skipped, captions travel beside the video
+    # the placeholder entry (no duration) is skipped, the subtitles are the video's child
     assert len(video.children) == 1
-    caption = video.children[0]
-    assert caption.mime_type == mt.SRT
-    assert caption.path and caption.path.read_text().startswith("1\n")
+    subtitles = video.children[0]
+    assert subtitles.mime_type == mt.SRT
+    assert subtitles.path and subtitles.path.read_text().startswith("1\n")
 
 
 def _write_thread(ed_dir: Path, name: str, title: str, category: str, subcategory: str, answered: bool) -> None:

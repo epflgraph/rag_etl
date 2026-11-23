@@ -49,8 +49,8 @@ def entry_id_of(node: Resource) -> str | None:
     """
     return extract_entry_id_from_url(node.url) if node.url else None
 
-# The transcript is quoted rather than put under a heading
-TRANSCRIPT_PREFIX = "> "
+# The subtitles are quoted rather than put under a heading
+SUBTITLES_PREFIX = "> "
 
 
 def _node_key(entry_id: str, language: str | None) -> str:
@@ -84,7 +84,7 @@ class VideoTransformer(Transformer):
     def _read(self, cache: Cache, node: Resource) -> None:
         entry_id = entry_id_of(node)
         if entry_id is None:
-            # A YouTube video has no Kaltura entry to reach: its captions
+            # A YouTube video has no Kaltura entry to reach: its subtitles
             # are kept as they are, the video itself is left as it is
             logger.warning(f"Leaving {node.title} as it is: no Kaltura entry id to reach the video with")
             return
@@ -192,7 +192,7 @@ class VideoTransformer(Transformer):
             end = slides[position + 1][0] if position + 1 < len(slides) else None
             spoken = text_between(cues, start, end)
             if spoken:
-                md_path.write_text(f"{markdown}\n\n{TRANSCRIPT_PREFIX}{spoken}\n", encoding="utf-8")
+                md_path.write_text(f"{markdown}\n\n{SUBTITLES_PREFIX}{spoken}\n", encoding="utf-8")
 
             # Each slide carries the public watch url of its own moment, so a
             # chunk cut from it links straight into that moment of the lecture

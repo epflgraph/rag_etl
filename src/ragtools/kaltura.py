@@ -1,3 +1,9 @@
+"""Kaltura (Mediaspace): sessions, entries, the video file behind an entry, and its caption assets.
+
+"Caption asset" is Kaltura's name for a subtitle file attached to an
+entry; once downloaded, the pipeline calls it the video's subtitles.
+"""
+
 import hashlib
 import logging
 import os
@@ -221,7 +227,7 @@ def url_with_ks(url: str, ks: str) -> str:
 
 def caption_mime_type(caption_info: dict) -> str | None:
     """
-    Return the mime type of a caption dict from get_subtitle_urls.
+    Return the mime type of a caption dict from list_caption_assets.
 
     Kaltura reports the format as a string enum ("1" for SRT), but some
     assets only carry a meaningful fileExt, so both are consulted. Returns
@@ -356,7 +362,7 @@ def list_channel_entries(client: KalturaClient, category_id: str) -> list:
     return entries
 
 
-def get_subtitle_urls(client: KalturaClient, entry_id: str) -> list[dict]:
+def list_caption_assets(client: KalturaClient, entry_id: str) -> list[dict]:
     """
     Return the ready caption assets attached to a Kaltura entry, as plain
     dicts with their download URL resolved.

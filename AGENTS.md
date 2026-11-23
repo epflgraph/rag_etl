@@ -101,6 +101,8 @@ is "no children", `is_chunk` is "has text").
 - **Identity is the node** (`eq=False`). `content_hash` is computed on every access (text, else children's hashes in order, else file bytes), so it never goes stale.
 - **`add_child(**fields)`** builds a child as a copy of its parent, naming only what differs: a page keeps its PDF's url and labels. `add_child(child)` attaches a subtree as it is. `detach()` removes a node and its subtree.
 - **Deep links travel as `url`**, copied down and refined (a page's `#page=N`, a slide's timestamp). Loaders read `node.url`; nothing re-resolves lineage.
+- **A video carries its subtitles as an SRT child** (Mediaspace and MOOC extractors alike), which the video step consumes into its slides.
+- **Words**: *subtitles* are what is said in a video (Kaltura's objects are *caption assets*, edX's attribute is `transcripts`); *transcribe*/*transcript* is only what the vision model reads off an image, a page or a slide.
 - **Nesting is the only relation** between resources. Links between trees (a video and its deck) are not modelled.
 - **Chunk ids** are assigned once the trees are final (`assign_ids`, at load): its position in the run (`"19"`), unique within a run, not stable across runs. Equal content under different metadata stays two chunks: courses own their duplicates.
 
@@ -136,7 +138,7 @@ constants: never remove or rename one, only add.
 
 - *Moodle*: sections → modules → files; availability dates become `from_`/`until`, written in Lausanne's time with its offset (`2026-09-07T08:00:00.000000+02:00`) so they name one instant. Requests time out after 60 s without data. A type Moodle names its own way (`document/unknown`, `application/g-zip`) falls back to the file name's type. Assignments cannot be fetched (no API access) — accepted.
 - *MOOC* (edX export): course → chapters (weeks, from `first_week_chapter`/`week_count`) → sequentials → verticals → pages (their HTML, as the export holds it), linked documents, quizzes (statement and statement + solution files, written to the export's `markdown/`), videos with their subtitles. Documents linked on a video page are skipped as duplicates of the video's slides. A video naming no source stops the run.
-- *Mediaspace*: a channel or playlist; videos with their Kaltura captions. Videos have no `path`; overrides reach them by `url` (`url="https://mediaspace.epfl.ch/*"`).
+- *Mediaspace*: a channel or playlist; videos with their subtitles (Kaltura caption assets). Videos have no `path`; overrides reach them by `url` (`url="https://mediaspace.epfl.ch/*"`).
 - *Local folder*, *Git* (repo or branch url; everything indexed by default).
 - *Ed Discussion*: threads filed under Ed's categories and subcategories, one markdown Q&A per answered thread, `subtype="forum_qa"` (staff answers; endorsed student answers if asked). A post's image is downloaded and shown as a markdown image, which the images step reads. Which categories to keep and how to label them is done by overrides.
 
@@ -235,6 +237,6 @@ by a bump of the `cache_version` of each step that uses it.
   - *Q&A*: threads were marked `is_qa`, which kept exercise splitting off them and went into the metadata `chatbot-pipelines` read. Now the Ed extractor states it as `subtype="forum_qa"`, no extra field. Trade-off: a thread can carry the type and number of the document it discusses, not its subtype as well (a search by subtype `homework` misses the Q&A about homework); if the judge replaces the subtype, Q&A-ness is only in the lineage. Javier to confirm this suits Tutor Bot.
 - **Links in MOOC pages** (Javier to decide, on hold until then). `html_to_markdown` keeps every link as the page wrote it (stripping them is markdownify's `strip=["a"]`). Relative `/static/…` links lead nowhere outside the courseware: open whether they become their published urls. The MOOC parser also takes external links (`https://…`) as linked documents and warns `Missing asset` for each.
 - **Mixed-language projects.** `Project.language` sets GraphAI's slide-detection language for every video and the Elasticsearch content analyzer for the whole index, while EPFL courses often mix languages (a French course with an English MOOC, an English deck with a French forum). Each source already states its own language (ISO code); open whether a resource could carry its language for detection, and whether the index should use a language-neutral analyzer. Left as is until the language can be informed reliably per resource.
-- **YouTube captions** are never indexed (SRT is not text and YouTube videos skip the video path).
+- **YouTube subtitles** are never indexed (SRT is not text and YouTube videos skip the video path).
 - **Consumers**: GraphAI's `/rag/retrieve` must embed queries with Qwen3-Embedding-8B and query `content`.
 - **Operations**: CI (ruff, pytest) is missing; the weekly timers are not wired; MICRO-303 is the pilot, other projects follow one by one; delete `legacy/` after the cutover.

@@ -51,9 +51,10 @@ def _subtitles(block: _Element, export: Export) -> Path | None:
     """
     The video's subtitle file in the MOOC's language, or None.
 
-    The video descriptor names its transcripts as a JSON map of language
-    code to file name, e.g. {"en": "<uuid>-en.srt", "fr": "<uuid>-fr.srt"},
-    and the files themselves live in the export's static folder.
+    The video descriptor names its subtitle files in its `transcripts`
+    attribute (edX's word), as a JSON map of language code to file name,
+    e.g. {"en": "<uuid>-en.srt", "fr": "<uuid>-fr.srt"}; the files
+    themselves live in the export's static folder.
     """
 
     raw = block.get("transcripts")
@@ -61,19 +62,19 @@ def _subtitles(block: _Element, export: Export) -> Path | None:
         return None
 
     try:
-        transcripts = json.loads(raw)
+        by_language = json.loads(raw)
     except json.JSONDecodeError:
         logger.warning(f"Could not parse transcripts attribute: '{raw}'")
         return None
 
-    file_name = (transcripts or {}).get(export.language)
+    file_name = (by_language or {}).get(export.language)
     if not file_name:
-        logger.debug(f"No {export.language} transcript among {sorted(transcripts or {})}, skipping subtitles")
+        logger.debug(f"No {export.language} subtitles among {sorted(by_language or {})}, skipping them")
         return None
 
     srt_path = export.dir / "static" / file_name
     if not srt_path.exists():
-        logger.warning(f"Transcript {srt_path} named by the descriptor does not exist")
+        logger.warning(f"Subtitles {srt_path} named by the descriptor do not exist")
         return None
 
     return srt_path

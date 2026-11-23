@@ -59,7 +59,8 @@ src/
 └── rag_etl/
     ├── core/                 resource.py (Resource, METADATA_FIELDS, iter_chunks, assign_ids), overrides.py
     ├── extractors/           base.py (Extractor, SourceUnavailable), markers.py (NO_BOT),
-    │                         moodle.py, local_folder.py, git.py, mediaspace.py, ed_discussion/,
+    │                         moodle.py, local_folder.py, git.py, mediaspace.py,
+    │                         ed_discussion/ (EdDiscussionExtractor; thread.py: one thread as Markdown),
     │                         mooc/ (MOOCExtractor; course.py the walk, export.py, page.py, quiz.py, video.py)
     ├── transformers/         base.py, normalize.py, images.py, pdf.py, video.py (ocr.py: their shared cached read), judge.py, cut.py, embed.py
     ├── loaders/              base.py, manifest.py, elasticsearch.py, index_settings.json
@@ -137,7 +138,7 @@ constants: never remove or rename one, only add.
 - *MOOC* (edX export): course → chapters (weeks, from `first_week_chapter`/`week_count`) → sequentials → verticals → pages (their HTML, as the export holds it), linked documents, quizzes (statement and statement + solution files, written to the export's `markdown/`), videos with their subtitles. Documents linked on a video page are skipped as duplicates of the video's slides. A video naming no source stops the run.
 - *Mediaspace*: a channel or playlist; videos with their Kaltura captions. Videos have no `path`; overrides reach them by `url` (`url="https://mediaspace.epfl.ch/*"`).
 - *Local folder*, *Git* (repo or branch url; everything indexed by default).
-- *Ed Discussion*: threads filed under Ed's categories and subcategories, one markdown Q&A per answered thread (staff answers; endorsed student answers if asked). A post's image is downloaded and shown as a markdown image, which the images step reads. Which categories to keep and how to label them is done by overrides.
+- *Ed Discussion*: threads filed under Ed's categories and subcategories, one markdown Q&A per answered thread, `subtype="forum_qa"` (staff answers; endorsed student answers if asked). A post's image is downloaded and shown as a markdown image, which the images step reads. Which categories to keep and how to label them is done by overrides.
 
 **Normalize.** zip and tar.gz unpack into children (UTF-8 names fixed),
 notebooks become markdown (their output images written beside it, read by
@@ -228,7 +229,10 @@ by a bump of the `cache_version` of each step that uses it.
 
 ## Open work
 
-- **The judge's inference** (Javier). It should also absorb what Ed Discussion's former LLM jury did: matching a thread to the document it is about, and its dates and week.
+- **The judge's inference** (Javier). It should also absorb what Ed Discussion's former LLM jury did (on `main`: `extractors/ed_discussion/`, with a catalogue of the previous run's documents): matching a thread to the document it is about, and its dates and week. The rewrite dropped the jury as a side effect of moving all inference to the judge, not by decision, and with it three things the judge takes over:
+  - *Release dates*: a thread took `from`/`until` from its matched document, so previous years' Q&A appeared with this year's material. Threads now carry none, and consumers filtering by release window show them from day one, until the judge copies them from the document it matches. A thread's own timestamps are no release window.
+  - *Holding back*: a practice or exam thread with no matching document was not indexed. Extractors return everything; dropping such a thread is the judge's to decide.
+  - *Q&A*: threads were marked `is_qa`, which kept exercise splitting off them and went into the metadata `chatbot-pipelines` read. Now the Ed extractor states it as `subtype="forum_qa"`, no extra field. Trade-off: a thread can carry the type and number of the document it discusses, not its subtype as well (a search by subtype `homework` misses the Q&A about homework); if the judge replaces the subtype, Q&A-ness is only in the lineage. Javier to confirm this suits Tutor Bot.
 - **Links in MOOC pages** (Javier to decide, on hold until then). `html_to_markdown` keeps every link as the page wrote it (stripping them is markdownify's `strip=["a"]`). Relative `/static/…` links lead nowhere outside the courseware: open whether they become their published urls. The MOOC parser also takes external links (`https://…`) as linked documents and warns `Missing asset` for each.
 - **Mixed-language projects.** `Project.language` sets GraphAI's slide-detection language for every video and the Elasticsearch content analyzer for the whole index, while EPFL courses often mix languages (a French course with an English MOOC, an English deck with a French forum). Each source already states its own language (ISO code); open whether a resource could carry its language for detection, and whether the index should use a language-neutral analyzer. Left as is until the language can be informed reliably per resource.
 - **YouTube captions** are never indexed (SRT is not text and YouTube videos skip the video path).

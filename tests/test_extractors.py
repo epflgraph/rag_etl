@@ -11,8 +11,8 @@ import requests
 
 import ragtools.mime_types as mt
 from rag_etl.extractors.base import Extractor, SourceUnavailable
-from rag_etl.extractors.ed_discussion.ed_discussion_extractor import EdDiscussionExtractor
-from rag_etl.extractors.ed_discussion.utils import format_qa
+from rag_etl.extractors.ed_discussion import EdDiscussionExtractor
+from rag_etl.extractors.ed_discussion.thread import format_qa, thread_markdown
 from rag_etl.extractors.git import GitExtractor, branch_from_url, repo_from_url
 from rag_etl.extractors.local_folder import LocalFolderExtractor
 from rag_etl.extractors.mediaspace import MediaspaceExtractor
@@ -444,13 +444,53 @@ def test_ed_discussion(tmp_path):
     assert list(tree["Logistics"]) == ["Room change?"]
     leaf = next(node for node in root.walk() if node.title == "Question about exam 2024")
     assert leaf.mime_type == mt.MARKDOWN and leaf.type is None and leaf.cut is None
+    # Ed states that a thread is a forum Q&A; what it is about is the judge's
+    assert leaf.subtype == "forum_qa"
+    # Containers carry no subtype: only the threads are Q&A
+    assert all(node.subtype is None for node in root.walk() if not node.is_leaf)
     assert leaf.path and "# Answer:" in leaf.path.read_text()
 
 
 def test_ed_discussion_headings_follow_the_forums_language():
-    qa = {"question": "Q?", "answers": ["A1", "A2"]}
-    assert format_qa(qa, "fr") == "# Question :\nQ?\n\n# Réponse 1 :\nA1\n\n# Réponse 2 :\nA2"
-    assert format_qa({"question": "Q?", "answers": ["A"]}, "en") == "# Question:\nQ?\n\n# Answer:\nA"
+    assert format_qa("Q?", ["A1", "A2"], "fr") == "# Question :\nQ?\n\n# Réponse 1 :\nA1\n\n# Réponse 2 :\nA2"
+    assert format_qa("Q?", ["A"], "en") == "# Question:\nQ?\n\n# Answer:\nA"
+
+
+ED_USERS = [{"id": 1, "course_role": "student"}, {"id": 2, "course_role": "staff"}]
+
+
+def test_ed_discussion_keeps_staff_posts_and_endorsed_ones_if_asked(tmp_path):
+    thread = {
+        "type": "question",
+        "title": "Etching",
+        "document": "Why?",
+        "answers": [
+            # A student's answer, endorsed, with a staff follow-up under it
+            {"user_id": 1, "is_endorsed": True, "document": "student", "comments": [{"user_id": 2, "document": "staff follow-up"}]},
+            {"user_id": 1, "document": "unendorsed"},
+        ],
+        "comments": [{"user_id": 2, "document": "staff comment"}],
+    }
+
+    without = thread_markdown(thread, ED_USERS, tmp_path, "en", include_endorsed=False)
+    endorsed = thread_markdown(thread, ED_USERS, tmp_path, "en", include_endorsed=True)
+
+    assert without == "# Question:\nEtching\n\nWhy?\n\n# Answer 1:\nstaff follow-up\n\n# Answer 2:\nstaff comment"
+    assert "student" in endorsed and "unendorsed" not in endorsed
+    # Unanswered, or not a question: nothing to index
+    assert thread_markdown({**thread, "answers": [], "comments": []}, ED_USERS, tmp_path, "en", False) is None
+    assert thread_markdown({**thread, "type": "post"}, ED_USERS, tmp_path, "en", False) is None
+
+
+def test_ed_discussion_shows_every_image_of_a_post(tmp_path):
+    (tmp_path / "a.png").write_bytes(b"png")
+    (tmp_path / "b").write_bytes(b"png")  # Ed drops the extension of some
+    post = {"user_id": 2, "document": "See", "content": '<image src="a.png"/><image src="https://static.us.edusercontent.com/files/b"/>'}
+    thread = {"type": "question", "title": "T", "document": "Q", "answers": [post]}
+
+    markdown = thread_markdown(thread, ED_USERS, tmp_path, "en", False)
+
+    assert f"![](<{tmp_path / 'a.png'}>)" in markdown and f"![](<{tmp_path / 'b'}>)" in markdown
 
 
 def test_ed_discussion_without_export(tmp_path):

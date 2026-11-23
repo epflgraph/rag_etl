@@ -29,7 +29,7 @@ from rag_etl.transformers.ocr import MAX_CONCURRENT_OCR, file_to_read, ocr_cache
 logger = logging.getLogger(__name__)
 
 
-def _page_number(md_path: Path) -> int:
+def page_number(md_path: Path) -> int:
     """The page a transcript belongs to, read back from its name (page_3.md → 3)."""
     return int(md_path.stem.removeprefix("page_"))
 
@@ -60,10 +60,10 @@ class PdfTransformer(Transformer):
 
         for md_path in md_paths:
             if not md_path.read_text(encoding="utf-8").strip():
-                logger.debug(f"Dropping page {_page_number(md_path)} of {node.title}: no readable content")
+                logger.debug(f"Dropping page {page_number(md_path)} of {node.title}: no readable content")
                 continue
 
-            node.add_child(title=f"page {_page_number(md_path)}", path=md_path, mime_type=mt.MARKDOWN)
+            node.add_child(title=f"page {page_number(md_path)}", path=md_path, mime_type=mt.MARKDOWN)
 
         logger.info(f"{node.title}: {len(node.children)} pages")
 

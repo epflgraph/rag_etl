@@ -7,7 +7,7 @@ endpoint come from the config.
 
 from ragtools.documents.exercises import Exercise, ExerciseList, ExerciseSnippet, split_exercises
 from ragtools.documents.headings import MAX_SECTION_LINES, line_count, merge_sections, split_by_most_common_heading
-from ragtools.documents.stitch import PAGE_MARKER, llm_stitch, stitch
+from ragtools.documents.stitch import PAGE_MARKER, PAGE_MARKER_RE, llm_stitch, split_pages, stitch
 
 __all__ = [
     "MAX_SECTION_LINES",
@@ -15,10 +15,12 @@ __all__ = [
     "ExerciseList",
     "ExerciseSnippet",
     "PAGE_MARKER",
+    "PAGE_MARKER_RE",
     "line_count",
     "llm_stitch",
     "merge_sections",
     "split_by_most_common_heading",
     "split_exercises",
+    "split_pages",
     "stitch",
 ]

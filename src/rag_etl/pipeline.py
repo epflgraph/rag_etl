@@ -1,6 +1,6 @@
 """The fixed sequence orchestrator.
 
-Extract → normalize → images → pdf → video → judge → cut → embed, then load:
+Extract → normalize → images → pdf → stitch → video → judge → cut → embed, then load:
 one sequence for every project, the steps constructed from the project.
 Extractors take nothing and produce trees, transformers take trees and
 produce trees, loaders take trees and produce nothing. Failures
@@ -27,6 +27,7 @@ from rag_etl.transformers import (
     JudgeTransformer,
     NormalizeTransformer,
     PdfTransformer,
+    StitchTransformer,
     Transformer,
     VideoTransformer,
 )
@@ -36,7 +37,8 @@ logger = logging.getLogger(__name__)
 
 # The transformers that keep a cache, by name: what `--refresh` accepts
 CACHED_STEPS = tuple(
-    step.name for step in (ImagesTransformer, PdfTransformer, VideoTransformer, CutTransformer, EmbedTransformer)
+    step.name
+    for step in (ImagesTransformer, PdfTransformer, StitchTransformer, VideoTransformer, CutTransformer, EmbedTransformer)
 )
 
 
@@ -84,6 +86,7 @@ def transform(
         # Images first: the markdown it reads is the sources', never the pages and slides read after
         ImagesTransformer(project_dir=project_dir, refresh=refresh == ImagesTransformer.name),
         PdfTransformer(project_dir=project_dir, refresh=refresh == PdfTransformer.name),
+        StitchTransformer(project_dir=project_dir, refresh=refresh == StitchTransformer.name),
         VideoTransformer(
             project_dir=project_dir,
             refresh=refresh == VideoTransformer.name,

@@ -22,8 +22,8 @@ def test_prompt_loads(prompt):
     assert prompt.strip()
 
 
-def test_stitch_user_prompt_takes_the_document():
-    assert "{document}" in STITCH_USER_PROMPT
+def test_stitch_user_prompt_takes_the_pages():
+    assert "{pages}" in STITCH_USER_PROMPT
 
 
 def test_transcription_prompts_share_the_rules_and_differ_in_their_specifics():

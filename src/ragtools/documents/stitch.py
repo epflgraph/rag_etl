@@ -1,14 +1,18 @@
-"""Stitching: ordered pages joined into one document, deterministic-first.
+"""Stitching: pages read one by one, made one document again.
 
-Page-by-page OCR leaves pages that sometimes need merging: tables or
-display equations cut at page boundaries, words split by hyphenation. The
-fixes here are deterministic post-processing over the ordered page texts,
-zero LLM calls. The LLM stitch runs as a per-document fallback, off by
-default: when a caller asks for it, it rewrites the whole joined document
-in a single call on top of the deterministic result.
+Page-by-page OCR knows nothing of the other pages: heading levels drift
+from page to page, tables, lists and display equations are cut at page
+boundaries, words are split by hyphenation. Two stitches mend that:
+
+- `llm_stitch` harmonises a document's pages with a model, a batch of
+  pages at a time, and hands the pages back apart (`split_pages`);
+- `stitch` joins pages into one text with plain code: page markers,
+  tables and equations cut by the boundary, hyphenation. Zero LLM calls.
 """
 
 from __future__ import annotations
+
+import re
 
 from pathlib import Path
 
@@ -16,25 +20,32 @@ from ragtools.llm import get_model
 
 # Page boundary markers, one per page, in strict page order
 PAGE_MARKER = "<!-- page {position} -->"
+PAGE_MARKER_RE = re.compile(PAGE_MARKER.format(position=r"(\d+)"))
 
-# The LLM stitch (the old prompt, ported verbatim), a per-document fallback,
-# kept as documents next to this module; the user prompt is a template
-# taking the document in place of {document}
+# The LLM stitch's prompts, kept as documents next to this module; the user
+# prompt is a template taking the fenced pages in place of {pages}
 STITCH_SYSTEM_PROMPT = (Path(__file__).parent / "prompts" / "stitch_markdown_pages.md").read_text(encoding="utf-8")
 STITCH_USER_PROMPT = (Path(__file__).parent / "prompts" / "stitch_user.md").read_text(encoding="utf-8").strip()
 
+# One call sees this many pages, the last ones of a batch seen again by the
+# next, so a long document never has to come back whole from a single call
+# and no page is harmonised without its neighbours
+BATCH_PAGES = 10
+BATCH_OVERLAP = 2
 
-def stitch(pages: list[str]) -> str:
+
+def stitch(pages: list[str], numbers: list[int] | None = None) -> str:
     """Join the pages in order, fixing what page-by-page processing broke.
 
     Tables and display equations cut by the page boundary are joined so
     they read as one again, and a word split by hyphenation is put back
     together. Each page keeps a boundary marker — except a page that
     continues a table or an equation, where a marker would break the very
-    block it belongs to.
+    block it belongs to. The markers carry the pages' own numbers when
+    given (a document missing a page), their position otherwise.
     """
     joined = ""
-    for position, page in enumerate(pages, start=1):
+    for position, page in zip(numbers or range(1, len(pages) + 1), pages):
         page = page.strip()
         if not page:
             continue
@@ -82,14 +93,63 @@ def _odd_dollars(text: str) -> bool:
     return text.count("$$") % 2 == 1
 
 
-def llm_stitch(text: str) -> str | None:
-    """Rewrite the joined document with one LLM call, per document, as a fallback.
+def mark_page(number: int, text: str) -> str:
+    """A page's text under its boundary marker."""
+    return f"{PAGE_MARKER.format(position=number)}\n\n{text.strip()}"
 
-    Returns None when the model answers with nothing, so the deterministic
-    result stands.
+
+def split_pages(text: str) -> list[tuple[int, str]]:
+    """A marked document split back into its (page number, text) pages, in the order found.
+
+    Text before the first marker belongs to the first page.
     """
-    # Replaced rather than formatted: the document's own braces (LaTeX) must stay as they are
-    user_prompt = STITCH_USER_PROMPT.replace("{document}", text)
+    markers = list(PAGE_MARKER_RE.finditer(text))
+    pages = []
+    for position, marker in enumerate(markers):
+        end = markers[position + 1].start() if position + 1 < len(markers) else len(text)
+        start = 0 if position == 0 else marker.start()
+        pages.append((int(marker.group(1)), PAGE_MARKER_RE.sub("", text[start:end], count=1).strip()))
+    return pages
 
-    stitched = get_model("stitch").text(user_prompt, system=STITCH_SYSTEM_PROMPT, name="stitch-markdown-pages")
-    return stitched.strip() or None
+
+def llm_stitch(pages: list[tuple[int, str]]) -> str:
+    """Harmonise a document's (page number, text) pages with a model; the marked document comes back.
+
+    Heading levels are made consistent across pages, and what a page
+    boundary cut (paragraphs, lists, tables, display equations) is merged.
+    The pages go a batch at a time, consecutive batches sharing their
+    boundary pages, and are joined again at a page marker. The model is told
+    to keep every marker: callers split the answer with `split_pages` and
+    check that the pages they gave are the pages they get.
+    """
+    marked = [mark_page(number, text) for number, text in pages]
+    step = BATCH_PAGES - BATCH_OVERLAP
+
+    stitched = ""
+    for start in range(0, len(marked), step):
+        batch = marked[start : start + BATCH_PAGES]
+        answer = _stitch_batch(batch) or "\n\n".join(batch)
+
+        # Joined at the marker of the batch's second page: the page before
+        # it was stitched with what precedes it, the pages from it on with
+        # what follows them
+        seam = PAGE_MARKER.format(position=pages[start + 1][0]) if start and len(batch) > 1 else None
+        if seam and seam in stitched and seam in answer:
+            stitched = f"{stitched[: stitched.index(seam)].rstrip()}\n\n{answer[answer.index(seam) :]}"
+        else:
+            stitched = f"{stitched}\n\n{answer}".strip()
+
+        if start + BATCH_PAGES >= len(marked):
+            break
+
+    return stitched
+
+
+def _stitch_batch(marked_pages: list[str]) -> str:
+    """One call: the marked pages, each in its own fence, stitched; empty when the model answers with nothing."""
+    fenced = "\n\n".join(f"```\n{page}\n```" for page in marked_pages)
+
+    # Replaced rather than formatted: the document's own braces (LaTeX) must stay as they are
+    user_prompt = STITCH_USER_PROMPT.replace("{pages}", fenced)
+
+    return get_model("stitch").text(user_prompt, system=STITCH_SYSTEM_PROMPT, name="stitch-markdown-pages").strip()

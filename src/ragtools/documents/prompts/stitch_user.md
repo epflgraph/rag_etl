@@ -4,6 +4,4 @@ Each snippet is enclosed in triple backticks and appears **in order**.
 
 Emit **only** the final Markdown (no fences).
 
-```
-{document}
-```
+{pages}

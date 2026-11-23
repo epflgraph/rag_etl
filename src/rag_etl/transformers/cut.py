@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import json
 import logging
-import re
 
 from collections.abc import Callable
 from dataclasses import asdict, dataclass
@@ -22,10 +21,10 @@ from rag_etl.core import Resource
 from rag_etl.core.resource import hash_text
 from rag_etl.transformers.base import Transformer
 from rag_etl.transformers.embed import MAX_CHUNK_CHARS
+from rag_etl.transformers.pdf import page_number
 from ragtools.documents import (
-    PAGE_MARKER,
+    PAGE_MARKER_RE,
     ExerciseSnippet,
-    llm_stitch,
     merge_sections,
     split_by_most_common_heading,
     split_exercises,
@@ -37,23 +36,34 @@ logger = logging.getLogger(__name__)
 # The exercises of one stitched document, cached by the document's content hash
 EXERCISES_FILE = "exercises.json"
 
-# Deep links into a pdf page, read back from the markers the stitch left
-PAGE_MARKER_RE = re.compile(PAGE_MARKER.format(position=r"(\d+)"))
+# A cut takes the node it consumes and the step's cache
+CutFunction = Callable[[Resource, Cache], None]
 
-CutFunction = Callable[["CutTransformer", Resource], None]
+
+def _readable_children(node: Resource) -> list[Resource]:
+    return [child for child in node.children if mt.is_text(child.mime_type) and child.path is not None]
 
 
 def document_texts(node: Resource) -> list[str]:
     """The texts to merge: one per readable page child, or the node's own file."""
     if node.children:
-        return [
-            child.path.read_text(encoding="utf-8")
-            for child in node.children
-            if mt.is_text(child.mime_type) and child.path is not None
-        ]
+        return [child.path.read_text(encoding="utf-8") for child in _readable_children(node) if child.path]
     if node.path is not None:
         return [node.path.read_text(encoding="utf-8")]
     return []
+
+
+def _joined(node: Resource) -> str:
+    """The node's texts joined into one, each page under its marker.
+
+    A PDF's pages carry their own numbers, so the deep link of a chunk
+    names the right page even when one before it is missing (blank, or
+    merged into its neighbour); anything else is numbered by position.
+    """
+    numbers = None
+    if node.mime_type == mt.PDF and node.children:
+        numbers = [page_number(child.path) for child in _readable_children(node) if child.path]
+    return stitch(document_texts(node), numbers)
 
 
 def _drop(node: Resource) -> None:
@@ -75,16 +85,8 @@ def exercises(cache: Cache, text: str) -> list[ExerciseSnippet]:
     return found
 
 
-def _stitch_pages(transformer: "CutTransformer", pages: list[str]) -> str:
-    """The pages stitched, the LLM fallback enabled only when asked for."""
-    text = stitch(pages)
-    if transformer.stitch_fallback:
-        text = llm_stitch(text) or text
-    return text
-
-
-def whole_document(transformer: "CutTransformer", node: Resource) -> None:
-    """The node becomes one chunk: its pages stitched, or its own file read."""
+def whole_document(node: Resource, cache: Cache) -> None:
+    """The node becomes one chunk: its pages joined, or its own file read."""
     pages = document_texts(node)
 
     if not pages:
@@ -92,10 +94,7 @@ def whole_document(transformer: "CutTransformer", node: Resource) -> None:
         _drop(node)
         return
 
-    if len(pages) == 1:
-        text = pages[0]
-    else:
-        text = _stitch_pages(transformer, pages)
+    text = pages[0] if len(pages) == 1 else _joined(node)
 
     if not text.strip():
         logger.warning(f"Dropping {node.title}: no readable content")
@@ -111,7 +110,7 @@ def whole_document(transformer: "CutTransformer", node: Resource) -> None:
     node.children = []
 
 
-def per_child(transformer: "CutTransformer", node: Resource) -> None:
+def per_child(node: Resource, cache: Cache) -> None:
     """Each readable child becomes a chunk in place, text read from its own file.
 
     Children carrying their own different cut keep it — an exception inside
@@ -133,21 +132,18 @@ def per_child(transformer: "CutTransformer", node: Resource) -> None:
         child.cut = None
 
 
-def per_exercise(transformer: "CutTransformer", node: Resource) -> None:
-    """The node's pages are stitched, annotated and cut into exercise chunks.
+def per_exercise(node: Resource, cache: Cache) -> None:
+    """The node's pages are joined, annotated and cut into exercise chunks.
 
     One chunk per exercise, carrying its number and the parts it holds; a
     chunk whose text starts on a pdf page deep-links into it.
     """
-    pages = document_texts(node)
-    if not pages:
+    if not document_texts(node):
         logger.warning(f"Dropping {node.title}: nothing to annotate")
         _drop(node)
         return
 
-    stitched = _stitch_pages(transformer, pages)
-
-    found = exercises(transformer.cache, stitched)
+    found = exercises(cache, _joined(node))
     if not found:
         logger.warning(f"Dropping {node.title}: no exercises annotated in it")
         _drop(node)
@@ -171,7 +167,7 @@ def per_exercise(transformer: "CutTransformer", node: Resource) -> None:
             chunk.url = f"{chunk.url}#page={page.group(1)}"
 
 
-def text(transformer: "CutTransformer", node: Resource) -> None:
+def text(node: Resource, cache: Cache) -> None:
     """The node's text is cut at its most common heading level, one chunk per part."""
     full = "\n\n".join(document_texts(node))
 
@@ -227,25 +223,24 @@ class CutTransformer(Transformer):
     name = "cut"
     cache_version = "exercises-1"  # the exercise splits (prompt, model)
 
-    stitch_fallback: bool = False  # the LLM stitch fallback, off by default
-
     def transform(self, roots: list[Resource]) -> list[Resource]:
+        cache = self.cache
         for root in roots:
-            self._cut(root)
+            self._cut(root, cache)
             for node in root.walk():
                 _mark_solutions(node)
         return roots
 
-    def _cut(self, node: Resource) -> None:
+    def _cut(self, node: Resource, cache: Cache) -> None:
         """Cut one node top-down: a cut consumes the node it applies to."""
         if node.cut is not None:
             try:
                 cut = CUTS[node.cut]
             except KeyError:
                 raise ValueError(f"Unknown cut '{node.cut}' for {node.title}") from None
-            cut(self, node)
+            cut(node, cache)
 
         # A consumed node has no children left, or chunk children that are
         # done; its subtree never needs a second cut
         for child in list(node.children):
-            self._cut(child)
+            self._cut(child, cache)

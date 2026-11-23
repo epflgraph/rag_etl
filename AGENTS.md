@@ -45,7 +45,7 @@ Commands: `venv/bin/python -m pytest -q`, `venv/bin/ruff check src tests`, `venv
 ```
 src/
 ├── ragtools/                 file preparation; never imports rag_etl (tests/test_layering.py)
-│   ├── llm/                  rcp.py (RCPClient: completions, structured output, embeddings, Langfuse tracing)
+│   ├── llm/                  rcp.py (RCPClient: `generate` with independent options (images, schema, length limit), `embeddings`, Langfuse tracing)
 │   │                         catalog.py (MODELS keyed (model, mode); get_model(task))
 │   ├── images/               transcribe_page, transcribe_slide (+ prompts/)
 │   ├── documents/            headings (split/merge sections), harmonize (harmonize_pages), stitch (stitch, split_pages), exercises (split_exercises) (+ prompts/)
@@ -214,7 +214,7 @@ by content hash only, values are files or directories, no eviction.
 - No model, prompt or setting in the key. A change is applied deliberately: every caching step declares its recipe's version (`cache_version`: `image-ocr-1` in images, `pdf-ocr-1` in pdf, `harmonize-1` in harmonize, `video-slides-1` in video, `exercises-1` in cut, `embedding-1` in embed; unique across steps, named after what the step does), and bumping it starts a fresh folder, the old one kept for rollback. `--refresh <step>` overwrites a step's current folder in place, for a rerun of the same recipe.
 - PDFs and videos cache as Merkle trees: transcripts are leaves under their own hash, and the parent keeps a small node record (`children.json`) of its ordered leaves. A node hit adopts the whole subtree without rendering; a miss falls back to the leaves, so one changed page re-reads one page.
 
-**Models**: every call goes through `RCPClient`. `catalog.py` holds the
+**Models**: every call goes through `RCPClient`: one entry point, `generate(prompt, images=, schema=, system=, max_chars=)`, whose options combine freely, and `embeddings`. `catalog.py` holds the
 settled model + parameter pairings and one entry per task (`ocr`, `judge`,
 `split_exercises`, `harmonize`, `embedding`); each capability asks
 `get_model(task)` itself. Changing a model is a one-line edit there, followed

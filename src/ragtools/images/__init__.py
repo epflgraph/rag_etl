@@ -88,9 +88,9 @@ def _transcribe(image_path: str | Path, system_prompt: str) -> str:
     """
 
     try:
-        markdown = get_model("ocr").vision(
+        markdown = get_model("ocr").generate(
             TRANSCRIBE_USER_PROMPT,
-            [image_path],
+            images=[image_path],
             system=system_prompt,
             detail="high",
             name="image-to-markdown",

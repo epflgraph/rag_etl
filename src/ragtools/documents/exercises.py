@@ -76,9 +76,9 @@ def split_exercises(text: str) -> list[ExerciseSnippet]:
         # Annotate the section with line numbers (ensuring empty line at the end)
         annotated = "\n".join([f"[L{i}] {line}" for i, line in enumerate(lines, start=1)] + [""])
 
-        exercise_list = get_model("split_exercises").structured(
+        exercise_list = get_model("split_exercises").generate(
             annotated,
-            ExerciseList,
+            schema=ExerciseList,
             system=EXERCISE_SYSTEM_PROMPT,
             name=ANNOTATOR_NAME,
         )

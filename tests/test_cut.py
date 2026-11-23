@@ -326,7 +326,7 @@ def test_split_exercises_merges_duplicate_exercises_on_separate_lines(monkeypatc
     """An exercise cut across sections reassembles in order, parts on separate lines."""
 
     class FakeLLM:
-        def structured(self, prompt, schema, **kwargs):
+        def generate(self, prompt, **kwargs):
             return ExerciseList(exercises=[Exercise(start_line=1, end_line=2, number="1", parts="statement")])
 
     monkeypatch.setattr("ragtools.documents.exercises.get_model", lambda task: FakeLLM())

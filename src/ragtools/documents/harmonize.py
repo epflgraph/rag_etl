@@ -66,4 +66,5 @@ def _harmonize_batch(marked_pages: list[str]) -> str:
     # Replaced rather than formatted: the document's own braces (LaTeX) must stay as they are
     user_prompt = HARMONIZE_USER_PROMPT.replace("{pages}", fenced)
 
-    return get_model("harmonize").text(user_prompt, system=HARMONIZE_SYSTEM_PROMPT, name="harmonize-pages").strip()
+    answer = get_model("harmonize").generate(user_prompt, system=HARMONIZE_SYSTEM_PROMPT, name="harmonize-pages")
+    return answer.strip()

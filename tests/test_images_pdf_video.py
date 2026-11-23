@@ -26,15 +26,15 @@ class FakeResolver:
 
 @pytest.fixture(autouse=True)
 def vision(monkeypatch):
-    monkeypatch.setattr("ragtools.llm.RCPClient.vision", lambda self, prompt, images, **kwargs: "slide text")
+    monkeypatch.setattr("ragtools.llm.RCPClient.generate", lambda self, prompt, **kwargs: "slide text")
     monkeypatch.setattr("rag_etl.transformers.video.extract_frame", fake_extract_frame)
 
 
 def count_reads(monkeypatch) -> list:
     calls: list = []
     monkeypatch.setattr(
-        "ragtools.llm.RCPClient.vision",
-        lambda self, prompt, images, **kwargs: calls.append(kwargs.get("name")) or "slide text",
+        "ragtools.llm.RCPClient.generate",
+        lambda self, prompt, **kwargs: calls.append(kwargs.get("name")) or "slide text",
     )
     return calls
 
@@ -189,7 +189,7 @@ def test_image_read_into_work_dir(tmp_path, images):
 
 
 def test_unreadable_image_dropped(tmp_path, images, monkeypatch):
-    monkeypatch.setattr("ragtools.llm.RCPClient.vision", lambda self, prompt, images, **kwargs: "")
+    monkeypatch.setattr("ragtools.llm.RCPClient.generate", lambda self, prompt, **kwargs: "")
     image_path = tmp_path / "slide.png"
     image_path.write_bytes(b"png fake")
     root = Resource(title="root", children=[Resource(title="slide", path=image_path, mime_type=mt.PNG)])
@@ -281,7 +281,7 @@ def test_video_gains_one_slide_child_per_segment(tmp_path, video):
 
 def test_slide_holding_a_quote_still_gets_its_speech(tmp_path, video, monkeypatch):
     monkeypatch.setattr(
-        "ragtools.llm.RCPClient.vision", lambda self, prompt, images, **kwargs: "# Motto\n\n> Measure twice"
+        "ragtools.llm.RCPClient.generate", lambda self, prompt, **kwargs: "# Motto\n\n> Measure twice"
     )
     srt_path = tmp_path / "0_abc_fr.srt"
     srt_path.write_text("1\n00:00:00,000 --> 00:00:10,000\nhello\n", encoding="utf-8")

@@ -23,7 +23,7 @@ def stub_model(monkeypatch, answer) -> list[str]:
         prompts.append(prompt)
         return answer(re.findall(r"```\n(.*?)\n```", prompt, flags=re.DOTALL))
 
-    monkeypatch.setattr("ragtools.documents.harmonize.get_model", lambda task: SimpleNamespace(text=text))
+    monkeypatch.setattr("ragtools.documents.harmonize.get_model", lambda task: SimpleNamespace(generate=text))
     return prompts
 
 

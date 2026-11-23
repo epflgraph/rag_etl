@@ -13,7 +13,7 @@ def stub_vision(monkeypatch, answer: str | Exception) -> None:
             raise answer
         return answer
 
-    monkeypatch.setattr("ragtools.images.get_model", lambda task: SimpleNamespace(vision=vision))
+    monkeypatch.setattr("ragtools.images.get_model", lambda task: SimpleNamespace(generate=vision))
 
 
 def test_looped_read_dropped(tmp_path, monkeypatch):

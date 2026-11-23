@@ -1,37 +1,18 @@
-"""Stitching: pages read one by one, made one document again.
+"""Stitching: a document's pages joined into one text with plain code, and taken apart again.
 
-Page-by-page OCR knows nothing of the other pages: heading levels drift
-from page to page, tables, lists and display equations are cut at page
-boundaries, words are split by hyphenation. Two stitches mend that:
-
-- `llm_stitch` harmonises a document's pages with a model, a batch of
-  pages at a time, and hands the pages back apart (`split_pages`);
-- `stitch` joins pages into one text with plain code: page markers,
-  tables and equations cut by the boundary, hyphenation. Zero LLM calls.
+Each page goes under a boundary marker; tables and display equations cut
+by a page boundary are rejoined, and words split by hyphenation put back
+together. Zero LLM calls: making the pages consistent with each other is
+`harmonize.py`'s.
 """
 
 from __future__ import annotations
 
 import re
 
-from pathlib import Path
-
-from ragtools.llm import get_model
-
 # Page boundary markers, one per page, in strict page order
 PAGE_MARKER = "<!-- page {position} -->"
 PAGE_MARKER_RE = re.compile(PAGE_MARKER.format(position=r"(\d+)"))
-
-# The LLM stitch's prompts, kept as documents next to this module; the user
-# prompt is a template taking the fenced pages in place of {pages}
-STITCH_SYSTEM_PROMPT = (Path(__file__).parent / "prompts" / "stitch_markdown_pages.md").read_text(encoding="utf-8")
-STITCH_USER_PROMPT = (Path(__file__).parent / "prompts" / "stitch_user.md").read_text(encoding="utf-8").strip()
-
-# One call sees this many pages, the last ones of a batch seen again by the
-# next, so a long document never has to come back whole from a single call
-# and no page is harmonised without its neighbours
-BATCH_PAGES = 10
-BATCH_OVERLAP = 2
 
 
 def stitch(pages: list[str], numbers: list[int] | None = None) -> str:
@@ -110,46 +91,3 @@ def split_pages(text: str) -> list[tuple[int, str]]:
         start = 0 if position == 0 else marker.start()
         pages.append((int(marker.group(1)), PAGE_MARKER_RE.sub("", text[start:end], count=1).strip()))
     return pages
-
-
-def llm_stitch(pages: list[tuple[int, str]]) -> str:
-    """Harmonise a document's (page number, text) pages with a model; the marked document comes back.
-
-    Heading levels are made consistent across pages, and what a page
-    boundary cut (paragraphs, lists, tables, display equations) is merged.
-    The pages go a batch at a time, consecutive batches sharing their
-    boundary pages, and are joined again at a page marker. The model is told
-    to keep every marker: callers split the answer with `split_pages` and
-    check that the pages they gave are the pages they get.
-    """
-    marked = [mark_page(number, text) for number, text in pages]
-    step = BATCH_PAGES - BATCH_OVERLAP
-
-    stitched = ""
-    for start in range(0, len(marked), step):
-        batch = marked[start : start + BATCH_PAGES]
-        answer = _stitch_batch(batch) or "\n\n".join(batch)
-
-        # Joined at the marker of the batch's second page: the page before
-        # it was stitched with what precedes it, the pages from it on with
-        # what follows them
-        seam = PAGE_MARKER.format(position=pages[start + 1][0]) if start and len(batch) > 1 else None
-        if seam and seam in stitched and seam in answer:
-            stitched = f"{stitched[: stitched.index(seam)].rstrip()}\n\n{answer[answer.index(seam) :]}"
-        else:
-            stitched = f"{stitched}\n\n{answer}".strip()
-
-        if start + BATCH_PAGES >= len(marked):
-            break
-
-    return stitched
-
-
-def _stitch_batch(marked_pages: list[str]) -> str:
-    """One call: the marked pages, each in its own fence, stitched; empty when the model answers with nothing."""
-    fenced = "\n\n".join(f"```\n{page}\n```" for page in marked_pages)
-
-    # Replaced rather than formatted: the document's own braces (LaTeX) must stay as they are
-    user_prompt = STITCH_USER_PROMPT.replace("{pages}", fenced)
-
-    return get_model("stitch").text(user_prompt, system=STITCH_SYSTEM_PROMPT, name="stitch-markdown-pages").strip()

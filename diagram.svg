@@ -87,7 +87,7 @@
   <rect x="614" y="168" width="140" height="96" rx="8" class="step"/>
   <text x="684" y="192" class="b" text-anchor="middle">3 — images, pdf, video</text>
   <text x="684" y="212" class="t" text-anchor="middle">images read, md's too</text>
-  <text x="684" y="228" class="t" text-anchor="middle">PDF → pages, stitched</text>
+  <text x="684" y="228" class="t" text-anchor="middle">PDF → pages, harmonized</text>
   <text x="684" y="244" class="t" text-anchor="middle">video → one slide each</text>
 
   <!-- Judge, with its planned inference -->

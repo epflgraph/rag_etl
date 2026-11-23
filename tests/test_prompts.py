@@ -3,7 +3,7 @@
 import pytest
 
 from ragtools.documents.exercises import EXERCISE_SYSTEM_PROMPT
-from ragtools.documents.stitch import STITCH_SYSTEM_PROMPT, STITCH_USER_PROMPT
+from ragtools.documents.harmonize import HARMONIZE_SYSTEM_PROMPT, HARMONIZE_USER_PROMPT
 from ragtools.images import PAGE_SYSTEM_PROMPT, SLIDE_SYSTEM_PROMPT, TRANSCRIBE_USER_PROMPT
 
 
@@ -11,8 +11,8 @@ from ragtools.images import PAGE_SYSTEM_PROMPT, SLIDE_SYSTEM_PROMPT, TRANSCRIBE_
     "prompt",
     [
         EXERCISE_SYSTEM_PROMPT,
-        STITCH_SYSTEM_PROMPT,
-        STITCH_USER_PROMPT,
+        HARMONIZE_SYSTEM_PROMPT,
+        HARMONIZE_USER_PROMPT,
         PAGE_SYSTEM_PROMPT,
         SLIDE_SYSTEM_PROMPT,
         TRANSCRIBE_USER_PROMPT,
@@ -22,8 +22,8 @@ def test_prompt_loads(prompt):
     assert prompt.strip()
 
 
-def test_stitch_user_prompt_takes_the_pages():
-    assert "{pages}" in STITCH_USER_PROMPT
+def test_harmonize_user_prompt_takes_the_pages():
+    assert "{pages}" in HARMONIZE_USER_PROMPT
 
 
 def test_transcription_prompts_share_the_rules_and_differ_in_their_specifics():

@@ -47,7 +47,7 @@ def test_whole_document_container_stitches_its_pages(tmp_path, transformer):
 
 
 def test_pdf_page_markers_carry_the_pages_own_numbers(tmp_path, transformer):
-    # Page 2 is missing (blank, or merged into page 1 by the stitch): the
+    # Page 2 is missing (blank, or merged into page 1 when harmonized): the
     # third page is still marked 3, which is where a deep link must land
     root = Resource(title="root")
     pdf = root.add_child(title="doc", path=tmp_path / "doc.pdf", mime_type=mt.PDF, cut="whole_document")

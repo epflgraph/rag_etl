@@ -56,7 +56,7 @@ STEPS = {
     "Normalize": "normalize",
     "Images": "images",
     "Pdf": "pdf",
-    "Stitch": "stitch",
+    "Harmonize": "harmonize",
     "Video": "video",
     "Judge": "judge",
     "Cut": "cut",
@@ -103,7 +103,7 @@ def test_transform_bypasses_only_the_refreshed_cache(tmp_path, monkeypatch):
     # every step works in the project's folder; only the named one refreshes
     assert all(kwargs["project_dir"] == tmp_path for kwargs in built.values())
     assert built["pdf"]["refresh"] is True
-    assert all(built[name]["refresh"] is False for name in ("images", "stitch", "video", "cut", "embed"))
+    assert all(built[name]["refresh"] is False for name in ("images", "harmonize", "video", "cut", "embed"))
 
 
 def test_run_pipeline_writes_a_manifest(tmp_path, monkeypatch):

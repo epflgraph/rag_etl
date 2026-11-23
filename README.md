@@ -45,7 +45,7 @@ rag-etl run --project micro303                # publish to rag_micro303
 rag-etl run --project micro303 --refresh pdf   # redo one step, ignoring its cache
 ```
 
-`--refresh` accepts `images`, `pdf`, `stitch`, `video`, `cut` and `embed`, and
+`--refresh` accepts `images`, `pdf`, `harmonize`, `video`, `cut` and `embed`, and
 overwrites that step's cache in place. After changing a prompt or a model,
 bump the `cache_version` of the steps that use it instead: the cache is keyed
 by content only and would otherwise serve the old results, and a new version
@@ -75,7 +75,7 @@ One fixed sequence, the same for every project:
 2. **normalize** — archives are unpacked, notebooks and HTML pages become markdown, oversized files are dropped.
 3. **images** — every image is read by a vision model, image files and the images a markdown file shows alike.
 4. **pdf** — every PDF page is rendered and read by a vision model, one child per page.
-5. **stitch** — the pages of each PDF, read one by one, are harmonised by a model as one document: consistent heading levels, tables and paragraphs cut by a page break merged back.
+5. **harmonize** — the pages of each PDF, read one by one, are made consistent by a model as one document: consistent heading levels, tables and paragraphs cut by a page break merged back.
 6. **video** — videos become one slide per slide change, each read by a vision model, with what was said over it.
 7. **judge** — every resource gets a type, a subtype and a cut. Today a stub reads cues from the titles; the project's overrides correct it.
 8. **cut** — resources become chunks: the whole document, one per child (page, slide), one per exercise, or one per heading section.

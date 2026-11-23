@@ -48,7 +48,7 @@ src/
 │   ├── llm/                  rcp.py (RCPClient: completions, structured output, embeddings, Langfuse tracing)
 │   │                         catalog.py (MODELS keyed (model, mode); get_model(task))
 │   ├── images/               transcribe_page, transcribe_slide (+ prompts/)
-│   ├── documents/            headings (split/merge sections), stitch (llm_stitch, split_pages, stitch), exercises (split_exercises) (+ prompts/)
+│   ├── documents/            headings (split/merge sections), harmonize (harmonize_pages), stitch (stitch, split_pages), exercises (split_exercises) (+ prompts/)
 │   ├── pdf.py                deterministic page rendering (PyMuPDF)
 │   ├── video.py              ffmpeg frames, SRT parsing, SlideDetector interface
 │   ├── graphai.py            GraphAI client + GraphAISlideDetector
@@ -62,7 +62,7 @@ src/
     │                         moodle.py, local_folder.py, git.py, mediaspace.py,
     │                         ed_discussion/ (EdDiscussionExtractor; thread.py: one thread as Markdown),
     │                         mooc/ (MOOCExtractor; course.py the walk, export.py, page.py, quiz.py, video.py)
-    ├── transformers/         base.py, normalize.py, images.py, pdf.py, stitch.py, video.py (ocr.py: the shared cached read), judge.py, cut.py, embed.py
+    ├── transformers/         base.py, normalize.py, images.py, pdf.py, harmonize.py, video.py (ocr.py: the shared cached read), judge.py, cut.py, embed.py
     ├── loaders/              base.py, manifest.py, elasticsearch.py, index_settings.json
     ├── projects/             Project, load_project; semester_2627_autumn/<project>.py
     ├── cache.py, pipeline.py, cli.py
@@ -72,7 +72,7 @@ legacy/                       pre-rewrite code, reference only, not packaged; de
 ## The pipeline
 
 `pipeline.run_pipeline(project, dry, refresh)`: extract → normalize →
-images → pdf → stitch → video → judge → cut → embed → load. One fixed sequence;
+images → pdf → harmonize → video → judge → cut → embed → load. One fixed sequence;
 projects never list steps. The contracts:
 
 - `Extractor.extract() -> Resource` — one root per source. Extractors are frozen dataclasses with a `dir` (relative to the project folder, resolved by the pipeline with `dataclasses.replace`).
@@ -102,7 +102,7 @@ is "no children", `is_chunk` is "has text").
 - **`add_child(**fields)`** builds a child as a copy of its parent, naming only what differs: a page keeps its PDF's url and labels. `add_child(child)` attaches a subtree as it is. `detach()` removes a node and its subtree.
 - **Deep links travel as `url`**, copied down and refined (a page's `#page=N`, a slide's timestamp). Loaders read `node.url`; nothing re-resolves lineage.
 - **A video carries its subtitles as an SRT child** (Mediaspace and MOOC extractors alike), which the video step consumes into its slides.
-- **Words**: *subtitles* are what is said in a video (Kaltura's objects are *caption assets*, edX's attribute is `transcripts`); *transcribe*/*transcript* is only what the vision model reads off an image, a page or a slide.
+- **Words**: *subtitles* are what is said in a video (Kaltura's objects are *caption assets*, edX's attribute is `transcripts`); *transcribe*/*transcript* is only what the vision model reads off an image, a page or a slide; to *harmonize* is to make a document's pages consistent with a model, the pages staying apart, while to *stitch* is to join pages into one text with plain code.
 - **Nesting is the only relation** between resources. Links between trees (a video and its deck) are not modelled.
 - **Chunk ids** are assigned once the trees are final (`assign_ids`, at load): its position in the run (`"19"`), unique within a run, not stable across runs. Equal content under different metadata stays two chunks: courses own their duplicates.
 
@@ -148,11 +148,11 @@ the images step like any markdown's images), HTML becomes markdown (MOOC pages,
 a repository's pages), files over their
 family's limit are dropped (PDF 50 MB, images 10 MB, text 5 MB).
 
-**Images, pdf, stitch, video**: the steps turning pixels into text with the vision model (sharing the cached read in `transformers/ocr.py`), and making a PDF's pages one document again. A file-backed node without its file fails loud.
+**Images, pdf, harmonize, video**: the steps turning pixels into text with the vision model (sharing the cached read in `transformers/ocr.py`), and making a PDF's pages consistent with each other. A file-backed node without its file fails loud.
 
 - *Images*: an image file is transcribed in place; a markdown file that shows local images (`![alt](figures/plot.png)`, relative or absolute, `<…>` for paths with spaces) gets each one replaced by its transcript, where it was, in a scratch copy. One cache for both: an image is read once, wherever it is shown. A missing image only warns and stays a reference (folders ship markdown without its figures); web images are left as they are. The step runs before pdf and video, so it only ever reads the sources' markdown, never pages or slides.
 - *PDF*: each page rendered deterministically (stable settings: the render is what gets hashed) and transcribed by the vision model; one child per page. No text-layer shortcut.
-- *Stitch*: the pages of every PDF, each read knowing nothing of the others, are harmonised by a model as one document (`ragtools.documents.llm_stitch`: consistent heading levels, what a page boundary cut merged back; the prompt and the batching of `main`, 10 pages a call, 2 shared with the next), then split back at the page markers into the page children, whatever the cut that follows. Cached by the pages as read. If the model loses, moves or repeats a marker, that document keeps its pages as read, with a warning; a page merged whole into its neighbour goes. Single pages are not stitched.
+- *Harmonize*: the pages of every PDF, each read knowing nothing of the others, are made consistent by a model as one document (`ragtools.documents.harmonize_pages`: consistent heading levels, what a page boundary cut merged back; the prompt and the batching of `main`'s LLM stitch, 10 pages a call, 2 shared with the next), then split back at the page markers into the page children. Nothing is joined: it runs before the judge, on every PDF, whatever the cut that follows. Cached by the pages as read. If the model loses, moves or repeats a marker, that document keeps its pages as read, with a warning; a page merged whole into its neighbour goes. Single pages are not stitched.
 - *Video*: one path for Mediaspace and MOOC videos. Kaltura entry id from the url → slides entry → GraphAI `detect_slides` (behind `SlideDetector`, swappable) → changes closer than `min_slide_seconds` dropped → one ffmpeg frame per segment, read from the url (never downloaded) → each slide transcribed, with the subtitles spoken over it appended as a quote; a slide links to its moment. GraphAI failing on one video drops that video, not the run. YouTube videos have no Kaltura entry and pass through.
 
 **Judge.** Fills `type`, `subtype` and `cut` for every resource, or drops it.
@@ -186,7 +186,7 @@ Where a cut merges a file's pages (never slides), it joins them with plain
 code (`ragtools.documents.stitch`): each page under a marker carrying its
 own page number, which is what a chunk's `#page=N` link is read back from,
 and tables, equations and hyphenated words rejoined across pages. The
-harmonising was done before, by the stitch step. One size limit, `MAX_CHUNK_CHARS` (`embed.py`), applies to every
+Making the pages consistent was done before, by the harmonize step. One size limit, `MAX_CHUNK_CHARS` (`embed.py`), applies to every
 chunk: the cut drops a bigger one with a warning.
 
 **Embed.** Qwen3-Embedding-8B on RCP (4096 dims), batched, cached per text
@@ -211,19 +211,19 @@ hybrid (vectors + text); query vectors must be unit-normalized.
 **Cache** (`cache.py`): on disk in the project's folder, one folder per recipe version, `<project>/cache/<cache_version>/` (projects never share one), keyed
 by content hash only, values are files or directories, no eviction.
 
-- No model, prompt or setting in the key. A change is applied deliberately: every caching step declares its recipe's version (`cache_version`: `image-ocr-1` in images, `pdf-ocr-1` in pdf, `stitch-1` in stitch, `video-slides-1` in video, `exercises-1` in cut, `embedding-1` in embed; unique across steps, named after what the step does), and bumping it starts a fresh folder, the old one kept for rollback. `--refresh <step>` overwrites a step's current folder in place, for a rerun of the same recipe.
+- No model, prompt or setting in the key. A change is applied deliberately: every caching step declares its recipe's version (`cache_version`: `image-ocr-1` in images, `pdf-ocr-1` in pdf, `harmonize-1` in harmonize, `video-slides-1` in video, `exercises-1` in cut, `embedding-1` in embed; unique across steps, named after what the step does), and bumping it starts a fresh folder, the old one kept for rollback. `--refresh <step>` overwrites a step's current folder in place, for a rerun of the same recipe.
 - PDFs and videos cache as Merkle trees: transcripts are leaves under their own hash, and the parent keeps a small node record (`children.json`) of its ordered leaves. A node hit adopts the whole subtree without rendering; a miss falls back to the leaves, so one changed page re-reads one page.
 
 **Models**: every call goes through `RCPClient`. `catalog.py` holds the
 settled model + parameter pairings and one entry per task (`ocr`, `judge`,
-`split_exercises`, `stitch`, `embedding`); each capability asks
+`split_exercises`, `harmonize`, `embedding`); each capability asks
 `get_model(task)` itself. Changing a model is a one-line edit there, followed
 by a bump of the `cache_version` of each step that uses it.
 
 ## Decided, do not reopen without the maintainer
 
 - Locators and urls are properties, never identity: they churn (Moodle edits, re-uploads).
-- No page markers as geometry: pages are child resources. (Markers only travel inside a text: for the stitch step to split its answer back into the pages, and for a merged chunk to link to its page.)
+- No page markers as geometry: pages are child resources. (Markers only travel inside a text: for the harmonize step to split its answer back into the pages, and for a merged chunk to link to its page.)
 - OCR stays transcription only: no exercise detection or labelling folded into it.
 - No per-project step lists, no escape hatch per project.
 - No prompt/model in cache keys; explicit refresh instead.

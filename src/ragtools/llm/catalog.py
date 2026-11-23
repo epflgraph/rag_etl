@@ -59,7 +59,7 @@ _TASKS: dict[str, tuple[str, str]] = {
     "ocr": ("Qwen/Qwen3.6-35B-A3B", "instruct"),
     "judge": ("Qwen/Qwen3.6-35B-A3B", "thinking"),
     "split_exercises": ("Qwen/Qwen3.6-35B-A3B", "thinking"),
-    "stitch": ("Qwen/Qwen3.6-35B-A3B", "instruct"),
+    "harmonize": ("Qwen/Qwen3.6-35B-A3B", "instruct"),
     "embedding": ("Qwen/Qwen3-Embedding-8B", "embedding"),
 }
 

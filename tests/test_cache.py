@@ -2,78 +2,67 @@
 
 import pytest
 
-from rag_etl.cache import Cache
+from rag_etl.cache import INDEX_FILE, Cache
 
 
 @pytest.fixture
-def cache_dir(tmp_path):
+def cache(tmp_path):
     # Not created: the cache makes its folders on first write
-    return tmp_path / "project" / "cache"
+    return Cache(tmp_path / "project" / "cache" / "pdf-ocr-1")
 
 
-def test_file_roundtrip(cache_dir, tmp_path):
-    cache = Cache(cache_dir / "pdf-ocr-1")
-    source = tmp_path / "out.md"
-    source.write_text("hello", encoding="utf-8")
-
-    cache.set("hash1", source)
-
-    destination = tmp_path / "sub" / "out.md"
-    assert cache.get("hash1", destination) is True
-    assert destination.read_text(encoding="utf-8") == "hello"
+def refreshed(cache: Cache) -> Cache:
+    return Cache(cache.cache_path, refresh=True)
 
 
-def test_entries_land_in_the_cache_folder(cache_dir, tmp_path):
-    cache = Cache(cache_dir / "pdf-ocr-1")
-    source = tmp_path / "out.md"
-    source.write_text("hello", encoding="utf-8")
+def test_a_value_is_read_back_as_written(cache):
+    cache.write("key1", "page_1.md", "hello")
 
-    cache.set("hash1", source)
-
-    assert (cache_dir / "pdf-ocr-1" / "hash1" / "out.md").is_file()
+    assert cache.read("key1", "page_1.md") == "hello"
+    # An entry is a folder named by its key, its values files in it
+    assert (cache.cache_path / "key1" / "page_1.md").read_text(encoding="utf-8") == "hello"
 
 
-def test_dir_roundtrip_copies_nested(cache_dir, tmp_path):
-    cache = Cache(cache_dir / "pdf-ocr-1")
-    out = tmp_path / "pages"
-    (out / "nested").mkdir(parents=True)
-    (out / "page_1.md").write_text("one", encoding="utf-8")
-    (out / "nested" / "page_2.md").write_text("two", encoding="utf-8")
-
-    cache.set("hash1", out)
-
-    destination = tmp_path / "other" / "pages"
-    assert cache.get("hash1", destination) is True
-    assert (destination / "page_1.md").read_text(encoding="utf-8") == "one"
-    assert (destination / "nested" / "page_2.md").read_text(encoding="utf-8") == "two"
+def test_an_empty_value_is_a_hit(cache):
+    # A blank page's transcript is cached like any other: not read again
+    cache.write("key1", "page_1.md", "")
+    assert cache.read("key1", "page_1.md") == ""
 
 
-def test_miss_returns_false(cache_dir, tmp_path):
-    cache = Cache(cache_dir / "pdf-ocr-1")
-    assert cache.get("unknown-hash", tmp_path / "x.md") is False
+def test_a_read_misses_and_respects_refresh(cache):
+    assert cache.read("unknown", "page_1.md") is None
+
+    cache.write("key1", "page_1.md", "hello")
+    assert cache.read("key1", "other.md") is None
+    assert refreshed(cache).read("key1", "page_1.md") is None
 
 
-def test_refresh_bypasses_lookup(cache_dir, tmp_path):
-    cache = Cache(cache_dir / "pdf-ocr-1")
-    source = tmp_path / "out.md"
-    source.write_text("hello", encoding="utf-8")
-    cache.set("hash1", source)
+def test_an_index_brings_back_a_documents_parts_in_order(cache):
+    # Parts and the document's index sit side by side in the one cache
+    cache.write("page-b", "page_2.md", "two")
+    cache.write("page-a", "page_1.md", "one")
+    cache.write_index("document", [("page_1.md", "page-a"), ("page_2.md", "page-b")])
 
-    refreshed = Cache(cache_dir / "pdf-ocr-1", refresh=True)
-    assert refreshed.get("hash1", tmp_path / "other.md") is False
-
-
-def test_text_roundtrip(cache_dir):
-    cache = Cache(cache_dir / "embed")
-    cache.write("hash1", "embedding.json", "[0.1, 0.2]")
-
-    assert cache.read("hash1", "embedding.json") == "[0.1, 0.2]"
+    assert cache.read_index("document") == [("page_1.md", "one"), ("page_2.md", "two")]
+    assert (cache.cache_path / "document" / INDEX_FILE).is_file()
 
 
-def test_text_read_misses_and_respects_refresh(cache_dir):
-    cache = Cache(cache_dir / "embed")
-    assert cache.read("unknown-hash", "embedding.json") is None
+def test_a_document_without_parts_has_an_empty_index(cache):
+    cache.write_index("document", [])
+    assert cache.read_index("document") == []
 
-    cache.write("hash1", "embedding.json", "[0.1]")
-    refreshed = Cache(cache_dir / "embed", refresh=True)
-    assert refreshed.read("hash1", "embedding.json") is None
+
+def test_an_index_misses_when_absent_malformed_incomplete_or_refreshed(cache):
+    assert cache.read_index("unknown") is None
+
+    cache.write("document", INDEX_FILE, "not json")
+    assert cache.read_index("document") is None
+
+    # A part the index names is gone: the document is redone, its other parts still cached
+    cache.write("page-a", "page_1.md", "one")
+    cache.write_index("document", [("page_1.md", "page-a"), ("page_2.md", "page-b")])
+    assert cache.read_index("document") is None
+
+    cache.write("page-b", "page_2.md", "two")
+    assert cache.read_index("document") is not None
+    assert refreshed(cache).read_index("document") is None

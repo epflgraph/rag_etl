@@ -21,9 +21,9 @@ import ragtools.mime_types as mt
 from ragtools.images import transcribe_slide
 
 from rag_etl.core import Resource
-from rag_etl.core.resource import hash_bytes, hash_text
+from rag_etl.core.resource import hash_file, hash_text
 from rag_etl.transformers.base import Transformer
-from rag_etl.transformers.ocr import file_to_read, ocr_cached
+from rag_etl.transformers.ocr import cached_transcript, file_to_read
 
 logger = logging.getLogger(__name__)
 
@@ -52,8 +52,8 @@ class ImagesTransformer(Transformer):
 
     def _read_image(self, node: Resource) -> None:
         image_path = file_to_read(node)
-        work_dir = self.work_root / hash_bytes(image_path.read_bytes())
-        md_path = ocr_cached(self.cache, image_path, transcribe_slide, work_dir / f"{image_path.stem}.md")
+        work_dir = self.work_root / hash_file(image_path)
+        md_path = cached_transcript(self.cache, image_path, transcribe_slide, work_dir / f"{image_path.stem}.md")
 
         if not md_path.read_text(encoding="utf-8").strip():
             logger.info(f"Dropping {node.title}: no readable content on it")
@@ -88,7 +88,9 @@ class ImagesTransformer(Transformer):
                 return match.group(0)
 
             read_any = True
-            image_md = ocr_cached(self.cache, image_path, transcribe_slide, work_dir / "images" / f"{image_path.stem}.md")
+            image_md = cached_transcript(
+                self.cache, image_path, transcribe_slide, work_dir / "images" / f"{image_path.stem}.md"
+            )
             return image_md.read_text(encoding="utf-8").strip()
 
         read = IMAGE_REFERENCE.sub(transcript, text)

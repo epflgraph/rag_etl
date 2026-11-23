@@ -1,11 +1,11 @@
 """PDF: one child per page, every page rendered and read, cached as a Merkle tree.
 
-The leaves are the per-page transcripts, each stored exactly once under
-its own rendered-page hash; the pdf's node record, keyed by the pdf's
-hash, lists its ordered page leaves. A node hit adopts the whole subtree —
-nothing is rendered, no page is read again; a node miss renders and falls
-back to the leaves, so one edited page re-OCRs one page. Either way the
-node is written back, so the run after a miss hits at the top again.
+The parts are the per-page transcripts, each stored exactly once under
+its own rendered-page hash; the pdf's index, keyed by the pdf's hash,
+lists its ordered pages. A pdf found by its index costs nothing: nothing
+is rendered, no page is read again. One whose index misses is rendered and
+falls back to its pages, so one edited page re-OCRs one page. Either way
+the index is written back, so the run after a miss finds it again.
 """
 
 from __future__ import annotations
@@ -21,10 +21,9 @@ from ragtools.images import transcribe_page
 from ragtools.pdf import save_pdf_pages
 
 from rag_etl.cache import Cache
-from rag_etl.core import Resource
-from rag_etl.core.resource import hash_bytes
+from rag_etl.core import Resource, hash_file
 from rag_etl.transformers.base import Transformer
-from rag_etl.transformers.ocr import MAX_CONCURRENT_OCR, file_to_read, ocr_cached
+from rag_etl.transformers.ocr import MAX_CONCURRENT_OCR, cached_transcript, file_to_read, write_transcripts
 
 logger = logging.getLogger(__name__)
 
@@ -54,9 +53,11 @@ class PdfTransformer(Transformer):
         pdf_hash = node.content_hash
         work_dir = self.work_root / pdf_hash
 
-        md_paths = cache.adopt(pdf_hash, work_dir)
-        if md_paths is None:
+        pages = cache.read_index(pdf_hash)
+        if pages is None:
             md_paths = self._render(cache, pdf_path, pdf_hash, work_dir)
+        else:
+            md_paths = write_transcripts(pages, work_dir)
 
         for md_path in md_paths:
             if not md_path.read_text(encoding="utf-8").strip():
@@ -68,20 +69,19 @@ class PdfTransformer(Transformer):
         logger.info(f"{node.title}: {len(node.children)} pages")
 
     def _render(self, cache: Cache, pdf_path: Path, pdf_hash: str, work_dir: Path) -> list[Path]:
-        """Render every page and read it, refilling the leaves and the node."""
+        """Render every page and read it, refilling the pages and the index."""
         page_paths = save_pdf_pages(pdf_path, work_dir)
 
         with ThreadPoolExecutor(max_workers=MAX_CONCURRENT_OCR) as executor:
             md_paths = list(
                 executor.map(
-                    lambda page: ocr_cached(cache, page, transcribe_page, page.with_suffix(".md")),
+                    lambda page: cached_transcript(cache, page, transcribe_page, page.with_suffix(".md")),
                     page_paths,
                 )
             )
 
-        cache.write_node(
-            pdf_hash,
-            [(md_path.name, hash_bytes(page_path.read_bytes())) for page_path, md_path in zip(page_paths, md_paths)],
+        cache.write_index(
+            pdf_hash, [(md_path.name, hash_file(page_path)) for page_path, md_path in zip(page_paths, md_paths)]
         )
 
         return md_paths

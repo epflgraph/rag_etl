@@ -57,7 +57,7 @@ src/
 │   ├── edx_quiz.py           parse_quiz, quiz_to_markdown (Open edX single/multiple choice)
 │   ├── archives.py, notebooks.py, files.py (iter_files), encoding.py, mime_types.py
 └── rag_etl/
-    ├── core/                 resource.py (Resource, METADATA_FIELDS, iter_chunks, assign_ids), overrides.py
+    ├── core/                 resource.py (Resource, METADATA_FIELDS, iter_chunks, assign_ids, hash_file/hash_text), overrides.py
     ├── extractors/           base.py (Extractor, SourceUnavailable), markers.py (NO_BOT),
     │                         moodle.py, local_folder.py, git.py, mediaspace.py,
     │                         ed_discussion/ (EdDiscussionExtractor; thread.py: one thread as Markdown),
@@ -209,10 +209,10 @@ hybrid (vectors + text); query vectors must be unit-normalized.
 ## Cache and models
 
 **Cache** (`cache.py`): on disk in the project's folder, one folder per recipe version, `<project>/cache/<cache_version>/` (projects never share one), keyed
-by content hash only, values are files or directories, no eviction.
+by content hash only, no eviction. An entry holds named text values (`<key>/<name>`); the interface is four methods: `read`, `write`, and `read_index`, `write_index` for documents made of parts.
 
 - No model, prompt or setting in the key. A change is applied deliberately: every caching step declares its recipe's version (`cache_version`: `image-ocr-1` in images, `pdf-ocr-1` in pdf, `harmonize-1` in harmonize, `video-slides-1` in video, `exercises-1` in cut, `embedding-1` in embed; unique across steps, named after what the step does), and bumping it starts a fresh folder, the old one kept for rollback. `--refresh <step>` overwrites a step's current folder in place, for a rerun of the same recipe.
-- PDFs and videos cache as Merkle trees: transcripts are leaves under their own hash, and the parent keeps a small node record (`children.json`) of its ordered leaves. A node hit adopts the whole subtree without rendering; a miss falls back to the leaves, so one changed page re-reads one page.
+- PDFs and videos cache as Merkle trees, parts and documents side by side in the one folder: each transcript (a page, a slide) is an entry under its own image's hash, and the document's entry holds an index (`index.json`) of its ordered parts. A document found by its index costs nothing (no rendering, no slide detection); one whose index misses falls back to its parts, so one changed page re-reads one page.
 
 **Models**: every call goes through `RCPClient`: one entry point, `generate(prompt, images=, schema=, system=, max_chars=)`, whose options combine freely, and `embeddings`. `catalog.py` holds the
 settled model + parameter pairings and one entry per task (`ocr`, `judge`,

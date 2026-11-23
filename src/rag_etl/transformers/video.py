@@ -1,13 +1,13 @@
 """Video: slide changes detected, one frame per segment read, subtitles appended.
 
-Cached as a Merkle tree, like the pdf: the leaves are the per-segment
+Cached as a Merkle tree, like the pdf: the parts are the per-segment
 transcripts, each stored exactly once under its frame's hash; the video's
-node record, keyed by the video's entry and language, lists its ordered
-slide leaves. A node hit adopts the whole subtree —
-no slide detection, no frame extraction, no read; a miss detects, extracts
-and falls back to the leaves, so an unchanged frame is never read again.
-Either way the node is written back, so the run after a miss hits at the
-top again. The frames themselves are scratch: re-derivable, never cached.
+index, keyed by the video's entry and language, lists its ordered slides.
+A video found by its index costs nothing: no slide detection, no frame
+extraction, no read. One whose index misses is detected, extracted and
+falls back to its slides, so an unchanged frame is never read again.
+Either way the index is written back, so the run after a miss finds it
+again. The frames themselves are scratch: re-derivable, never cached.
 """
 
 from __future__ import annotations
@@ -31,10 +31,9 @@ from ragtools.video import (
 )
 
 from rag_etl.cache import Cache
-from rag_etl.core import Resource
-from rag_etl.core.resource import hash_bytes, hash_text
+from rag_etl.core import Resource, hash_file, hash_text
 from rag_etl.transformers.base import Transformer
-from rag_etl.transformers.ocr import MAX_CONCURRENT_OCR, ocr_cached
+from rag_etl.transformers.ocr import MAX_CONCURRENT_OCR, cached_transcript, write_transcripts
 from ragtools.graphai import GraphAIError
 from ragtools.kaltura import KalturaVideoResolver, build_entry_url, extract_entry_id_from_url
 
@@ -53,8 +52,8 @@ def entry_id_of(node: Resource) -> str | None:
 SUBTITLES_PREFIX = "> "
 
 
-def _node_key(entry_id: str, language: str | None) -> str:
-    """The video's key, for its cache node and its work folder: its entry plus the detection language."""
+def _video_key(entry_id: str, language: str | None) -> str:
+    """The video's key, for its index in the cache and its work folder: its entry plus the detection language."""
     return hash_text(f"{entry_id}|{language}")
 
 
@@ -89,11 +88,13 @@ class VideoTransformer(Transformer):
             logger.warning(f"Leaving {node.title} as it is: no Kaltura entry id to reach the video with")
             return
 
-        key = _node_key(entry_id, self.language)
+        key = _video_key(entry_id, self.language)
         work_dir = self.work_root / key
 
-        md_paths = cache.adopt(key, work_dir)
-        if md_paths is None:
+        slides = cache.read_index(key)
+        if slides is not None:
+            md_paths = write_transcripts(slides, work_dir)
+        else:
             video_url = self.resolver.url(entry_id)
             if not video_url:
                 logger.warning(f"Dropping {node.title}: no video file for entry {entry_id}")
@@ -114,7 +115,7 @@ class VideoTransformer(Transformer):
             logger.info(f"Entry {entry_id}: {len(timestamps)} slide changes detected")
 
             frames = self._extract(cache, video_url, timestamps, work_dir)
-            cache.write_node(key, [(md_path.name, hash_bytes(frame.read_bytes())) for frame, md_path in frames])
+            cache.write_index(key, [(md_path.name, hash_file(frame)) for frame, md_path in frames])
             md_paths = [md_path for _, md_path in frames]
 
         self._build_slides(node, entry_id, md_paths)
@@ -124,7 +125,7 @@ class VideoTransformer(Transformer):
             node.detach()
 
     def _extract(self, cache: Cache, video_url: str, timestamps: list[int], work_dir: Path) -> list[tuple[Path, Path]]:
-        """Extract one frame per interval and read it, refilling the leaves.
+        """Extract one frame per interval and read it, refilling the slides.
 
         The last reported timestamp is the end of the video rather than a
         slide, so it only bounds the final interval. The frames are scratch:
@@ -146,8 +147,8 @@ class VideoTransformer(Transformer):
 
             # Each frame is named after the second its interval starts at,
             # which is where the slides and their deep links are read back
-            # from. Keeping it in the name means the node record is enough
-            # to adopt the slides, with no extra file listing which frame
+            # from. Keeping it in the name means the index is enough to
+            # bring the slides back, with no extra file listing which frame
             # belongs to which moment. Six digits so that sorting the names
             # sorts them chronologically.
             frame_path = work_dir / f"{start:06d}.jpg"
@@ -159,7 +160,7 @@ class VideoTransformer(Transformer):
         with ThreadPoolExecutor(max_workers=MAX_CONCURRENT_OCR) as executor:
             md_paths = list(
                 executor.map(
-                    lambda frame: ocr_cached(cache, frame, transcribe_slide, frame.with_suffix(".md")),
+                    lambda frame: cached_transcript(cache, frame, transcribe_slide, frame.with_suffix(".md")),
                     frames,
                 )
             )

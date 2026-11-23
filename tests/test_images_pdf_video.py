@@ -10,7 +10,7 @@ import pytest
 
 import ragtools.mime_types as mt
 from rag_etl.core import Resource
-from rag_etl.core.resource import hash_bytes
+from rag_etl.core import hash_file
 from rag_etl.transformers import ImagesTransformer, PdfTransformer, VideoTransformer
 
 
@@ -91,7 +91,7 @@ def test_pdf_gains_one_child_per_page(tmp_path, pdf):
     # The page children carry the parent's descriptive metadata
     assert all(child.week == 3 and child.type == "theory" for child in lecture.children)
     # And the generated pages live in the work area, not beside the pdf
-    pages_dir = pdf.work_root / hash_bytes(pdf_path.read_bytes())
+    pages_dir = pdf.work_root / hash_file(pdf_path)
     assert (pages_dir / "page_1.png").exists()
     assert (pages_dir / "page_1.md").exists()
     assert not (tmp_path / "lecture").exists()
@@ -115,7 +115,7 @@ def test_pdf_one_changed_page_reOCRs_one_page(tmp_path, pdf, monkeypatch):
     assert len(calls) == 1
 
 
-def test_warm_pdf_rerun_adopts_the_whole_subtree(tmp_path, pdf, monkeypatch):
+def test_warm_pdf_rerun_brings_every_page_back_from_its_index(tmp_path, pdf, monkeypatch):
     """A second run over an unchanged pdf renders nothing and reads nothing."""
     pdf_path = make_pdf(tmp_path / "lecture.pdf", ["alpha", "beta"])
     pdf.transform([pdf_tree(pdf_path)])
@@ -137,7 +137,7 @@ def test_warm_pdf_rerun_adopts_the_whole_subtree(tmp_path, pdf, monkeypatch):
     assert [child.title for child in root.children[0].children] == ["page 1", "page 2"]
     # Only the transcripts are staged back into the work area: no page is
     # rendered, so no png exists at all
-    work_dir = pdf.work_root / hash_bytes(pdf_path.read_bytes())
+    work_dir = pdf.work_root / hash_file(pdf_path)
     assert (work_dir / "page_1.md").is_file()
     assert not (work_dir / "page_1.png").exists()
 
@@ -181,7 +181,7 @@ def test_image_read_into_work_dir(tmp_path, images):
     images.transform([root])
 
     slide = root.children[0]
-    work_dir = images.work_root / hash_bytes(image_path.read_bytes())
+    work_dir = images.work_root / hash_file(image_path)
     assert slide.mime_type == mt.MARKDOWN
     assert slide.path == work_dir / "slide.md"
     # Nothing is written beside the source image
@@ -314,7 +314,7 @@ def test_video_with_no_frames_dropped(tmp_path):
     assert root.children == []
 
 
-def test_warm_video_rerun_adopts_the_cached_slides(tmp_path, video, monkeypatch):
+def test_warm_video_rerun_brings_the_slides_back_from_its_index(tmp_path, video, monkeypatch):
     """An entry already read is neither detected, extracted nor read again."""
     root = Resource(title="root", children=[mediaspace_video()])
 
@@ -333,7 +333,7 @@ def test_warm_video_rerun_adopts_the_cached_slides(tmp_path, video, monkeypatch)
 
     warm.transform([root])
 
-    # The whole subtree is adopted: the same slides, nothing re-done
+    # Every slide comes back from the index: the same slides, nothing re-done
     assert [child.title for child in root.children[0].children] == ["0:00", "0:40"]
 
 

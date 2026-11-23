@@ -34,6 +34,11 @@ def hash_text(text: str) -> str:
     return hash_bytes(text.encode("utf-8"))
 
 
+def hash_file(path: Path) -> str:
+    """Return the sha256 hex digest of a file's bytes."""
+    return hash_bytes(path.read_bytes())
+
+
 # eq=False: a node is an identity in its tree, not a value. Two nodes with
 # the same fields are still two nodes, and removing one must not remove the other
 @dataclass(eq=False)
@@ -111,7 +116,7 @@ class Resource:
                 combined.update(child.content_hash.encode("utf-8"))
             return combined.hexdigest()
         if self.path is not None:
-            return hash_bytes(self.path.read_bytes())
+            return hash_file(self.path)
         return hash_text("")
 
     def add_child(self, child: Resource | None = None, **fields: Any) -> Resource:

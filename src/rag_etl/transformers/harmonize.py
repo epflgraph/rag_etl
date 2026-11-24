@@ -52,32 +52,41 @@ class HarmonizeTransformer(Transformer):
         cache = self.cache
 
         # A single page has no neighbour to be consistent with
-        documents = [
-            node for root in roots for node in root.walk() if node.mime_type == mt.PDF and len(_pages(node)) > 1
-        ]
-        logger.info(f"{len(documents)} documents to harmonize")
+        nodes = [node for root in roots for node in root.walk() if node.mime_type == mt.PDF and len(_pages(node)) > 1]
+
+        # A course hands the same PDF over more than once (a file and the
+        # archive it is also in): each document is harmonized once, for all
+        # its copies, rather than once per copy that misses the cache together
+        documents: dict[str, list[tuple[int, str]]] = {}
+        copies: dict[str, list[Resource]] = {}
+        for node in nodes:
+            pages = [(page_number(page.path), page.path.read_text(encoding="utf-8")) for page in _pages(node) if page.path]
+            key = hash_text("\n".join(f"{number}\n{text}" for number, text in pages))
+            documents[key] = pages
+            copies.setdefault(key, []).append(node)
+        logger.info(f"{len(documents)} documents to harmonize, in {len(nodes)} PDFs")
 
         # The model calls run side by side; the trees are only touched after
         with ThreadPoolExecutor(max_workers=MAX_CONCURRENT_DOCUMENTS) as executor:
-            harmonized = list(executor.map(lambda node: self._harmonized(cache, node), documents))
+            texts = list(
+                executor.map(lambda key: self._harmonized(cache, key, documents[key], copies[key][0].title), documents)
+            )
 
-        for node, (key, text) in zip(documents, harmonized):
-            self._replace_pages(node, key, text)
+        for key, text in zip(documents, texts):
+            for node in copies[key]:
+                self._replace_pages(node, key, text)
 
         return roots
 
-    def _harmonized(self, cache: Cache, node: Resource) -> tuple[str, str]:
-        """The document's key and its harmonized text, from the cache or the model."""
-        pages = [(page_number(page.path), page.path.read_text(encoding="utf-8")) for page in _pages(node) if page.path]
-        key = hash_text("\n".join(f"{number}\n{text}" for number, text in pages))
-
+    def _harmonized(self, cache: Cache, key: str, pages: list[tuple[int, str]], title: str) -> str:
+        """The document's harmonized text, from the cache or the model."""
         text = cache.read(key, HARMONIZED_FILE)
         if text is None:
-            logger.info(f"Harmonizing {node.title} ({len(pages)} pages)")
+            logger.info(f"Harmonizing {title} ({len(pages)} pages)")
             text = harmonize_pages(pages)
             cache.write(key, HARMONIZED_FILE, text)
 
-        return key, text
+        return text
 
     def _replace_pages(self, node: Resource, key: str, text: str) -> None:
         """Split the harmonized document back into the page children, or keep them as read."""

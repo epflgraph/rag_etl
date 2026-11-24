@@ -101,6 +101,19 @@ def test_a_document_is_harmonized_once_for_its_pages_as_read(tmp_path, harmonize
     assert len(prompts) == 2
 
 
+def test_copies_of_one_document_in_a_run_are_harmonized_once(tmp_path, harmonizer, monkeypatch):
+    # The same PDF handed over three times (a file, a folder, an archive), in one run
+    prompts = stub_model(monkeypatch, echo)
+    roots = [pdf_with_pages(tmp_path, {1: "# Intro", 2: "# Method"}) for _ in range(3)]
+
+    harmonizer.transform(roots)
+
+    assert len(prompts) == 1
+    # Every copy gets the harmonized pages
+    for root in roots:
+        assert [page.path.read_text() for page in root.children[0].children] == ["## Intro", "## Method"]
+
+
 def test_pages_stay_as_read_when_a_marker_is_lost(tmp_path, harmonizer, monkeypatch, caplog):
     stub_model(monkeypatch, lambda pages: "everything in one piece, no marker left")
     root = pdf_with_pages(tmp_path, {1: "# Intro", 2: "# Method"})

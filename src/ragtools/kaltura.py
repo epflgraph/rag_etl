@@ -8,6 +8,7 @@ import hashlib
 import logging
 import os
 from pathlib import Path
+from typing import Any
 from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 
 import requests
@@ -54,7 +55,7 @@ def is_kaltura_id(text: str) -> bool:
     return has_separator and has_valid_partner_id and has_valid_hash
 
 
-def enum_value(value):
+def enum_value(value: Any) -> Any:
     """
     Unwrap a Kaltura enum object to its plain value.
 
@@ -433,7 +434,7 @@ def download_caption(client: KalturaClient, caption_info: dict, output_path: Pat
     return True
 
 
-def original_flavor(client: KalturaClient, entry_id: str):
+def original_flavor(client: KalturaClient, entry_id: str) -> Any | None:
     """
     Return the entry's original (source) flavor asset, or None.
 

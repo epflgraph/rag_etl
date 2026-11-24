@@ -1,4 +1,5 @@
 import mimetypes
+from pathlib import Path
 
 MARKDOWN = "text/markdown"
 TXT = "text/plain"
@@ -64,7 +65,8 @@ DEFAULT_MIME_TYPES = (
 )
 
 
-def guess_mime_type(path):
+def guess_mime_type(path: str | Path) -> str | None:
+    """The mime type a file's name says it is, or None when the name says nothing."""
     mime_type, _ = mimetypes.guess_type(path)
     return mime_type
 

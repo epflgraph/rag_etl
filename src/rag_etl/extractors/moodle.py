@@ -8,6 +8,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 from zoneinfo import ZoneInfo
 
 import requests
@@ -33,7 +34,7 @@ def local_iso(epoch: int) -> str:
     return datetime.fromtimestamp(epoch, LOCAL_TIME).isoformat(timespec="microseconds")
 
 
-def extract_url(module, module_contents):
+def extract_url(module: dict[str, Any], module_contents: dict[str, Any]) -> str | None:
     # If resource is hidden from students, do not fill in url
     if not module["visible"]:
         return None
@@ -50,16 +51,13 @@ def extract_url(module, module_contents):
     return url
 
 
-def extract_from_and_until(module) -> tuple[str | None, str | None]:
-    # If not specified availability, return
+def extract_from_and_until(module: dict[str, Any]) -> tuple[str | None, str | None]:
+    # Most modules restrict nothing: no dates
     if not module["availability"]:
         return (None, None)
 
-    # If availability is not parsable, return
-    try:
-        availability = json.loads(module["availability"])
-    except Exception:
-        return (None, None)
+    # Moodle writes its restrictions as JSON
+    availability = json.loads(module["availability"])
 
     # Initialise from_ and until
     from_ = None

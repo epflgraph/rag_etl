@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 from collections.abc import Sequence
 from dataclasses import dataclass
+from pathlib import Path
 
 from ragtools.files import iter_files
 from ragtools.mime_types import DEFAULT_MIME_TYPES, guess_mime_type
@@ -26,7 +27,7 @@ class LocalFolderExtractor(Extractor):
 
     mime_types: Sequence[str] = DEFAULT_MIME_TYPES
 
-    def extract_closest_metadata(self, path, metadata_file):
+    def extract_closest_metadata(self, path: Path, metadata_file: str) -> str | None:
         # Try to get metadata from current path
         metadata_file_path = path / metadata_file
         if metadata_file_path.exists():

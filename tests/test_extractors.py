@@ -17,7 +17,7 @@ from rag_etl.extractors.git import GitExtractor, branch_from_url, repo_from_url
 from rag_etl.extractors.local_folder import LocalFolderExtractor
 from rag_etl.extractors.mediaspace import MediaspaceExtractor
 from rag_etl.extractors.mooc import MOOCExtractor
-from rag_etl.extractors.moodle import MoodleExtractor
+from rag_etl.extractors.moodle import MoodleExtractor, extract_from_and_until
 
 
 MOODLE_SECTIONS = [
@@ -154,6 +154,17 @@ def test_moodle_dates(monkeypatch, tmp_path):
     # Lausanne's time, its offset stated: 02:40 UTC in winter, 10:40 UTC in summer
     assert leaf.from_ == "2026-02-02T03:40:00.000000+01:00"
     assert leaf.until == "2026-08-29T12:40:00.000000+02:00"
+
+
+def test_moodle_module_without_restrictions_has_no_dates(caplog):
+    # The usual case, and a silent one
+    assert extract_from_and_until({"name": "Series 3", "availability": None}) == (None, None)
+    assert caplog.text == ""
+
+
+def test_moodle_broken_availability_stops_the_run():
+    with pytest.raises(json.JSONDecodeError):
+        extract_from_and_until({"name": "Series 3", "availability": "{not json"})
 
 
 def test_moodle_unreachable(monkeypatch, tmp_path):

@@ -29,6 +29,8 @@ class FakeResolver:
 def vision(monkeypatch):
     monkeypatch.setattr("ragtools.llm.RCPClient.generate", lambda self, prompt, **kwargs: "slide text")
     monkeypatch.setattr("rag_etl.transformers.video.extract_frame", fake_extract_frame)
+    # Where a slide's link to its moment of the video is built from
+    monkeypatch.setenv("DEFAULT_MEDIASPACE_BASE_URL", "https://mediaspace.test")
 
 
 def count_reads(monkeypatch) -> list:

@@ -64,8 +64,15 @@ MOODLE_SECTIONS = [
 ]
 
 
+def moodle_settings(monkeypatch):
+    """The settings the Moodle extractor reads, pointing nowhere real."""
+    monkeypatch.setenv("MOODLE_URL", "https://moodle.test")
+    monkeypatch.setenv("MOODLE_TOKEN", "test-token")
+
+
 def fake_moodle_get(monkeypatch, sections):
     """A requests.get stand-in answering the API call and the file downloads."""
+    moodle_settings(monkeypatch)
 
     def fake_get(url, params=None, **kwargs):
         if params is not None:
@@ -150,6 +157,8 @@ def test_moodle_dates(monkeypatch, tmp_path):
 
 
 def test_moodle_unreachable(monkeypatch, tmp_path):
+    moodle_settings(monkeypatch)
+
     def fake_get(url, params=None, **kwargs):
         raise requests.ConnectionError("down")
 

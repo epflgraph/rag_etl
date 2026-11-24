@@ -98,7 +98,6 @@ def transform(
             project_dir=project_dir,
             refresh=refresh == VideoTransformer.name,
             detector=GraphAISlideDetector(),
-            mediaspace_url=os.environ.get("DEFAULT_MEDIASPACE_BASE_URL"),
             language=project.language,
         ),
         JudgeTransformer(project_dir=project_dir, overrides=project.overrides),

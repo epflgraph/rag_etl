@@ -120,18 +120,8 @@ class ManifestLoader(Loader):
             },
             "summary": _summary(
                 [
-                    {
-                        "source": chunk.lineage()[0].title,
-                        "type": chunk.type,
-                        "subtype": chunk.subtype,
-                        "number": chunk.number,
-                        "subnumber": chunk.subnumber,
-                        "exercise_parts": chunk.exercise_parts,
-                        "url": chunk.url,
-                        "week": chunk.week,
-                        "from": chunk.from_,
-                        "until": chunk.until,
-                    }
+                    # The metadata fields come from their one declaration: a new one reaches the rows by itself
+                    {"source": chunk.lineage()[0].title, "url": chunk.url, **chunk.metadata}
                     for chunk in iter_chunks(roots)
                 ],
                 SUMMARY_LEVELS,

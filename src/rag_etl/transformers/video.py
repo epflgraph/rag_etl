@@ -66,7 +66,6 @@ class VideoTransformer(Transformer):
     cache_version = "video-slides-1"
 
     detector: SlideDetector
-    mediaspace_url: str | None = None
     min_slide_seconds: int = 40
     language: str | None = None
     # Opens its Kaltura session on the first video asked for, so building it reaches nothing
@@ -201,7 +200,7 @@ class VideoTransformer(Transformer):
                 title=f"{start // 60}:{start % 60:02d}",
                 path=md_path,
                 mime_type=mt.MARKDOWN,
-                url=build_entry_url(entry_id, self.mediaspace_url, start),
+                url=build_entry_url(entry_id, start_seconds=start),
             )
 
     def _take_subtitles(self, node: Resource) -> list[Cue]:

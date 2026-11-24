@@ -158,6 +158,4 @@ class GraphAISlideDetector(SlideDetector):
     def detect(self, video_url: str, language: str | None = None) -> list[int]:
         token = get_access_token()
         video_token = retrieve_video(video_url, token)
-        if video_token is None:
-            raise GraphAIError(f"GraphAI found no video at {video_url}")
         return detect_slides(video_token, token, language)

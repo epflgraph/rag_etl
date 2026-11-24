@@ -18,6 +18,7 @@ from rag_etl.extractors.local_folder import LocalFolderExtractor
 from rag_etl.extractors.mediaspace import MediaspaceExtractor
 from rag_etl.extractors.mooc import MOOCExtractor
 from rag_etl.extractors.moodle import MoodleExtractor, extract_from_and_until
+from rag_etl.transformers import ImagesTransformer, NormalizeTransformer
 
 
 MOODLE_SECTIONS = [
@@ -363,6 +364,35 @@ def test_mooc_extraction_is_idempotent(tmp_path):
     # The page goes as the export holds it, for normalize to convert
     page = next(node for node in root.walk() if node.title == "Lecture")
     assert page.mime_type == mt.HTML and page.path == base / "html" / "h1.html"
+
+
+def test_mooc_page_images_are_found_in_the_export_and_read(tmp_path, monkeypatch):
+    base = tmp_path / "export"
+    _write_mooc_export(base)
+    # The page names its image the courseware's way; the export holds it under another spelling
+    (base / "html" / "h1.html").write_text(
+        '<html><body><p>Before.</p><img src="/static/Intro_picture.png"/>'
+        '<img src="https://x.org/web.png"/><img src="/static/gone.png"/><p>After.</p></body></html>'
+    )
+    (base / "static" / "Intro picture.png").write_bytes(b"png fake")
+    (base / "policies" / "assets.json").write_text(json.dumps({"Intro_picture.png": {"displayname": "Intro picture.png"}}))
+
+    root = MOOCExtractor(dir=base, language="en", first_week_chapter=1, week_count=1).extract()
+
+    # A copy of the page, in the one folder the extractor writes, the export's own page left as it is
+    page = next(node for node in root.walk() if node.title == "Lecture")
+    assert page.path == base / "markdown" / "h1.html"
+    assert "/static/Intro_picture.png" in (base / "html" / "h1.html").read_text()
+
+    # Normalize makes it markdown, and the images step reads the image where it is shown
+    monkeypatch.setattr("ragtools.llm.RCPClient.generate", lambda self, prompt, **kwargs: "a clean room")
+    NormalizeTransformer(project_dir=tmp_path / "project").transform([root])
+    ImagesTransformer(project_dir=tmp_path / "project").transform([root])
+
+    text = page.path.read_text()
+    assert "Before.\n\na clean room" in text and "After." in text
+    # A web image and one the export does not hold stay as the page wrote them
+    assert "https://x.org/web.png" in text and "/static/gone.png" in text
 
 
 def test_mooc_page_marked_no_bot_is_left_out(tmp_path):

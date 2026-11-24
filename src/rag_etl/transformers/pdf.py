@@ -33,6 +33,13 @@ def page_number(md_path: Path) -> int:
     return int(md_path.stem.removeprefix("page_"))
 
 
+def page_url(url: str | None, number: int) -> str | None:
+    """A PDF's url, opened at one of its pages; as it is when it already points somewhere in the document."""
+    if url is None or "#" in url:
+        return url
+    return f"{url}#page={number}"
+
+
 @dataclass(frozen=True)
 class PdfTransformer(Transformer):
     """Turns every PDF into one child per page."""
@@ -64,7 +71,11 @@ class PdfTransformer(Transformer):
                 logger.debug(f"Dropping page {page_number(md_path)} of {node.title}: no readable content")
                 continue
 
-            node.add_child(title=f"page {page_number(md_path)}", path=md_path, mime_type=mt.MARKDOWN)
+            # Each page links to itself in the PDF, so a chunk cut from it cites its own page
+            number = page_number(md_path)
+            node.add_child(
+                title=f"page {number}", path=md_path, mime_type=mt.MARKDOWN, url=page_url(node.url, number)
+            )
 
         logger.info(f"{node.title}: {len(node.children)} pages")
 

@@ -12,6 +12,7 @@ import ragtools.mime_types as mt
 from rag_etl.core import Resource
 from rag_etl.core import hash_file
 from rag_etl.transformers import ImagesTransformer, PdfTransformer, VideoTransformer
+from rag_etl.transformers.pdf import page_url
 
 
 class FakeResolver:
@@ -95,6 +96,47 @@ def test_pdf_gains_one_child_per_page(tmp_path, pdf):
     assert (pages_dir / "page_1.png").exists()
     assert (pages_dir / "page_1.md").exists()
     assert not (tmp_path / "lecture").exists()
+
+
+def test_each_page_links_to_itself_in_the_pdf(tmp_path, pdf):
+    pdf_path = make_pdf(tmp_path / "lecture.pdf", ["alpha", "beta"])
+    root = pdf_tree(pdf_path, url="https://moodle.epfl.ch/lecture.pdf")
+
+    pdf.transform([root])
+
+    lecture = root.children[0]
+    assert [page.url for page in lecture.children] == [
+        "https://moodle.epfl.ch/lecture.pdf#page=1",
+        "https://moodle.epfl.ch/lecture.pdf#page=2",
+    ]
+    # The document's own link is left as it is
+    assert lecture.url == "https://moodle.epfl.ch/lecture.pdf"
+
+
+def test_a_page_keeps_its_own_number_when_one_before_it_is_blank(tmp_path, pdf, monkeypatch):
+    # The first page reads to nothing and is dropped: the second still links to page 2
+    answers = iter(["", "beta"])
+    monkeypatch.setattr("ragtools.llm.RCPClient.generate", lambda self, prompt, **kwargs: next(answers))
+    monkeypatch.setattr("rag_etl.transformers.pdf.MAX_CONCURRENT_OCR", 1)
+    pdf_path = make_pdf(tmp_path / "lecture.pdf", ["", "beta"])
+    root = pdf_tree(pdf_path, url="https://moodle.epfl.ch/lecture.pdf")
+
+    pdf.transform([root])
+
+    [page] = root.children[0].children
+    assert page.title == "page 2" and page.url == "https://moodle.epfl.ch/lecture.pdf#page=2"
+
+
+@pytest.mark.parametrize(
+    "url, expected",
+    [
+        (None, None),  # a PDF with no public address has none to refine
+        ("https://x.org/a.pdf#section", "https://x.org/a.pdf#section"),  # already pointing somewhere in it
+        ("https://x.org/a.pdf?download=1", "https://x.org/a.pdf?download=1#page=3"),
+    ],
+)
+def test_page_url(url, expected):
+    assert page_url(url, 3) == expected
 
 
 def test_pdf_without_a_file_fails_loud(pdf):

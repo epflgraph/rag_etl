@@ -21,7 +21,7 @@ from rag_etl.core import Resource
 from rag_etl.core.resource import hash_text
 from rag_etl.transformers.base import Transformer
 from rag_etl.transformers.embed import MAX_CHUNK_CHARS
-from rag_etl.transformers.pdf import page_number
+from rag_etl.transformers.pdf import page_number, page_url
 from ragtools.documents import (
     PAGE_MARKER_RE,
     ExerciseSnippet,
@@ -163,8 +163,8 @@ def per_exercise(node: Resource, cache: Cache) -> None:
         )
 
         page = PAGE_MARKER_RE.search(exercise.text)
-        if page and chunk.url:
-            chunk.url = f"{chunk.url}#page={page.group(1)}"
+        if page:
+            chunk.url = page_url(chunk.url, int(page.group(1)))
 
 
 def text(node: Resource, cache: Cache) -> None:

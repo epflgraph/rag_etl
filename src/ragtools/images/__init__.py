@@ -10,6 +10,7 @@ writes it wherever it belongs.
 from __future__ import annotations
 
 import logging
+import re
 
 from pathlib import Path
 
@@ -70,6 +71,24 @@ def strip_code_fence(markdown: str) -> str:
     return "\n".join(lines[1:-1]).strip()
 
 
+# A Markdown image with a link target, ![alt](target): the alt may hold one
+# level of brackets, the target one level of parentheses
+IMAGE_WITH_TARGET = re.compile(r"!\[((?:[^\[\]]|\[[^\[\]]*\])*)\]\((?:[^()]|\([^()]*\))*\)")
+
+
+def strip_image_targets(markdown: str) -> str:
+    """
+    Leave every image as its description alone: ![alt](target) becomes ![alt].
+
+    A transcript describes the figures it sees in their ALT text. It is read
+    off pixels, so it cannot know where a picture is stored, yet the model
+    sometimes fills the link in with something plausible (a placeholder
+    name, an address that leads nowhere). Nothing invented may reach a
+    reader as a link.
+    """
+    return IMAGE_WITH_TARGET.sub(r"![\1]", markdown)
+
+
 def transcribe_page(image_path: str | Path) -> str:
     """Transcribe one rendered PDF page into Markdown."""
     return _transcribe(image_path, PAGE_SYSTEM_PROMPT)
@@ -100,4 +119,4 @@ def _transcribe(image_path: str | Path, system_prompt: str) -> str:
         logger.warning(f"Dropping the read of {image_path}: {e} — beyond any transcription")
         return ""
 
-    return strip_code_fence(markdown)
+    return strip_image_targets(strip_code_fence(markdown))

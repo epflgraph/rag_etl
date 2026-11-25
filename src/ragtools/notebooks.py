@@ -7,8 +7,6 @@ on disk rewritten to point at them. Reading the images is left to whoever
 reads the Markdown; nothing here calls a model.
 """
 
-from __future__ import annotations
-
 import os
 import re
 

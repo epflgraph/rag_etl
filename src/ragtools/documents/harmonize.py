@@ -7,8 +7,6 @@ a time, and hands back one marked document, which `split_pages` takes
 apart into the pages again.
 """
 
-from __future__ import annotations
-
 from pathlib import Path
 
 from ragtools.documents.stitch import PAGE_MARKER, mark_page

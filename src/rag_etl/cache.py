@@ -16,8 +16,6 @@ of its ordered parts. A document found by its index costs nothing; one
 whose index misses falls back to its parts, so only what changed is redone.
 """
 
-from __future__ import annotations
-
 import json
 
 from collections.abc import Sequence

@@ -1,7 +1,5 @@
 """The extractor contract: fetch one source, return one tree of resources."""
 
-from __future__ import annotations
-
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path

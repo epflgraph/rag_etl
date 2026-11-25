@@ -1,7 +1,5 @@
 """Heading-aware section splitting: the text cut's chunker and the annotator's input bound."""
 
-from __future__ import annotations
-
 import logging
 import re
 

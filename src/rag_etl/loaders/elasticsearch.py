@@ -7,8 +7,6 @@ consumers at the new index. A failed run leaves the alias — and every
 older index, kept for investigation and rollback — exactly as they were.
 """
 
-from __future__ import annotations
-
 import json
 import logging
 import os

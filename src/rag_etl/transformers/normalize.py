@@ -1,7 +1,5 @@
 """Normalize: archives into files, notebooks and HTML into Markdown, oversized files dropped."""
 
-from __future__ import annotations
-
 import logging
 
 from collections.abc import Sequence

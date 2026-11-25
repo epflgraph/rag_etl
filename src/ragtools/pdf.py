@@ -8,8 +8,6 @@ subscripts or a table in small print is enlarged. Pages are clamped to a
 maximum size before they are handed to a vision model.
 """
 
-from __future__ import annotations
-
 from collections.abc import Iterator
 from pathlib import Path
 

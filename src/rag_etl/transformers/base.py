@@ -1,7 +1,5 @@
 """The transformer contract: reshape the trees handed over by the previous step."""
 
-from __future__ import annotations
-
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from pathlib import Path

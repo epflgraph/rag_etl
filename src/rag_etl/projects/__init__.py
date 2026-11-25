@@ -1,7 +1,5 @@
 """Projects: one declarative `Project` per project, found by its id in the semester folders."""
 
-from __future__ import annotations
-
 import importlib
 import pkgutil
 

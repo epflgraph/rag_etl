@@ -7,8 +7,6 @@ normal form, since course material travels between systems with different
 opinions about accents and encodings.
 """
 
-from __future__ import annotations
-
 import logging
 import tarfile
 import unicodedata

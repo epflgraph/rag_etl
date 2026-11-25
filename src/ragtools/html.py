@@ -6,8 +6,6 @@ content is removed first (scripts, styles, navigation), and runs of blank
 lines are collapsed after.
 """
 
-from __future__ import annotations
-
 import re
 from html import unescape
 from pathlib import Path

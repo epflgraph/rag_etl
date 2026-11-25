@@ -4,8 +4,6 @@ A module, folder, file or page carrying it is not for the bots; everything
 else is extracted. What the material is, the judge and the overrides decide.
 """
 
-from __future__ import annotations
-
 import re
 
 NO_BOT = re.compile(r"\[NO_BOT\]")

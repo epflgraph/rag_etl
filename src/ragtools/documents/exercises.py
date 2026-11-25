@@ -7,8 +7,6 @@ holds: the statement, the solution, or both. Nothing is split unless a
 per_exercise cut asks for it.
 """
 
-from __future__ import annotations
-
 import logging
 
 from dataclasses import dataclass

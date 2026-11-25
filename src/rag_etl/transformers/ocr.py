@@ -1,7 +1,5 @@
 """The one OCR step the images, pdf and video transformers share, cached by content."""
 
-from __future__ import annotations
-
 from collections.abc import Callable
 from pathlib import Path
 

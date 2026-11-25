@@ -1,7 +1,5 @@
 """The loader contract: take the transformed trees, produce nothing."""
 
-from __future__ import annotations
-
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from datetime import datetime

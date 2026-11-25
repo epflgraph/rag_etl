@@ -6,8 +6,6 @@ Most-specific wins; equal specificity resolves by declaration order, first
 declared wins, loudly.
 """
 
-from __future__ import annotations
-
 import fnmatch
 import logging
 import re

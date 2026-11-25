@@ -6,8 +6,6 @@ annotates with their vectors. The cuts live in one
 registry; new kinds of cuts join via PR, never course-local code.
 """
 
-from __future__ import annotations
-
 import json
 import logging
 

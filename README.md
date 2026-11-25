@@ -13,7 +13,8 @@ index per project.
 
 ## Install
 
-Python 3.12 or later.
+Python 3.12 or later, and two programs on the `PATH`: `ffmpeg` (the video
+step takes its frames with it) and `git` (for projects with a Git source).
 
 ```bash
 python -m venv venv

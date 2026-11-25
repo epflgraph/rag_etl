@@ -1,0 +1,36 @@
+{
+  "settings": {
+    "index": {
+      "analysis": {
+        "analyzer": {
+          "base_en": { "tokenizer": "standard", "filter": ["lowercase", "asciifolding", "stemmer_en"] },
+          "base_fr": { "tokenizer": "standard", "filter": ["lowercase", "asciifolding", "stemmer_fr"] }
+        },
+        "filter": {
+          "stemmer_en": { "type": "stemmer", "language": "light_english" },
+          "stemmer_fr": { "type": "stemmer", "language": "light_french" }
+        }
+      }
+    }
+  },
+  "mappings": {
+    "properties": {
+      "id":          { "type": "keyword" },
+      "content":     { "type": "text", "analyzer": "base_en" },
+      "embedding":   { "type": "dense_vector", "dims": 4096, "similarity": "dot_product",
+                       "index": true, "index_options": { "type": "int8_hnsw" } },
+      "title":       { "type": "keyword" },
+      "lineage":     { "type": "keyword" },
+      "url":         { "type": "keyword" },
+      "type":        { "type": "keyword" },
+      "subtype":     { "type": "keyword" },
+      "number":      { "type": "keyword" },
+      "subnumber":   { "type": "keyword" },
+      "week":        { "type": "integer" },
+      "exercise_parts": { "type": "keyword" },
+      "has_solution":   { "type": "boolean" },
+      "from":        { "type": "date" },
+      "until":       { "type": "date" }
+    }
+  }
+}

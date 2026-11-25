@@ -1,0 +1,27 @@
+"""Documents: generic Markdown capabilities over texts, usable standalone.
+
+Heading-aware splitting, page harmonizing and stitching, and exercise splitting take plain
+texts and hand text or snippets back; the model each one pins and the
+endpoint come from the config.
+"""
+
+from ragtools.documents.exercises import Exercise, ExerciseList, ExerciseSnippet, split_exercises
+from ragtools.documents.headings import MAX_SECTION_LINES, line_count, merge_sections, split_by_most_common_heading
+from ragtools.documents.harmonize import harmonize_pages
+from ragtools.documents.stitch import PAGE_MARKER, PAGE_MARKER_RE, split_pages, stitch
+
+__all__ = [
+    "MAX_SECTION_LINES",
+    "Exercise",
+    "ExerciseList",
+    "ExerciseSnippet",
+    "PAGE_MARKER",
+    "PAGE_MARKER_RE",
+    "line_count",
+    "harmonize_pages",
+    "merge_sections",
+    "split_by_most_common_heading",
+    "split_exercises",
+    "split_pages",
+    "stitch",
+]

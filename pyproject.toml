@@ -1,36 +1,40 @@
 [build-system]
-requires = ["setuptools>=64", "wheel"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "rag-etl"
-version = "0.1.0"
+version = "1.0.0"
 description = "An ETL pipeline for preparing data for retrieval-augmented generation (RAG)."
 readme = "README.md"
 authors = [
     { name = "Aitor Pérez Pérez", email = "aitor.perez@epfl.ch" },
     { name = "Javier Lloret Pardo", email = "javier.lloretpardo@epfl.ch" }
 ]
-license = { text = "MIT" }
+license = "MIT"
 requires-python = ">=3.12"
 
-# optional: your runtime dependencies
+# The lower bounds are the versions the pipeline was developed and run with
 dependencies = [
-    "python-dotenv",
-    "pandas",
-    "requests",
-    "openai",
-    "lxml",
-    "google-genai",
-    "bs4",
-    "nbformat",
-    "nbconvert",
-    "pymupdf",
-    "Pillow",
-    "pathvalidate",     # sanitise user-input strings to use as filenames
-    "langfuse",
-    "KalturaApiClient",
+    "python-dotenv>=1.2.1",
+    "requests>=2.32.5",
+    "openai>=2.2.0",
+    "lxml>=6.0.2",
+    "beautifulsoup4>=4.14.2",
+    "markdownify>=1.2.3",
+    "nbformat>=5.10.4",
+    "nbconvert>=7.16.6",
+    "pymupdf>=1.26.4",
+    "Pillow>=11.3.0",
+    "pathvalidate>=3.3.1",     # sanitise user-input strings to use as filenames
+    "pydantic>=2.12.0",
+    "langfuse>=4.14.2",
+    "KalturaApiClient>=23.5.0",
+    "elasticsearch>=8.19.3,<9",
 ]
+
+[project.scripts]
+rag-etl = "rag_etl.cli:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
@@ -38,10 +42,15 @@ package-dir = {"" = "src"}
 [tool.setuptools.packages.find]
 where = ["src"]
 
+# The prompts are documents, not code: they ship with the package
+[tool.setuptools.package-data]
+"ragtools.documents" = ["prompts/*.md"]
+"ragtools.images" = ["prompts/*.md"]
+"rag_etl.loaders" = ["index_settings.json"]
+
 [project.optional-dependencies]
 dev = [
     "pytest",
-    "black",
     "ruff",
     "mypy",
 ]
@@ -53,9 +62,6 @@ testpaths = ["tests"]
 [tool.ruff]
 line-length = 120
 
-[tool.ruff.lint]
-ignore = [
-    "I001",   # avoids import reordering
-    "RUF012", # avoids linting in course_info and tag_metadata 
-    "RUF022", # avoids expecting alphabetical order
-] 
+[tool.mypy]
+python_version = "3.12"
+ignore_missing_imports = true

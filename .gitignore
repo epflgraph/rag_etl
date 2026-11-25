@@ -1,8 +1,9 @@
 # Python cache
 __pycache__/
 
-# Package installed in editing mode
+# Package installed in editing mode, and the staging folder of a regular install
 *.egg-info/
+build/
 
 # Pycharm project files
 .idea/
@@ -12,3 +13,15 @@ __pycache__/
 
 # MACOS .DS_Store
 .DS_Store
+
+# Virtual environment
+venv/
+
+# Ruff cache
+.ruff_cache/
+
+# Mypy cache
+.mypy_cache/
+
+# Pytest cache
+.pytest_cache/

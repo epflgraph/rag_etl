@@ -1,0 +1,196 @@
+"""Unit tests for the manifest loader."""
+
+import json
+
+from datetime import UTC, datetime
+from pathlib import Path
+
+from rag_etl.core import Resource, assign_ids
+from rag_etl.loaders import ManifestLoader
+
+TIMESTAMP = datetime(2026, 10, 19, 15, 30, 45, tzinfo=UTC)
+
+
+def tree() -> list[Resource]:
+    pdf = Resource(title="Exercise set 3", url="https://moodle/3", type="practice", subtype="homework")
+    pdf.add_child(
+        title="Exercise 2a",
+        number="2",
+        subnumber="a",
+        exercise_parts="statement",
+        week=3,
+        from_="2026-10-06",
+        until="2026-10-13",
+        text="compute",
+    )
+    pdf.add_child(
+        title="Exercise 2b",
+        number="2",
+        subnumber="b",
+        exercise_parts="solution",
+        has_solution=True,
+        week=3,
+        from_="2026-10-06",
+        until="2026-10-13",
+        text="solution",
+    )
+    video = Resource(title="Lecture 5")
+    video.add_child(title="intro", type="theory", subtype="lecture", week=5, text="hello")
+    return [pdf, video]
+
+
+def write(project_dir: Path, roots: list[Resource], dry: bool = False) -> dict:
+    ManifestLoader(project_dir=project_dir, project="demo", timestamp=TIMESTAMP, dry=dry).load(roots)
+    [path] = (project_dir / "output").glob("*.json")
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def test_manifest_lands_in_output_with_the_timestamp_name(tmp_path):
+    manifest = write(tmp_path, tree())
+
+    assert (tmp_path / "output" / "20261019T153045_manifest.json").exists()
+    header = manifest["header"]
+    assert header["project"] == "demo"
+    assert header["dry"] is False
+    assert header["timestamp"] == TIMESTAMP.isoformat()
+    assert header["index"] == "rag_demo_20261019_153045"
+    assert header["alias"] == "rag_demo"
+    assert isinstance(header["pipeline_version"], str)
+
+
+def test_tree_is_metadata_only(tmp_path):
+    manifest = write(tmp_path,tree())
+
+    def walk(node):
+        assert "text" not in node
+        assert "embedding" not in node
+        assert node["content_hash"]
+        for child in node["children"]:
+            walk(child)
+
+    [pdf, _] = manifest["tree"]
+    walk(pdf)
+    assert pdf["title"] == "Exercise set 3"
+    assert pdf["chunk"] is False
+    assert pdf["children"][0]["chunk"] is True
+    assert pdf["children"][1]["exercise_parts"] == "solution"
+    assert pdf["children"][1]["has_solution"] is True
+
+
+def test_tree_names_each_chunk_by_its_document_id(tmp_path):
+    roots = tree()
+    assign_ids(roots)
+
+    manifest = write(tmp_path,roots)
+
+    [pdf, video] = manifest["tree"]
+    assert pdf["id"] is None
+    assert [child["id"] for child in pdf["children"]] == [chunk.id for chunk in roots[0].children]
+    assert video["children"][0]["id"] == "3"
+
+
+def test_summary_drills_down_per_source_type_subtype_number_subnumber_parts(tmp_path):
+    manifest = write(tmp_path,tree())
+    summary = manifest["summary"]
+
+    assert summary["chunks"] == 3
+    assert summary["with_url"] == 2
+    assert summary["with_week"] == 3
+    assert summary["with_from"] == 2
+    # url, week and dates vary across sources, so no value is stated at the top
+    assert "url" not in summary
+    assert "week" not in summary
+    assert "from" not in summary
+
+    [pdf_group, video_group] = summary["counts"]
+    assert pdf_group["source"] == "Exercise set 3"
+    assert pdf_group["chunks"] == 2
+    # the whole group carries the pdf's url and the same release dates
+    assert pdf_group["with_url"] == 2
+    assert pdf_group["url"] == "https://moodle/3"
+    assert pdf_group["week"] == 3
+    assert pdf_group["from"] == "2026-10-06"
+    assert pdf_group["until"] == "2026-10-13"
+
+    # levels the group does not split are stated on it; the drill-down starts where it splits
+    assert pdf_group["type"] == "practice"
+    assert pdf_group["subtype"] == "homework"
+    assert pdf_group["number"] == "2"
+    [sub_a, sub_b] = pdf_group["counts"]
+    assert sub_a["subnumber"] == "a"
+    assert sub_a["exercise_parts"] == "statement"
+    assert sub_a["chunks"] == 1
+    assert "counts" not in sub_a
+    assert sub_b["subnumber"] == "b"
+    assert sub_b["exercise_parts"] == "solution"
+    assert "counts" not in sub_b
+
+    assert video_group["source"] == "Lecture 5"
+    assert video_group["chunks"] == 1
+    assert video_group["with_url"] == 0
+    assert video_group["week"] == 5
+    assert video_group["with_from"] == 0
+    # unset levels are stated as null, not left out
+    assert video_group["type"] == "theory"
+    assert video_group["subtype"] == "lecture"
+    assert video_group["number"] is None
+    assert video_group["subnumber"] is None
+    assert video_group["exercise_parts"] is None
+    assert "counts" not in video_group
+
+
+def test_summary_states_values_only_when_unanimous(tmp_path):
+    root = Resource(title="Set", url="https://moodle/x", week=3)
+    root.add_child(title="one", from_="2026-10-06", text="a")
+    root.add_child(title="two", from_="2026-10-07", text="b")
+    root.add_child(title="three", text="c")
+
+    manifest = write(tmp_path,[root])
+    group = manifest["summary"]
+
+    assert group["chunks"] == 3
+    # unanimous values are stated
+    assert group["with_url"] == 3
+    assert group["url"] == "https://moodle/x"
+    assert group["with_week"] == 3
+    assert group["week"] == 3
+    # disagreeing values are counted but not stated
+    assert group["with_from"] == 2
+    assert "from" not in group
+    # nobody set one: the count says so, the value stays absent
+    assert group["with_until"] == 0
+    assert "until" not in group
+
+
+def test_unlabelled_chunks_land_in_null_buckets(tmp_path):
+    root = Resource(title="stray")
+    root.add_child(title="chunk", text="body")
+
+    manifest = write(tmp_path,[root])
+
+    summary = manifest["summary"]
+    assert summary["source"] == "stray"
+    assert summary["type"] is None
+    assert "counts" not in summary
+
+
+def test_tree_paths_are_relative_to_the_project_folder(tmp_path):
+    root = Resource(title="folder", path=tmp_path / "local")
+    root.add_child(title="page", path=tmp_path / "work" / "abc" / "page_1.md", text="body")
+    root.add_child(title="elsewhere", path=tmp_path.parent / "shared.md", text="other")
+    root.add_child(title="no file", path=None, text="third")
+
+    [folder] = write(tmp_path, [root])["tree"]
+
+    assert folder["path"] == "local"
+    [page, elsewhere, no_file] = folder["children"]
+    assert page["path"] == "work/abc/page_1.md"
+    assert elsewhere["path"] == "../shared.md"
+    assert no_file["path"] is None
+
+
+def test_dry_manifest_is_named_and_stamped(tmp_path):
+    manifest = write(tmp_path, tree(), dry=True)
+
+    assert (tmp_path / "output" / "20261019T153045_manifest_dry.json").exists()
+    assert manifest["header"]["dry"] is True

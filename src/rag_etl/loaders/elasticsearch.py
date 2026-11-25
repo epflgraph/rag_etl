@@ -1,0 +1,127 @@
+"""The Elasticsearch loader: publishes one run into its own index.
+
+Every run builds a fresh index named after the project and the run's
+timestamp, so runs never collide and the index the alias points at is
+never touched: bulk-load, refresh, then one atomic alias update points
+consumers at the new index. A failed run leaves the alias — and every
+older index, kept for investigation and rollback — exactly as they were.
+"""
+
+from __future__ import annotations
+
+import json
+import logging
+import os
+
+from collections.abc import Iterator
+from dataclasses import dataclass
+from datetime import datetime
+from pathlib import Path
+from typing import Any
+
+from elasticsearch import Elasticsearch, NotFoundError
+from elasticsearch.helpers import bulk
+
+from rag_etl.core import Resource, iter_chunks
+from rag_etl.loaders.base import Loader, alias_name, index_name
+
+logger = logging.getLogger(__name__)
+
+
+def index_settings(language: str | None) -> dict[str, Any]:
+    """The create-index body, with the content analyzer set for the language."""
+    settings: dict[str, Any] = json.loads(
+        (Path(__file__).parent / "index_settings.json").read_text(encoding="utf-8")
+    )
+    settings["mappings"]["properties"]["content"]["analyzer"] = f"base_{language or 'en'}"
+    return settings
+
+
+def _client() -> Elasticsearch:
+    """The shared instance, configured from the environment."""
+    return Elasticsearch(
+        hosts=[f"https://{os.environ['ES_HOST']}:{os.environ['ES_PORT']}"],
+        basic_auth=(os.environ["ES_USERNAME"], os.environ["ES_PASSWORD"]),
+        ca_certs=os.environ["ES_CAFILE"],
+        request_timeout=3600,
+    )
+
+
+@dataclass(frozen=True)
+class ElasticsearchLoader(Loader):
+    """Publishes one run's chunks into a fresh index, then shifts the alias."""
+
+    project: str
+    timestamp: datetime
+    language: str | None
+    # The shared instance is reached only when loading: building the loader
+    # reads no connection settings
+    client: Elasticsearch | None = None
+
+    @property
+    def alias(self) -> str:
+        return alias_name(self.project)
+
+    @property
+    def index(self) -> str:
+        return index_name(self.project, self.timestamp)
+
+    def load(self, roots: list[Resource]) -> None:
+        """Check every chunk, create the run's index, bulk-load the chunks, shift the alias."""
+        # A run that cannot publish everything publishes nothing, not even an empty index
+        self._check(roots)
+
+        client = self.client if self.client is not None else _client()
+        self._create_index(client)
+        bulk(client, self._actions(roots))
+        client.indices.refresh(index=self.index)
+        self._shift_alias(client)
+
+    @staticmethod
+    def _check(roots: list[Resource]) -> None:
+        """Fail loud on any chunk that cannot become a document: no id, unembedded or unlabelled."""
+        for chunk in iter_chunks(roots):
+            if chunk.id is None:
+                raise ValueError(f"chunk {chunk.title!r} has no id: assign_ids runs before loading")
+            if chunk.embedding is None:
+                raise ValueError(f"chunk {chunk.title!r} is not embedded")
+            if chunk.type is None or chunk.subtype is None:
+                raise ValueError(f"chunk {chunk.title!r} is unlabelled: every indexed chunk needs a type and a subtype")
+
+    def _create_index(self, client: Elasticsearch) -> None:
+        body = index_settings(self.language)
+        client.indices.create(index=self.index, settings=body["settings"], mappings=body["mappings"])
+
+    def _actions(self, roots: list[Resource]) -> Iterator[dict[str, Any]]:
+        """One index action per chunk, streamed: documents are built as bulk sends them.
+
+        Elasticsearch's own `_id` mirrors the document's `id`, so a hit
+        carries one identifier, not two.
+        """
+        for chunk in iter_chunks(roots):
+            yield {"_op_type": "index", "_index": self.index, "_id": chunk.id, "_source": self._source(chunk)}
+
+    def _source(self, node: Resource) -> dict[str, Any]:
+        """One document: its id, content, vector, title, ancestors' breadcrumb, deep link and metadata."""
+        document: dict[str, Any] = {
+            "id": node.id,
+            "content": node.text,
+            "embedding": node.embedding,
+            "title": node.title,
+            "lineage": [ancestor.title or ancestor.url or "unknown" for ancestor in node.lineage()[:-1]],
+            "url": node.url,
+            **node.metadata,
+        }
+        return {key: value for key, value in document.items() if value is not None}
+
+    def _shift_alias(self, client: Elasticsearch) -> None:
+        """Point the alias at the fresh index in one atomic update."""
+        actions: list[dict[str, Any]] = []
+        try:
+            current = client.indices.get_alias(name=self.alias)
+            actions.extend({"remove": {"index": name, "alias": self.alias}} for name in current)
+        except NotFoundError:
+            pass
+
+        actions.append({"add": {"index": self.index, "alias": self.alias}})
+        client.indices.update_aliases(actions=actions)

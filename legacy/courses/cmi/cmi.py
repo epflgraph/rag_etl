@@ -3,7 +3,6 @@ from __future__ import annotations
 from datetime import date
 
 import logging
-from typing import List, Tuple
 
 from rag_etl.projects import BaseProject
 from rag_etl.extractors import Extractor, LocalFolderExtractor
@@ -67,7 +66,7 @@ class CMIProject(BaseProject):
     ################################################################
 
     @property
-    def pdf_to_markdown_type_subtypes(self) -> List[Tuple[str, str]]:
+    def pdf_to_markdown_type_subtypes(self) -> list[tuple[str, str]]:
         return [
             (self.tag_metadata[tag].get("type"), self.tag_metadata[tag].get("subtype"))
             for tag in self.tag_metadata
@@ -75,7 +74,7 @@ class CMIProject(BaseProject):
         ]
 
     @property
-    def split_exercises_type_subtypes(self) -> List[Tuple[str, str]]:
+    def split_exercises_type_subtypes(self) -> list[tuple[str, str]]:
         return [
             (self.tag_metadata[tag].get("type"), self.tag_metadata[tag].get("subtype"))
             for tag in self.tag_metadata
@@ -83,7 +82,7 @@ class CMIProject(BaseProject):
         ]
 
     @property
-    def extractors(self) -> List[Extractor]:
+    def extractors(self) -> list[Extractor]:
         return [
             LocalFolderExtractor(
                 folder_base_path=self.local_folder_base_path,
@@ -93,7 +92,7 @@ class CMIProject(BaseProject):
         ]
 
     @property
-    def transformers(self) -> List[BaseTransformer]:
+    def transformers(self) -> list[BaseTransformer]:
         return [
             ExtractZipTransformer(cache=self.project_code),
             JupyterToMarkdownTransformer(cache=self.project_code),
@@ -103,7 +102,7 @@ class CMIProject(BaseProject):
         ]
 
     @property
-    def loaders(self) -> List[BaseLoader]:
+    def loaders(self) -> list[BaseLoader]:
         return [ContentMetadataLoader(course_path=self.course_path, course_info=self.course_info)]
 
 

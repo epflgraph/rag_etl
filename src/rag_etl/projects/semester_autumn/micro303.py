@@ -1,7 +1,5 @@
 """The MICRO-303 project (Microfabrication I)."""
 
-from __future__ import annotations
-
 from pathlib import Path
 
 from rag_etl.core import Override

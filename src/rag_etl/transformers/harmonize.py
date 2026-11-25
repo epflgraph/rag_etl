@@ -11,8 +11,6 @@ exercise), it works on these pages.
 Cached by the hash of the pages as read: an unchanged PDF is harmonized once.
 """
 
-from __future__ import annotations
-
 import logging
 
 from concurrent.futures import ThreadPoolExecutor

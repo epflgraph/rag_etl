@@ -9,8 +9,6 @@ beside the prompt, a schema for the answer, a limit on its length.
 raised: either the run completes or it stops loud.
 """
 
-from __future__ import annotations
-
 import base64
 import io
 import os

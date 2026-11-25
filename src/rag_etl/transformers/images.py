@@ -9,8 +9,6 @@ video, so the markdown it reads is only ever the sources', never pages
 or slides read later.
 """
 
-from __future__ import annotations
-
 import logging
 import re
 

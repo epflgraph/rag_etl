@@ -11,8 +11,6 @@ are recovered from the cache by hash. Nothing reads a manifest; it is
 inspected.
 """
 
-from __future__ import annotations
-
 import json
 import logging
 

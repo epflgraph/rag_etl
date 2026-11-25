@@ -1,7 +1,5 @@
 """One Ed Discussion thread as Markdown: its question, then the answers kept, in the forum's language."""
 
-from __future__ import annotations
-
 import logging
 import os
 import re

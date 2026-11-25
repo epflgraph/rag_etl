@@ -6,8 +6,6 @@ There is no type/subtype → cut mapping here: how the judge decides is
 Javier's business; this is a stub for his inference.
 """
 
-from __future__ import annotations
-
 import re
 
 from dataclasses import dataclass

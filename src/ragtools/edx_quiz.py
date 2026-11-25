@@ -5,8 +5,6 @@ renders it, with or without its answers marked and its explanation.
 Problems of any other kind are not supported and parse to None.
 """
 
-from __future__ import annotations
-
 import logging
 from dataclasses import dataclass
 

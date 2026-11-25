@@ -4,8 +4,6 @@
 - the quiz again, its answers marked and its explanation added
 """
 
-from __future__ import annotations
-
 import logging
 
 from lxml.etree import _Element

@@ -10,8 +10,6 @@ Either way the index is written back, so the run after a miss finds it
 again. The frames themselves are scratch: re-derivable, never cached.
 """
 
-from __future__ import annotations
-
 import logging
 
 from concurrent.futures import ThreadPoolExecutor

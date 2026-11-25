@@ -7,8 +7,6 @@ endpoint comes from the config. The text comes back, and whoever asked
 writes it wherever it belongs.
 """
 
-from __future__ import annotations
-
 import logging
 import re
 

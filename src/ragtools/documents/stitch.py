@@ -6,8 +6,6 @@ together. Zero LLM calls: making the pages consistent with each other is
 `harmonize.py`'s.
 """
 
-from __future__ import annotations
-
 import re
 
 # Page boundary markers, one per page, in strict page order

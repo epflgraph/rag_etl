@@ -1,7 +1,5 @@
 """Git extractor: a GitLab/GitHub repository cloned shallow into a resource tree."""
 
-from __future__ import annotations
-
 import logging
 import re
 import shutil

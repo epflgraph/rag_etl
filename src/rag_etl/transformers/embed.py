@@ -5,8 +5,6 @@ so a chunk that changed is embedded again and a chunk that did not is
 not; there is no eviction. A model change bumps the cache version.
 """
 
-from __future__ import annotations
-
 import json
 import logging
 

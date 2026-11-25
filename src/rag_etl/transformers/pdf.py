@@ -8,8 +8,6 @@ falls back to its pages, so one edited page re-OCRs one page. Either way
 the index is written back, so the run after a miss finds it again.
 """
 
-from __future__ import annotations
-
 import logging
 
 from concurrent.futures import ThreadPoolExecutor

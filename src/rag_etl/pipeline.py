@@ -7,8 +7,6 @@ produce trees, loaders take trees and produce nothing. Failures
 propagate: either every source is indexed or the run stops loud.
 """
 
-from __future__ import annotations
-
 import dataclasses
 import logging
 import os

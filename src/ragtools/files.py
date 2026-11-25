@@ -1,7 +1,5 @@
 """Files: walking a folder the way every source and archive is walked."""
 
-from __future__ import annotations
-
 import os
 
 from collections.abc import Iterator
